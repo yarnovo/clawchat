@@ -37,6 +37,24 @@ server-install:
 server-dev:
 	cd server && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
+# ---- Docker ----
+.PHONY: dev-up dev-down dev-logs deploy-up deploy-down
+
+dev-up:
+	docker compose up -d
+
+dev-down:
+	docker compose down
+
+dev-logs:
+	docker compose logs -f
+
+deploy-up:
+	docker compose --profile deploy up -d --build
+
+deploy-down:
+	docker compose --profile deploy down
+
 # ---- Common ----
 .PHONY: setup version clean
 

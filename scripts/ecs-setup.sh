@@ -44,16 +44,6 @@ else
   echo "    Already configured"
 fi
 
-# ---- Nginx ----
-if ! command -v nginx &>/dev/null; then
-  echo "==> Installing Nginx"
-  apt-get install -y -qq nginx
-  systemctl enable --now nginx
-else
-  echo "==> Nginx already installed: $(nginx -v 2>&1)"
-fi
-
-
 # ---- Common tools ----
 TOOLS=(git make curl wget jq)
 MISSING=()

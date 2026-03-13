@@ -79,20 +79,22 @@ jobs:
       - name: Prepare directories
         run: ssh root@${{ secrets.ECS_HOST }} "mkdir -p /opt/clawchat/{server,cli,web}"
 
-      - name: Deploy server
+      - name: Deploy compose and config
         run: |
-          rsync -az --delete server/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/server/
-          ssh root@${{ secrets.ECS_HOST }} "cd /opt/clawchat/server && docker build -t clawchat-server . && docker rm -f clawchat-server 2>/dev/null; docker run -d --name clawchat-server --restart unless-stopped -p 8000:8000 clawchat-server"
+          scp docker-compose.yml root@${{ secrets.ECS_HOST }}:/opt/clawchat/
+          rsync -az deploy/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/deploy/
+
+      - name: Deploy server
+        run: rsync -az --delete server/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/server/
+
+      - name: Deploy web
+        run: rsync -az --delete app/build/web/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/web/
 
       - name: Deploy CLI
         run: |
           scp cli/clawchat-linux-amd64 root@${{ secrets.ECS_HOST }}:/opt/clawchat/cli/clawchat
           ssh root@${{ secrets.ECS_HOST }} "chmod +x /opt/clawchat/cli/clawchat && ln -sf /opt/clawchat/cli/clawchat /usr/local/bin/clawchat"
 
-      - name: Deploy web
-        run: rsync -az --delete app/build/web/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/web/
-
-      - name: Deploy nginx config
+      - name: Start services
         run: |
-          scp deploy/nginx/clawchat.conf root@${{ secrets.ECS_HOST }}:/etc/nginx/sites-available/clawchat
-          ssh root@${{ secrets.ECS_HOST }} "rm -f /etc/nginx/sites-enabled/default && ln -sf /etc/nginx/sites-available/clawchat /etc/nginx/sites-enabled/clawchat && nginx -t && systemctl reload nginx"
+          ssh root@${{ secrets.ECS_HOST }} "cd /opt/clawchat && docker compose --profile deploy up -d --build --remove-orphans"
