@@ -1,0 +1,25 @@
+name: OpenClaw Server CI
+
+on:
+  push:
+    paths: [openclaw-server/**]
+  pull_request:
+    paths: [openclaw-server/**]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: openclaw-server
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm test
