@@ -44,6 +44,33 @@ services:
       - postgres
       - redis
 
+  container-server:
+    profiles: [deploy]
+    container_name: clawchat-container-server
+    image: registry-vpc.cn-hangzhou.aliyuncs.com/clawchat/container-server:latest
+    restart: unless-stopped
+    environment:
+      PORT: "3002"
+    ports:
+      - "3002:3002"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  openclaw-server:
+    profiles: [deploy]
+    container_name: clawchat-openclaw-server
+    image: registry-vpc.cn-hangzhou.aliyuncs.com/clawchat/openclaw-server:latest
+    restart: unless-stopped
+    environment:
+      PORT: "3003"
+      CONTAINER_SERVER_URL: http://container-server:3002
+      OPENCLAW_IMAGE: ${OPENCLAW_IMAGE:-openclaw:local}
+      OPENCLAW_NETWORK: clawchat_default
+    ports:
+      - "3003:3003"
+    depends_on:
+      - container-server
+
   nginx:
     profiles: [deploy]
     image: nginx:alpine

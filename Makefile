@@ -40,6 +40,27 @@ im-dev:
 im-db-push:
 	cd im-server && npx prisma db push
 
+# ---- Container Server (Hono/TypeScript) ----
+.PHONY: container-install container-dev
+
+container-install:
+	cd container-server && npm install
+
+container-dev:
+	cd container-server && npm run dev
+
+# ---- OpenClaw Server (Hono/TypeScript) ----
+.PHONY: openclaw-install openclaw-dev openclaw-build-image
+
+openclaw-install:
+	cd openclaw-server && npm install
+
+openclaw-dev:
+	cd openclaw-server && npm run dev
+
+openclaw-build-image:
+	cd openclaw && docker build -t openclaw:local .
+
 # ---- MCP Server (Python/FastAPI) ----
 .PHONY: mcp-dev mcp-install
 

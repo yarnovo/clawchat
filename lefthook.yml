@@ -7,3 +7,11 @@ pre-commit:
       glob: "im-server/**/*.ts"
       root: "im-server/"
       run: npx prisma generate && npx tsc --noEmit
+    container-server-typecheck:
+      glob: "container-server/**/*.ts"
+      root: "container-server/"
+      run: npx tsc --noEmit
+    openclaw-server-typecheck:
+      glob: "openclaw-server/**/*.ts"
+      root: "openclaw-server/"
+      run: npx tsc --noEmit
