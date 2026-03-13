@@ -53,6 +53,7 @@ else
   echo "==> Nginx already installed: $(nginx -v 2>&1)"
 fi
 
+
 # ---- Common tools ----
 TOOLS=(git make curl wget jq)
 MISSING=()
