@@ -82,6 +82,18 @@ mcp-install:
 mcp-dev:
 	cd mcp-server && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
+# ---- Promo Video (Remotion) ----
+.PHONY: promo-install promo-dev promo-render
+
+promo-install:
+	cd promo-video && npm install
+
+promo-dev:
+	cd promo-video && npm run dev
+
+promo-render:
+	cd promo-video && npm run render
+
 # ---- Docker ----
 .PHONY: dev-up dev-down dev-logs deploy-up deploy-down
 
