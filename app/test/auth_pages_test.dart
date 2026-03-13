@@ -1,27 +1,15 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:clawchat/app.dart';
 import 'package:clawchat/services/auth_service.dart';
 import 'package:clawchat/services/api_client.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart' as http_testing;
+import 'test_helpers.dart';
 
 ApiClient _mockApiClient(AuthService authService) {
-  final mockClient = http_testing.MockClient((request) async {
-    final path = request.url.path;
-    if (path.endsWith('/friends')) {
-      return http.Response(jsonEncode([]), 200);
-    }
-    if (path.endsWith('/friends/requests')) {
-      return http.Response(jsonEncode([]), 200);
-    }
-    return http.Response(jsonEncode({'error': 'not found'}), 404);
-  });
   return ApiClient(
     baseUrl: 'http://localhost:3000',
     authService: authService,
-    httpClient: mockClient,
+    httpClient: mockHttpClient(),
   );
 }
 

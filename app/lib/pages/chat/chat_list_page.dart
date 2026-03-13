@@ -1,8 +1,33 @@
 import 'package:flutter/material.dart';
-import '../../models/chat.dart';
+import '../../services/service_provider.dart';
 
-class ChatListPage extends StatelessWidget {
+class ChatListPage extends StatefulWidget {
   const ChatListPage({super.key});
+
+  @override
+  State<ChatListPage> createState() => _ChatListPageState();
+}
+
+class _ChatListPageState extends State<ChatListPage> {
+  List<Map<String, dynamic>> _conversations = [];
+  bool _loading = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final api = ServiceProvider.of(context);
+    final res = await api.getConversations();
+    if (mounted) {
+      setState(() {
+        _loading = false;
+        if (res.ok) _conversations = res.data;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,38 +45,92 @@ class ChatListPage extends StatelessWidget {
           ),
         ],
       ),
-      body: ListView.builder(
-        itemCount: mockChats.length,
-        itemBuilder: (context, index) {
-          final chat = mockChats[index];
-          return _ChatItem(chat: chat);
-        },
-      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: _conversations.isEmpty
+                  ? ListView(
+                      children: const [
+                        SizedBox(height: 200),
+                        Center(
+                          child: Text('暂无聊天',
+                              style: TextStyle(color: Colors.grey)),
+                        ),
+                      ],
+                    )
+                  : ListView.builder(
+                      itemCount: _conversations.length,
+                      itemBuilder: (context, index) {
+                        final conv = _conversations[index];
+                        final friend =
+                            conv['friend'] as Map<String, dynamic>?;
+                        final lastMsg =
+                            conv['lastMessage'] as Map<String, dynamic>?;
+
+                        return _ChatItem(
+                          name: friend?['name'] ?? '未知',
+                          avatar: friend?['avatar'] ?? '👤',
+                          lastMessage: lastMsg?['content'] ?? '',
+                          time: _formatTime(lastMsg?['createdAt']),
+                          onTap: () async {
+                            await Navigator.pushNamed(
+                              context,
+                              '/chat_detail',
+                              arguments: {
+                                'name': friend?['name'] ?? '未知',
+                                'avatar': friend?['avatar'] ?? '👤',
+                                'conversationId': conv['id'],
+                              },
+                            );
+                            _load();
+                          },
+                        );
+                      },
+                    ),
+            ),
     );
+  }
+
+  String _formatTime(String? isoTime) {
+    if (isoTime == null) return '';
+    final dt = DateTime.tryParse(isoTime);
+    if (dt == null) return '';
+    final now = DateTime.now();
+    final local = dt.toLocal();
+    if (local.year == now.year &&
+        local.month == now.month &&
+        local.day == now.day) {
+      return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    }
+    return '${local.month}/${local.day}';
   }
 }
 
 class _ChatItem extends StatelessWidget {
-  final Chat chat;
+  final String name;
+  final String avatar;
+  final String lastMessage;
+  final String time;
+  final VoidCallback onTap;
 
-  const _ChatItem({required this.chat});
+  const _ChatItem({
+    required this.name,
+    required this.avatar,
+    required this.lastMessage,
+    required this.time,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () {
-        Navigator.pushNamed(
-          context,
-          '/chat_detail',
-          arguments: {'name': chat.name, 'avatar': chat.avatar},
-        );
-      },
+      onTap: onTap,
       child: Container(
         color: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
-            // 头像
             Container(
               width: 48,
               height: 48,
@@ -60,10 +139,9 @@ class _ChatItem extends StatelessWidget {
                 borderRadius: BorderRadius.circular(6),
               ),
               alignment: Alignment.center,
-              child: Text(chat.avatar, style: const TextStyle(fontSize: 24)),
+              child: Text(avatar, style: const TextStyle(fontSize: 24)),
             ),
             const SizedBox(width: 12),
-            // 内容
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -72,60 +150,27 @@ class _ChatItem extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          chat.name,
+                          name,
                           style: const TextStyle(
-                            fontSize: 16,
-                            color: Color(0xFF191919),
-                          ),
+                              fontSize: 16, color: Color(0xFF191919)),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       Text(
-                        chat.time,
+                        time,
                         style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFFB0B0B0),
-                        ),
+                            fontSize: 12, color: Color(0xFFB0B0B0)),
                       ),
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          chat.lastMessage,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF999999),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (chat.unreadCount > 0)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF44336),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            chat.unreadCount > 99
-                                ? '99+'
-                                : '${chat.unreadCount}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                    ],
+                  Text(
+                    lastMessage,
+                    style: const TextStyle(
+                        fontSize: 14, color: Color(0xFF999999)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),

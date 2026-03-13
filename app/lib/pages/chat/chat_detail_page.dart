@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
-import '../../models/message.dart';
+import '../../services/service_provider.dart';
 
 class ChatDetailPage extends StatefulWidget {
   final String name;
   final String avatar;
+  final String conversationId;
 
   const ChatDetailPage({
     super.key,
     required this.name,
     required this.avatar,
+    required this.conversationId,
   });
 
   @override
@@ -19,29 +21,70 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   final _focusNode = FocusNode();
-  final List<Message> _messages = [
-    const Message(content: '你好，在吗？', isMine: false, time: '10:00'),
-    const Message(content: '在的，什么事？', isMine: true, time: '10:01'),
-    const Message(content: '明天下午有空吗？想找你聊聊项目的事', isMine: false, time: '10:02'),
-    const Message(content: '可以的，下午两点怎么样？', isMine: true, time: '10:03'),
-    const Message(content: '好的，那我们约在会议室', isMine: false, time: '10:05'),
-  ];
+  List<Map<String, dynamic>> _messages = [];
+  bool _loading = true;
+  String? _myId;
 
-  void _sendMessage() {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _loadInitial();
+  }
+
+  Future<void> _loadInitial() async {
+    final api = ServiceProvider.of(context);
+    final meRes = await api.getMe();
+    if (meRes.ok) {
+      _myId = meRes.data['id'] as String;
+    }
+    await _loadMessages();
+  }
+
+  Future<void> _loadMessages() async {
+    final api = ServiceProvider.of(context);
+    final res = await api.getMessages(conversationId: widget.conversationId);
+    if (mounted) {
+      setState(() {
+        _loading = false;
+        if (res.ok) _messages = res.data;
+      });
+      _scrollToBottom();
+    }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
+    });
+  }
+
+  Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
-    setState(() {
-      _messages.add(Message(content: text, isMine: true, time: '刚刚'));
-    });
     _controller.clear();
     _focusNode.requestFocus();
-    Future.delayed(const Duration(milliseconds: 100), () {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOut,
-      );
-    });
+
+    final api = ServiceProvider.of(context);
+    final res = await api.sendMessage(
+      conversationId: widget.conversationId,
+      content: text,
+    );
+    if (res.ok && mounted) {
+      setState(() {
+        _messages.add(res.data);
+      });
+      _scrollToBottom();
+    }
+  }
+
+  String _formatTime(String? isoTime) {
+    if (isoTime == null) return '';
+    final dt = DateTime.tryParse(isoTime);
+    if (dt == null) return '';
+    final local = dt.toLocal();
+    return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
   }
 
   @override
@@ -66,25 +109,31 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
       ),
       body: Column(
         children: [
-          // 消息列表
           Expanded(
             child: Container(
               color: const Color(0xFFEDEDED),
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                itemCount: _messages.length,
-                itemBuilder: (context, index) {
-                  final msg = _messages[index];
-                  return _MessageBubble(
-                    message: msg,
-                    avatar: msg.isMine ? '🐱' : widget.avatar,
-                  );
-                },
-              ),
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      itemCount: _messages.length,
+                      itemBuilder: (context, index) {
+                        final msg = _messages[index];
+                        final sender =
+                            msg['sender'] as Map<String, dynamic>? ?? {};
+                        final isMine = sender['id'] == _myId;
+                        return _MessageBubble(
+                          content: msg['content'] as String? ?? '',
+                          isMine: isMine,
+                          avatar: isMine ? '🐱' : widget.avatar,
+                          time: _formatTime(msg['createdAt'] as String?),
+                        );
+                      },
+                    ),
             ),
           ),
-          // 输入栏
           Container(
             color: const Color(0xFFF7F7F7),
             padding: EdgeInsets.only(
@@ -96,7 +145,8 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
             child: Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.keyboard_voice_outlined, size: 28),
+                  icon:
+                      const Icon(Icons.keyboard_voice_outlined, size: 28),
                   color: const Color(0xFF191919),
                   onPressed: () {},
                 ),
@@ -143,10 +193,17 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
 }
 
 class _MessageBubble extends StatelessWidget {
-  final Message message;
+  final String content;
+  final bool isMine;
   final String avatar;
+  final String time;
 
-  const _MessageBubble({required this.message, required this.avatar});
+  const _MessageBubble({
+    required this.content,
+    required this.isMine,
+    required this.avatar,
+    required this.time,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -154,10 +211,10 @@ class _MessageBubble extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment:
-            message.isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
+            isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!message.isMine) ...[
+          if (!isMine) ...[
             Container(
               width: 40,
               height: 40,
@@ -172,15 +229,14 @@ class _MessageBubble extends StatelessWidget {
           ],
           Flexible(
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: message.isMine
-                    ? const Color(0xFF95EC69)
-                    : Colors.white,
+                color: isMine ? const Color(0xFF95EC69) : Colors.white,
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Text(
-                message.content,
+                content,
                 style: const TextStyle(
                   fontSize: 16,
                   color: Color(0xFF191919),
@@ -188,7 +244,7 @@ class _MessageBubble extends StatelessWidget {
               ),
             ),
           ),
-          if (message.isMine) ...[
+          if (isMine) ...[
             const SizedBox(width: 8),
             Container(
               width: 40,

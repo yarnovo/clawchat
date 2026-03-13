@@ -101,6 +101,61 @@ class ApiClient {
     );
     return ApiResponse(res.statusCode, jsonDecode(res.body));
   }
+
+  // ---- Conversations ----
+
+  Future<ApiResponse> createConversation({required String friendId}) async {
+    final res = await _http.post(
+      Uri.parse('$baseUrl/v1/im/conversations'),
+      headers: await _headers(),
+      body: jsonEncode({'friendId': friendId}),
+    );
+    return ApiResponse(res.statusCode, jsonDecode(res.body));
+  }
+
+  Future<ApiListResponse> getConversations() async {
+    final res = await _http.get(
+      Uri.parse('$baseUrl/v1/im/conversations'),
+      headers: await _headers(),
+    );
+    return ApiListResponse(res.statusCode, List<Map<String, dynamic>>.from(jsonDecode(res.body)));
+  }
+
+  // ---- Messages ----
+
+  Future<ApiResponse> sendMessage({
+    required String conversationId,
+    required String content,
+  }) async {
+    final res = await _http.post(
+      Uri.parse('$baseUrl/v1/im/messages'),
+      headers: await _headers(),
+      body: jsonEncode({'conversationId': conversationId, 'content': content}),
+    );
+    return ApiResponse(res.statusCode, jsonDecode(res.body));
+  }
+
+  Future<ApiListResponse> getMessages({
+    required String conversationId,
+    String? before,
+    int limit = 50,
+  }) async {
+    var url = '$baseUrl/v1/im/messages?conversationId=$conversationId&limit=$limit';
+    if (before != null) url += '&before=$before';
+    final res = await _http.get(
+      Uri.parse(url),
+      headers: await _headers(),
+    );
+    return ApiListResponse(res.statusCode, List<Map<String, dynamic>>.from(jsonDecode(res.body)));
+  }
+
+  Future<ApiResponse> deleteMessage({required String id}) async {
+    final res = await _http.delete(
+      Uri.parse('$baseUrl/v1/im/messages/$id'),
+      headers: await _headers(),
+    );
+    return ApiResponse(res.statusCode, jsonDecode(res.body));
+  }
 }
 
 class ApiListResponse {

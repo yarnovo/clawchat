@@ -86,6 +86,7 @@ class _ClawChatAppState extends State<ClawChatApp> {
             builder: (_) => ChatDetailPage(
               name: args['name'] as String,
               avatar: args['avatar'] as String,
+              conversationId: args['conversationId'] as String,
             ),
           );
         }

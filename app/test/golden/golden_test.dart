@@ -23,7 +23,7 @@ void main() {
     testWidgets('聊天详情页截图', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
-          home: ChatDetailPage(name: '张三', avatar: '👨'),
+          home: ChatDetailPage(name: '张三', avatar: '👨', conversationId: 'test'),
         ),
       );
       await tester.pumpAndSettle();
