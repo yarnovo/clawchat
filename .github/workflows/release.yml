@@ -5,6 +5,10 @@ on:
     tags: [v*]
   workflow_dispatch:
 
+env:
+  ACR_REGISTRY: registry.cn-hangzhou.aliyuncs.com
+  ACR_NAMESPACE: clawchat
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -18,6 +22,24 @@ jobs:
       - name: Read version
         id: version
         run: echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
+
+      # ---- Docker images → ACR ----
+      - name: Login to ACR
+        run: echo "${{ secrets.ACR_PASSWORD }}" | docker login ${{ env.ACR_REGISTRY }} -u ${{ secrets.ACR_USERNAME }} --password-stdin
+
+      - name: Build and push im-server
+        run: |
+          docker build -t ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/im-server:latest \
+                       -t ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/im-server:${{ steps.version.outputs.version }} \
+                       im-server/
+          docker push ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/im-server --all-tags
+
+      - name: Build and push mcp-server
+        run: |
+          docker build -t ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/mcp-server:latest \
+                       -t ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/mcp-server:${{ steps.version.outputs.version }} \
+                       mcp-server/
+          docker push ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/mcp-server --all-tags
 
       # ---- Flutter web ----
       - uses: subosito/flutter-action@v2
@@ -46,7 +68,6 @@ jobs:
             app/build/web/
             cli/clawchat-linux-amd64
             cli/clawchat-darwin-arm64
-            mcp-server/
 
       # ---- GitHub Release (tag only) ----
       - name: Create GitHub Release
@@ -77,18 +98,12 @@ jobs:
           ssh-keyscan -H ${{ secrets.ECS_HOST }} >> ~/.ssh/known_hosts
 
       - name: Prepare directories
-        run: ssh root@${{ secrets.ECS_HOST }} "mkdir -p /opt/clawchat/{im-server,mcp-server,cli,web}"
+        run: ssh root@${{ secrets.ECS_HOST }} "mkdir -p /opt/clawchat/{cli,web,deploy}"
 
       - name: Deploy compose and config
         run: |
           scp docker-compose.yml root@${{ secrets.ECS_HOST }}:/opt/clawchat/
           rsync -az deploy/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/deploy/
-
-      - name: Deploy im-server
-        run: rsync -az --delete --exclude=node_modules --exclude=dist --exclude=.env --exclude=src/generated im-server/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/im-server/
-
-      - name: Deploy mcp-server
-        run: rsync -az --delete --exclude=.venv --exclude=__pycache__ --exclude=.env mcp-server/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/mcp-server/
 
       - name: Deploy web
         run: rsync -az --delete app/build/web/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/web/
@@ -98,6 +113,6 @@ jobs:
           scp cli/clawchat-linux-amd64 root@${{ secrets.ECS_HOST }}:/opt/clawchat/cli/clawchat
           ssh root@${{ secrets.ECS_HOST }} "chmod +x /opt/clawchat/cli/clawchat && ln -sf /opt/clawchat/cli/clawchat /usr/local/bin/clawchat"
 
-      - name: Start services
+      - name: Pull and start services
         run: |
-          ssh root@${{ secrets.ECS_HOST }} "cd /opt/clawchat && docker compose --profile deploy up -d --build --remove-orphans"
+          ssh root@${{ secrets.ECS_HOST }} "cd /opt/clawchat && docker compose --profile deploy pull && docker compose --profile deploy up -d --remove-orphans"

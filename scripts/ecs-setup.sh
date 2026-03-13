@@ -58,9 +58,17 @@ else
   echo "==> All tools already installed"
 fi
 
+# ---- ACR login (VPC 内网) ----
+echo "==> Logging in to ACR (VPC)"
+if [ -n "${ACR_USERNAME:-}" ] && [ -n "${ACR_PASSWORD:-}" ]; then
+  echo "$ACR_PASSWORD" | docker login registry-vpc.cn-hangzhou.aliyuncs.com -u "$ACR_USERNAME" --password-stdin
+else
+  echo "    Skipped (set ACR_USERNAME and ACR_PASSWORD to enable)"
+fi
+
 # ---- Project directory ----
 echo "==> Creating project directory"
-mkdir -p /opt/clawchat/{im-server,mcp-server,cli,web,deploy}
+mkdir -p /opt/clawchat/{cli,web,deploy}
 
 # ---- Verify ----
 echo "==> Verifying"
