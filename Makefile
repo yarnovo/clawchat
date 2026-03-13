@@ -28,6 +28,18 @@ cli-build:
 cli-run: cli-build
 	./cli/clawchat
 
+# ---- IM Server (Hono/TypeScript) ----
+.PHONY: im-dev im-install im-db-push
+
+im-install:
+	cd im-server && npm install
+
+im-dev:
+	cd im-server && npm run dev
+
+im-db-push:
+	cd im-server && npx prisma db push
+
 # ---- Server (Python/FastAPI) ----
 .PHONY: server-dev server-install
 

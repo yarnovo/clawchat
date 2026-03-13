@@ -3,3 +3,7 @@ pre-commit:
     flutter-analyze:
       glob: "app/**/*.dart"
       run: cd app && flutter analyze
+    im-server-typecheck:
+      glob: "im-server/**/*.ts"
+      root: "im-server/"
+      run: npx prisma generate && npx tsc --noEmit

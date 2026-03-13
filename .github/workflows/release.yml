@@ -77,12 +77,15 @@ jobs:
           ssh-keyscan -H ${{ secrets.ECS_HOST }} >> ~/.ssh/known_hosts
 
       - name: Prepare directories
-        run: ssh root@${{ secrets.ECS_HOST }} "mkdir -p /opt/clawchat/{server,cli,web}"
+        run: ssh root@${{ secrets.ECS_HOST }} "mkdir -p /opt/clawchat/{im-server,server,cli,web}"
 
       - name: Deploy compose and config
         run: |
           scp docker-compose.yml root@${{ secrets.ECS_HOST }}:/opt/clawchat/
           rsync -az deploy/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/deploy/
+
+      - name: Deploy im-server
+        run: rsync -az --delete im-server/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/im-server/
 
       - name: Deploy server
         run: rsync -az --delete server/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/server/

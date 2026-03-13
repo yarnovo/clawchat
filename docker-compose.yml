@@ -19,6 +19,20 @@ services:
     volumes:
       - redisdata:/data
 
+  im-server:
+    profiles: [deploy]
+    container_name: clawchat-im-server
+    build: ./im-server
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://clawchat:clawchat@postgres:5432/clawchat
+      JWT_SECRET: ${JWT_SECRET:-clawchat-prod-secret}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - redis
+
   server:
     profiles: [deploy]
     container_name: clawchat-server
@@ -41,6 +55,7 @@ services:
       - ./deploy/nginx/clawchat.conf:/etc/nginx/conf.d/default.conf:ro
       - /opt/clawchat/web:/usr/share/nginx/html:ro
     depends_on:
+      - im-server
       - server
 
 volumes:

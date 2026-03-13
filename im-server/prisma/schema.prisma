@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// 枚举
+// ============================================================
+
+/// 账号类型：人类用户 / AI Agent
+enum AccountType {
+  human
+  agent
+}
+
+/// Agent 容器运行状态
+enum AgentStatus {
+  created           // 刚创建，尚未启动
+  starting          // agent-manager 正在拉起容器
+  running           // 容器运行中，已连接 Relay
+  stopped           // 用户主动停止
+  error             // 容器崩溃或启动失败
+  api_key_exhausted // API Key 余额不足
+}
+
+/// 好友关系状态
+enum FriendshipStatus {
+  pending  // 已发送请求，待对方确认
+  accepted // 已通过
+  rejected // 已拒绝
+}
+
+/// 会话类型
+enum ConversationType {
+  dm    // 私聊（1对1）
+  group // 群聊
+}
+
+/// 消息内容类型
+enum MessageType {
+  text  // 文字
+  image // 图片
+  voice // 语音
+}
+
+/// 群成员角色
+enum GroupRole {
+  owner  // 群主
+  admin  // 管理员
+  member // 普通成员
+}
+
+// ============================================================
+// 核心表
+// ============================================================
+
+/// 统一账号表 —— 人和 Agent 是一等公民，共用同一张表
+/// Agent 通过 ownerId 归属顶层人类用户，配额统一算在 owner 头上
+model Account {
+  id           String      @id @default(uuid())
+  type         AccountType               // human / agent
+  name         String                    // 显示名称
+  avatar       String?                   // 头像 URL
+  email        String?     @unique       // 登录邮箱（Agent 可为空）
+  passwordHash String?                   // bcrypt 哈希（Agent 无密码）
+  ownerId      String?                   // 顶层人类 owner（Agent 才有）
+  parentId     String?                   // 直接创建者（支持 Agent 创建子 Agent）
+  createdAt    DateTime    @default(now())
+
+  // 自引用关系：owner → 名下所有 Agent
+  owner  Account?  @relation("OwnerAgents", fields: [ownerId], references: [id])
+  agents Account[] @relation("OwnerAgents")
+
+  // 自引用关系：parent → 直接子级（Agent 树状层级）
+  parent   Account?  @relation("ParentChildren", fields: [parentId], references: [id])
+  children Account[] @relation("ParentChildren")
+
+  agentConfig      AgentConfig?   // Agent 专属配置（1:1）
+  sentMessages     Message[]      @relation("Sender")
+  groupMemberships GroupMember[]
+  ownedGroups      Group[]
+
+  friendshipsA Friendship[] @relation("FriendA")
+  friendshipsB Friendship[] @relation("FriendB")
+}
+
+/// Agent 专属配置 —— 模型、API Key、OpenClaw 容器信息
+/// 与 Account 1:1 关联，仅 type=agent 的账号才有
+model AgentConfig {
+  id           String      @id @default(uuid())
+  accountId    String      @unique        // 关联的 Agent 账号
+  model        String                     // 模型名称（如 claude-opus-4-6）
+  apiKey       String?                    // 加密存储的 API Key
+  inheritKey   Boolean     @default(true) // 是否继承父级 API Key
+  systemPrompt String?                    // Agent 性格/系统提示词
+  openClawUrl  String?                    // OpenClaw 实例地址
+  roomId       String?                    // Relay 房间 ID
+  token        String?                    // Relay 连接 Token
+  containerId  String?                    // Docker 容器 ID
+  volumeName   String?                    // Docker Volume 名称（持久化数据）
+  status       AgentStatus @default(created) // 容器运行状态
+  startedAt    DateTime?                  // 最近启动时间
+  stoppedAt    DateTime?                  // 最近停止时间
+
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================
+// 社交关系
+// ============================================================
+
+/// 好友关系 —— A 向 B 发起好友请求
+/// 唯一约束保证同一对用户只能有一条关系记录
+model Friendship {
+  id         String           @id @default(uuid())
+  accountAId String                        // 请求发起方
+  accountBId String                        // 请求接收方
+  status     FriendshipStatus @default(pending)
+  createdAt  DateTime         @default(now())
+
+  accountA Account @relation("FriendA", fields: [accountAId], references: [id])
+  accountB Account @relation("FriendB", fields: [accountBId], references: [id])
+
+  @@unique([accountAId, accountBId])
+}
+
+/// 群组
+model Group {
+  id        String   @id @default(uuid())
+  name      String                 // 群名称
+  avatar    String?                // 群头像
+  ownerId   String                 // 群主账号 ID
+  createdAt DateTime @default(now())
+
+  owner   Account      @relation(fields: [ownerId], references: [id])
+  members GroupMember[]
+}
+
+/// 群成员 —— 记录谁在哪个群、什么角色
+model GroupMember {
+  id        String   @id @default(uuid())
+  groupId   String
+  accountId String
+  role      GroupRole @default(member)
+  joinedAt  DateTime @default(now())
+
+  group   Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  account Account @relation(fields: [accountId], references: [id])
+
+  @@unique([groupId, accountId]) // 同一个人不能重复加群
+}
+
+// ============================================================
+// 消息
+// ============================================================
+
+/// 会话 —— 私聊或群聊的容器
+/// targetId 指向对方账号（dm）或群组（group）
+model Conversation {
+  id        String           @id @default(uuid())
+  type      ConversationType // dm / group
+  targetId  String           // dm=对方账号ID, group=群组ID
+  updatedAt DateTime         @default(now()) @updatedAt
+
+  messages Message[]
+}
+
+/// 消息 —— 支持文字、图片、语音
+/// 软删除（deletedAt）用于消息撤回
+model Message {
+  id               String           @id @default(uuid())
+  conversationId   String
+  conversationType ConversationType          // 冗余字段，方便查询
+  senderId         String                    // 发送者账号 ID
+  type             MessageType      @default(text)
+  content          String?                   // 文字内容
+  fileUrl          String?                   // 图片/语音文件 URL
+  mentions         String[]         @default([]) // 被 @ 的账号 ID 列表
+  deletedAt        DateTime?                 // 软删除时间（撤回）
+  createdAt        DateTime         @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+  sender       Account      @relation("Sender", fields: [senderId], references: [id])
+}
