@@ -38,7 +38,10 @@ server-dev:
 	cd server && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 # ---- Common ----
-.PHONY: version clean
+.PHONY: setup version clean
+
+setup:
+	lefthook install
 
 version:
 	@echo $(VERSION)
