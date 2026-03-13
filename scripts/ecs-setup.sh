@@ -34,7 +34,8 @@ if [ ! -f /etc/docker/daemon.json ] || ! grep -q 'registry-mirrors' /etc/docker/
   cat > /etc/docker/daemon.json <<'DAEMON'
 {
   "registry-mirrors": [
-    "https://ozvvtlky.mirror.aliyuncs.com"
+    "https://docker.m.daocloud.io",
+    "https://mirror.ccs.tencentyun.com"
   ]
 }
 DAEMON
