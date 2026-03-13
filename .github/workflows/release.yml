@@ -76,6 +76,9 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H ${{ secrets.ECS_HOST }} >> ~/.ssh/known_hosts
 
+      - name: Prepare directories
+        run: ssh root@${{ secrets.ECS_HOST }} "mkdir -p /opt/clawchat/{server,cli,web}"
+
       - name: Deploy server
         run: |
           rsync -az --delete server/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/server/
