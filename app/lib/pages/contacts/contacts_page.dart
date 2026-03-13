@@ -94,15 +94,22 @@ class _ContactsPageState extends State<ContactsPage> {
                   name: item['friend']['name'] ?? '',
                   avatar: item['friend']['avatar'],
                   email: item['friend']['email'] ?? '',
-                  onTap: () {
-                    Navigator.pushNamed(
-                      context,
-                      '/chat_detail',
-                      arguments: {
-                        'name': item['friend']['name'] ?? '',
-                        'avatar': item['friend']['avatar'] ?? '👤',
-                      },
+                  onTap: () async {
+                    final api = ServiceProvider.of(context);
+                    final res = await api.createConversation(
+                      friendId: item['friend']['id'],
                     );
+                    if (res.ok && context.mounted) {
+                      Navigator.pushNamed(
+                        context,
+                        '/chat_detail',
+                        arguments: {
+                          'name': item['friend']['name'] ?? '',
+                          'avatar': item['friend']['avatar'] ?? '👤',
+                          'conversationId': res.data['id'],
+                        },
+                      );
+                    }
                   },
                 ),
           ],
