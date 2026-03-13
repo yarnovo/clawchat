@@ -100,6 +100,20 @@ deploy-up:
 deploy-down:
 	docker compose --profile deploy down
 
+# ---- Dev (local full-stack) ----
+.PHONY: dev dev-web
+
+dev:
+	docker compose up -d
+	make im-dev &
+	make agent-dev &
+	@sleep 2
+	make dev-web
+
+dev-web: app-build-web
+	docker compose restart dev-nginx
+	@echo "Ready at http://localhost:8080"
+
 # ---- Common ----
 .PHONY: setup version clean
 

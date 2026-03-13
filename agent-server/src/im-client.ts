@@ -29,6 +29,20 @@ export async function registerAgentAccount(opts: {
   return body.account;
 }
 
+// Add direct friendship between owner and agent
+export async function addDirectFriend(accountAId: string, accountBId: string): Promise<void> {
+  const res = await fetch(`${IM_SERVER_URL}/v1/im/friends/add-direct`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ accountAId, accountBId }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json();
+    throw new Error(body.error || `im-server returned ${res.status}`);
+  }
+}
+
 // Delete an Agent account from im-server
 export async function deleteAgentAccount(accountId: string): Promise<void> {
   const res = await fetch(

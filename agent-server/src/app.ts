@@ -18,8 +18,8 @@ app.post("/", async (c) => {
   const { ownerId, name, avatar, model, apiKey, systemPrompt, parentId } =
     await c.req.json();
 
-  if (!ownerId || !name || !model) {
-    return c.json({ error: "ownerId, name, and model are required" }, 400);
+  if (!ownerId || !name) {
+    return c.json({ error: "ownerId and name are required" }, 400);
   }
 
   // 1. Register Agent account in im-server
@@ -35,7 +35,7 @@ app.post("/", async (c) => {
       avatar,
       config: {
         create: {
-          model,
+          model: model || "gpt-4o",
           apiKey,
           systemPrompt,
           gatewayToken: `agent-${imAccount.id}`,
@@ -44,6 +44,9 @@ app.post("/", async (c) => {
     },
     include: { config: true },
   });
+
+  // 3. Auto-add friendship between owner and agent
+  await imClient.addDirectFriend(ownerId, imAccount.id);
 
   return c.json(agent, 201);
 });

@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../services/service_provider.dart';
+import '../contacts/add_friend_page.dart';
+import '../contacts/create_agent_page.dart';
 
 class ChatListPage extends StatefulWidget {
   const ChatListPage({super.key});
 
   @override
-  State<ChatListPage> createState() => _ChatListPageState();
+  State<ChatListPage> createState() => ChatListPageState();
 }
 
-class _ChatListPageState extends State<ChatListPage> {
+class ChatListPageState extends State<ChatListPage> {
+  void reload() => _load();
   List<Map<String, dynamic>> _conversations = [];
   bool _loading = true;
 
@@ -39,9 +42,25 @@ class _ChatListPageState extends State<ChatListPage> {
             icon: const Icon(Icons.search, size: 22),
             onPressed: () {},
           ),
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.add_circle_outline, size: 22),
-            onPressed: () {},
+            onSelected: (value) async {
+              Widget page;
+              if (value == 'add') {
+                page = const AddFriendPage();
+              } else {
+                page = const CreateAgentPage();
+              }
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => page),
+              );
+              _load();
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'add', child: Text('添加朋友')),
+              PopupMenuItem(value: 'create', child: Text('创建朋友')),
+            ],
           ),
         ],
       ),

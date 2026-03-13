@@ -15,10 +15,12 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
+  final _chatKey = GlobalKey<ChatListPageState>();
+  final _contactsKey = GlobalKey<ContactsPageState>();
 
   late final List<Widget> _pages = [
-    const ChatListPage(),
-    const ContactsPage(),
+    ChatListPage(key: _chatKey),
+    ContactsPage(key: _contactsKey),
     const DiscoverPage(),
     ProfilePage(onLogout: widget.onLogout),
   ];
@@ -36,7 +38,11 @@ class _HomePageState extends State<HomePage> {
         ),
         child: BottomNavigationBar(
           currentIndex: _currentIndex,
-          onTap: (index) => setState(() => _currentIndex = index),
+          onTap: (index) {
+            setState(() => _currentIndex = index);
+            if (index == 0) _chatKey.currentState?.reload();
+            if (index == 1) _contactsKey.currentState?.reload();
+          },
           type: BottomNavigationBarType.fixed,
           backgroundColor: const Color(0xFFF7F7F7),
           selectedItemColor: const Color(0xFF07C160),

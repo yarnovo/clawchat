@@ -27,4 +27,31 @@
 ## API 路由
 
 - `/v1/im/*` — im-server (Hono/TypeScript)，IM 核心业务
+- `/v1/agents/*` — agent-server (Hono/TypeScript)，Agent CRUD + 生命周期
+- `/v1/containers/*` — container-server (Hono/TypeScript)，Docker 容器管理
+- `/v1/openclaw/*` — openclaw-server (Hono/TypeScript)，OpenClaw 实例编排
 - `/v1/mcp/*` — mcp-server (FastAPI/Python)，MCP 服务
+
+## 文档导航
+
+产品设计文档位于 `/Users/yarnb/clawchat/docs/`：
+
+| 文件 | 内容 |
+|------|------|
+| 01-product-overview.md | 产品概述、愿景 |
+| 02-account-system.md | 账号体系设计 |
+| 03-feature-design.md | 功能设计 |
+| 04-architecture.md | 系统架构 |
+| 05-database-schema.md | 数据库表设计 |
+| 06-relay-protocol.md | Relay WebSocket 协议 |
+| 07-rest-api.md | REST API 规范 |
+| 08-offline-sync.md | 离线同步 |
+| 09-infrastructure.md | 基础设施与部署 |
+| 10-openclaw-plugin.md | OpenClaw Channel 插件 |
+| 11-agent-hosting.md | Agent 容器托管 |
+| 12-business-model.md | 商业模式 |
+| 13-launch-strategy.md | 上线策略 |
+| 14-blockchain.md | 区块链相关 |
+| 15-error-handling.md | 错误处理 |
+
+项目路线图：`ROADMAP.md`

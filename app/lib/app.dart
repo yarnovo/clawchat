@@ -28,7 +28,7 @@ class _ClawChatAppState extends State<ClawChatApp> {
     _authService = widget.authService ?? AuthService();
     _apiClient = widget.apiClient ??
         ApiClient(
-          baseUrl: 'http://localhost:3000',
+          baseUrl: '',
           authService: _authService,
         );
     _checkLogin();

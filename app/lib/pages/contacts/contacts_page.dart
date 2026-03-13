@@ -7,10 +7,11 @@ class ContactsPage extends StatefulWidget {
   const ContactsPage({super.key});
 
   @override
-  State<ContactsPage> createState() => _ContactsPageState();
+  State<ContactsPage> createState() => ContactsPageState();
 }
 
-class _ContactsPageState extends State<ContactsPage> {
+class ContactsPageState extends State<ContactsPage> {
+  void reload() => _load();
   List<Map<String, dynamic>> _friends = [];
   bool _loading = true;
 

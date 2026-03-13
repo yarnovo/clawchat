@@ -102,6 +102,27 @@ class ApiClient {
     return ApiResponse(res.statusCode, jsonDecode(res.body));
   }
 
+  // ---- Agents ----
+
+  Future<ApiResponse> createAgent({
+    required String name,
+    String? avatar,
+    String? model,
+  }) async {
+    final me = await getMe();
+    final res = await _http.post(
+      Uri.parse('$baseUrl/v1/agents'),
+      headers: await _headers(),
+      body: jsonEncode({
+        'ownerId': me.data['id'],
+        'name': name,
+        'avatar': avatar,
+        if (model != null) 'model': model, // ignore: use_null_aware_elements
+      }),
+    );
+    return ApiResponse(res.statusCode, jsonDecode(res.body));
+  }
+
   // ---- Conversations ----
 
   Future<ApiResponse> createConversation({required String friendId}) async {

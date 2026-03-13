@@ -4,9 +4,46 @@ import { authMiddleware } from "../auth.js";
 import type { AppEnv } from "../env.js";
 
 const friends = new Hono<AppEnv>();
-friends.use(authMiddleware);
 
 const ACCOUNT_SELECT = { id: true, name: true, avatar: true, email: true, type: true };
+
+// 内部接口：直接添加好友（Agent 创建后自动添加，不走申请流程，无需鉴权）
+friends.post("/add-direct", async (c) => {
+  const { accountAId, accountBId } = await c.req.json();
+
+  if (!accountAId || !accountBId) {
+    return c.json({ error: "accountAId and accountBId are required" }, 400);
+  }
+
+  const existing = await prisma.friendship.findFirst({
+    where: {
+      OR: [
+        { accountAId, accountBId },
+        { accountAId: accountBId, accountBId: accountAId },
+      ],
+    },
+  });
+
+  if (existing) {
+    if (existing.status === "accepted") {
+      return c.json(existing);
+    }
+    const updated = await prisma.friendship.update({
+      where: { id: existing.id },
+      data: { status: "accepted" },
+    });
+    return c.json(updated);
+  }
+
+  const friendship = await prisma.friendship.create({
+    data: { accountAId, accountBId, status: "accepted" },
+  });
+
+  return c.json(friendship, 201);
+});
+
+// 以下路由需要鉴权
+friends.use(authMiddleware);
 
 // 发送好友申请（通过 email 查找）
 friends.post("/request", async (c) => {
