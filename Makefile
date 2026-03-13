@@ -114,6 +114,15 @@ dev-web: app-build-web
 	docker compose restart dev-nginx
 	@echo "Ready at http://localhost:8080"
 
+# ---- E2E Tests (Playwright) ----
+.PHONY: e2e-install e2e-test
+
+e2e-install:
+	cd e2e && npm install && npx playwright install chromium
+
+e2e-test:
+	cd e2e && npx playwright test
+
 # ---- Common ----
 .PHONY: setup version clean
 
