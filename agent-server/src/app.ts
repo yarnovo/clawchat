@@ -46,7 +46,20 @@ app.post("/", async (c) => {
   });
 
   // 3. Auto-add friendship between owner and agent
-  await imClient.addDirectFriend(ownerId, imAccount.id);
+  try {
+    await imClient.addDirectFriend(ownerId, imAccount.id);
+  } catch (err) {
+    // Compensate: roll back local DB record and im-server account
+    try {
+      await prisma.agent.delete({ where: { id: agent.id } });
+    } catch { /* best effort */ }
+    try {
+      await imClient.deleteAgentAccount(imAccount.id);
+    } catch { /* best effort */ }
+
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return c.json({ error: `Failed to add friendship: ${message}` }, 500);
+  }
 
   return c.json(agent, 201);
 });

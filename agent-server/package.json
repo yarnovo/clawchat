@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
+    "msw": "^2.12.10",
     "prisma": "^7.5.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",

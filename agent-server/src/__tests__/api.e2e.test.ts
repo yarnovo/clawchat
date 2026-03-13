@@ -27,6 +27,7 @@ vi.mock("../openclaw-client.js", () => ({
 import app from "../app.js";
 import { prisma } from "../db.js";
 import * as imClient from "../im-client.js";
+import * as openclawClient from "../openclaw-client.js";
 
 const request = (path: string, init?: RequestInit) => {
   // Avoid trailing slash: "/" → "/v1/agents", "?q=x" → "/v1/agents?q=x"
@@ -253,5 +254,76 @@ describe("Agent Lifecycle", () => {
     );
     expect(res.status).toBe(400);
     expect((await res.json()).error).toContain("not running");
+  });
+
+  it("POST /:id/start openclaw-client 抛错 → 状态落为 error", async () => {
+    // Ensure agent is in a startable state (not already running)
+    await prisma.agentConfig.update({
+      where: { agentId: lifecycleAgentId },
+      data: { status: "stopped" },
+    });
+
+    // Make createInstance throw
+    vi.mocked(openclawClient.createInstance).mockRejectedValueOnce(
+      new Error("OpenClaw service unavailable"),
+    );
+
+    const res = await request(`/${lifecycleAgentId}/start`, { method: "POST" });
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toContain("OpenClaw service unavailable");
+
+    // Verify status is 'error' in DB
+    const config = await prisma.agentConfig.findUnique({
+      where: { agentId: lifecycleAgentId },
+    });
+    expect(config?.status).toBe("error");
+  });
+
+  it("POST /:id/start 已 running 的 Agent 再次 start → 覆盖为新容器", async () => {
+    // First, set the agent to running state
+    await prisma.agentConfig.update({
+      where: { agentId: lifecycleAgentId },
+      data: { status: "running", containerId: "old-container" },
+    });
+
+    // Reset mock to succeed
+    vi.mocked(openclawClient.createInstance).mockResolvedValueOnce({
+      containerId: "new-container-456",
+    });
+
+    const res = await request(`/${lifecycleAgentId}/start`, { method: "POST" });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.containerId).toBe("new-container-456");
+
+    // Verify status updated with new container
+    const config = await prisma.agentConfig.findUnique({
+      where: { agentId: lifecycleAgentId },
+    });
+    expect(config?.status).toBe("running");
+    expect(config?.containerId).toBe("new-container-456");
+  });
+
+  it("POST /:id/stop 从未 start 过的 Agent → openclaw stop 抛错返回 500", async () => {
+    // Create a brand new agent that has never been started
+    const createRes = await request(
+      "/",
+      jsonReq("POST", { ownerId, name: "NeverStartedBot", apiKey: "sk-key" }),
+    );
+    const agent = await createRes.json();
+
+    // Make stopInstance throw (simulating the instance doesn't exist)
+    vi.mocked(openclawClient.stopInstance).mockRejectedValueOnce(
+      new Error("Instance not found"),
+    );
+
+    const res = await request(`/${agent.id}/stop`, { method: "POST" });
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toContain("Instance not found");
+
+    // Clean up
+    await prisma.agent.delete({ where: { id: agent.id } }).catch(() => {});
   });
 });
