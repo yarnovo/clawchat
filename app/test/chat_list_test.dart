@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:clawchat/app.dart';
+import 'test_helpers.dart';
 
 void main() {
   group('底部导航栏', () {
     testWidgets('四个 Tab 切换正常', (tester) async {
-      await tester.pumpWidget(const ClawChatApp());
+      await tester.pumpWidget(await loggedInApp());
       await tester.pumpAndSettle();
 
       // 默认在聊天页
@@ -34,7 +34,7 @@ void main() {
 
   group('聊天列表', () {
     testWidgets('显示所有聊天项', (tester) async {
-      await tester.pumpWidget(const ClawChatApp());
+      await tester.pumpWidget(await loggedInApp());
       await tester.pumpAndSettle();
 
       expect(find.text('文件传输助手'), findsOneWidget);
@@ -43,7 +43,7 @@ void main() {
     });
 
     testWidgets('显示未读角标', (tester) async {
-      await tester.pumpWidget(const ClawChatApp());
+      await tester.pumpWidget(await loggedInApp());
       await tester.pumpAndSettle();
 
       // 张三有 2 条未读
@@ -53,7 +53,7 @@ void main() {
     });
 
     testWidgets('点击聊天项进入详情页', (tester) async {
-      await tester.pumpWidget(const ClawChatApp());
+      await tester.pumpWidget(await loggedInApp());
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('张三'));

@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:clawchat/app.dart';
+import 'test_helpers.dart';
 
 void main() {
   group('个人中心页', () {
     testWidgets('显示用户信息', (tester) async {
-      await tester.pumpWidget(const ClawChatApp());
+      await tester.pumpWidget(await loggedInApp());
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('我'));
@@ -15,7 +15,7 @@ void main() {
     });
 
     testWidgets('显示功能菜单', (tester) async {
-      await tester.pumpWidget(const ClawChatApp());
+      await tester.pumpWidget(await loggedInApp());
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('我'));

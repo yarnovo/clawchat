@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:clawchat/app.dart';
+import 'test_helpers.dart';
 
 void main() {
   group('发现页', () {
     testWidgets('显示所有功能项', (tester) async {
-      await tester.pumpWidget(const ClawChatApp());
+      await tester.pumpWidget(await loggedInApp());
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('发现'));
@@ -21,7 +21,7 @@ void main() {
     });
 
     testWidgets('每项都有右箭头', (tester) async {
-      await tester.pumpWidget(const ClawChatApp());
+      await tester.pumpWidget(await loggedInApp());
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('发现'));

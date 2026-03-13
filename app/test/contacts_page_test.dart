@@ -1,10 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:clawchat/app.dart';
+import 'test_helpers.dart';
 
 void main() {
   group('通讯录页', () {
     testWidgets('显示功能入口', (tester) async {
-      await tester.pumpWidget(const ClawChatApp());
+      await tester.pumpWidget(await loggedInApp());
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('通讯录'));
@@ -17,7 +17,7 @@ void main() {
     });
 
     testWidgets('显示联系人列表和字母索引', (tester) async {
-      await tester.pumpWidget(const ClawChatApp());
+      await tester.pumpWidget(await loggedInApp());
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('通讯录'));
@@ -33,7 +33,7 @@ void main() {
     });
 
     testWidgets('点击联系人进入聊天', (tester) async {
-      await tester.pumpWidget(const ClawChatApp());
+      await tester.pumpWidget(await loggedInApp());
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('通讯录'));

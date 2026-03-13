@@ -1,9 +1,51 @@
 import 'package:flutter/material.dart';
 import 'pages/home_page.dart';
 import 'pages/chat/chat_detail_page.dart';
+import 'pages/auth/login_page.dart';
+import 'pages/auth/register_page.dart';
+import 'services/api_client.dart';
+import 'services/auth_service.dart';
 
-class ClawChatApp extends StatelessWidget {
-  const ClawChatApp({super.key});
+class ClawChatApp extends StatefulWidget {
+  final AuthService? authService;
+  final ApiClient? apiClient;
+
+  const ClawChatApp({super.key, this.authService, this.apiClient});
+
+  @override
+  State<ClawChatApp> createState() => _ClawChatAppState();
+}
+
+class _ClawChatAppState extends State<ClawChatApp> {
+  late final AuthService _authService;
+  late final ApiClient _apiClient;
+  bool? _isLoggedIn;
+
+  @override
+  void initState() {
+    super.initState();
+    _authService = widget.authService ?? AuthService();
+    _apiClient = widget.apiClient ??
+        ApiClient(
+          baseUrl: 'http://localhost:3000',
+          authService: _authService,
+        );
+    _checkLogin();
+  }
+
+  Future<void> _checkLogin() async {
+    final loggedIn = await _authService.isLoggedIn();
+    setState(() => _isLoggedIn = loggedIn);
+  }
+
+  void _onAuthSuccess() {
+    setState(() => _isLoggedIn = true);
+  }
+
+  void _onLogout() async {
+    await _authService.logout();
+    setState(() => _isLoggedIn = false);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +75,7 @@ class ClawChatApp extends StatelessWidget {
           space: 0,
         ),
       ),
-      home: const HomePage(),
+      home: _buildHome(),
       onGenerateRoute: (settings) {
         if (settings.name == '/chat_detail') {
           final args = settings.arguments as Map<String, dynamic>;
@@ -44,8 +86,33 @@ class ClawChatApp extends StatelessWidget {
             ),
           );
         }
+        if (settings.name == '/register') {
+          return MaterialPageRoute(
+            builder: (_) => RegisterPage(
+              apiClient: _apiClient,
+              authService: _authService,
+              onRegisterSuccess: _onAuthSuccess,
+            ),
+          );
+        }
         return null;
       },
+    );
+  }
+
+  Widget _buildHome() {
+    if (_isLoggedIn == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    if (_isLoggedIn!) {
+      return HomePage(onLogout: _onLogout);
+    }
+    return LoginPage(
+      apiClient: _apiClient,
+      authService: _authService,
+      onLoginSuccess: _onAuthSuccess,
     );
   }
 }

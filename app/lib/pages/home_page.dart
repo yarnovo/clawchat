@@ -5,7 +5,9 @@ import 'discover/discover_page.dart';
 import 'profile/profile_page.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  final VoidCallback? onLogout;
+
+  const HomePage({super.key, this.onLogout});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -14,11 +16,11 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _currentIndex = 0;
 
-  final _pages = const [
-    ChatListPage(),
-    ContactsPage(),
-    DiscoverPage(),
-    ProfilePage(),
+  late final List<Widget> _pages = [
+    const ChatListPage(),
+    const ContactsPage(),
+    const DiscoverPage(),
+    ProfilePage(onLogout: widget.onLogout),
   ];
 
   @override

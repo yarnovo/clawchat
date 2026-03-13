@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key});
+  final VoidCallback? onLogout;
+
+  const ProfilePage({super.key, this.onLogout});
 
   @override
   Widget build(BuildContext context) {
@@ -88,6 +90,27 @@ class ProfilePage extends StatelessWidget {
               _ProfileItem(icon: Icons.settings, title: '设置'),
             ],
           ),
+          if (onLogout != null) ...[
+            const SizedBox(height: 8),
+            Container(
+              color: Colors.white,
+              width: double.infinity,
+              child: InkWell(
+                onTap: onLogout,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 14),
+                  child: Text(
+                    '退出登录',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.red,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
