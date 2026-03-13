@@ -46,7 +46,7 @@ jobs:
             app/build/web/
             cli/clawchat-linux-amd64
             cli/clawchat-darwin-arm64
-            server/
+            mcp-server/
 
       # ---- GitHub Release (tag only) ----
       - name: Create GitHub Release
@@ -77,7 +77,7 @@ jobs:
           ssh-keyscan -H ${{ secrets.ECS_HOST }} >> ~/.ssh/known_hosts
 
       - name: Prepare directories
-        run: ssh root@${{ secrets.ECS_HOST }} "mkdir -p /opt/clawchat/{im-server,server,cli,web}"
+        run: ssh root@${{ secrets.ECS_HOST }} "mkdir -p /opt/clawchat/{im-server,mcp-server,cli,web}"
 
       - name: Deploy compose and config
         run: |
@@ -87,8 +87,8 @@ jobs:
       - name: Deploy im-server
         run: rsync -az --delete --exclude=node_modules --exclude=dist --exclude=.env --exclude=src/generated im-server/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/im-server/
 
-      - name: Deploy server
-        run: rsync -az --delete server/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/server/
+      - name: Deploy mcp-server
+        run: rsync -az --delete mcp-server/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/mcp-server/
 
       - name: Deploy web
         run: rsync -az --delete app/build/web/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/web/

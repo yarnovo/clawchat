@@ -1,7 +1,7 @@
 [project]
-name = "server"
+name = "mcp-server"
 version = "0.0.0"
-description = "ClawChat API server"
+description = "ClawChat MCP server"
 requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.135.1",

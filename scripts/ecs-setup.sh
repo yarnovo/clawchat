@@ -60,7 +60,7 @@ fi
 
 # ---- Project directory ----
 echo "==> Creating project directory"
-mkdir -p /opt/clawchat/{im-server,server,cli,web,deploy}
+mkdir -p /opt/clawchat/{im-server,mcp-server,cli,web,deploy}
 
 # ---- Verify ----
 echo "==> Verifying"

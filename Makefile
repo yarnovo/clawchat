@@ -40,14 +40,14 @@ im-dev:
 im-db-push:
 	cd im-server && npx prisma db push
 
-# ---- Server (Python/FastAPI) ----
-.PHONY: server-dev server-install
+# ---- MCP Server (Python/FastAPI) ----
+.PHONY: mcp-dev mcp-install
 
-server-install:
-	cd server && uv sync
+mcp-install:
+	cd mcp-server && uv sync
 
-server-dev:
-	cd server && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+mcp-dev:
+	cd mcp-server && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 # ---- Docker ----
 .PHONY: dev-up dev-down dev-logs deploy-up deploy-down

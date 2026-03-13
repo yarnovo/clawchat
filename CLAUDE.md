@@ -27,4 +27,4 @@
 ## API 路由
 
 - `/v1/im/*` — im-server (Hono/TypeScript)，IM 核心业务
-- `/v1/ai/*` — server (FastAPI/Python)，AI/ML 相关
+- `/v1/mcp/*` — mcp-server (FastAPI/Python)，MCP 服务

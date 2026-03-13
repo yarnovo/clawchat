@@ -17,7 +17,7 @@ Flutter App (Web/iOS/Android)
 | 组件 | 技术栈 | 说明 |
 |------|--------|------|
 | `app/` | Flutter / Dart | 跨平台聊天 UI |
-| `server/` | Python / FastAPI | RESTful API 后端 |
+| `mcp-server/` | Python / FastAPI | MCP 服务 |
 | `cli/` | Go / Cobra | Docker 容器管理工具 |
 | `openclaw/` | TypeScript / Node.js | 多通道 AI 助手网关 |
 | `deploy/` | Nginx | 反向代理与静态文件服务 |
@@ -32,9 +32,9 @@ make setup
 make app-run            # 在 Chrome 中运行
 make app-serve          # 构建并启动本地服务 (localhost:5555)
 
-# API 服务
-make server-install     # 安装 Python 依赖
-make server-dev         # 启动开发服务器 (localhost:8000)
+# MCP 服务
+make mcp-install        # 安装 Python 依赖
+make mcp-dev            # 启动开发服务器 (localhost:8000)
 
 # CLI 工具
 make cli-build          # 编译

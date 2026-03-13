@@ -1,8 +1,11 @@
 #!/bin/sh
 set -e
 
-echo "Running prisma db push..."
-npx prisma db push --skip-generate
+echo "Running prisma migrate deploy..."
+npx prisma migrate deploy
+
+echo "Running seed..."
+npx prisma db seed
 
 echo "Starting im-server..."
 exec node dist/index.js
