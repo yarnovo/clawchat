@@ -40,6 +40,18 @@ im-dev:
 im-db-push:
 	cd im-server && npx prisma db push
 
+# ---- Agent Server (Hono/TypeScript + Prisma) ----
+.PHONY: agent-install agent-dev agent-db-push
+
+agent-install:
+	cd agent-server && npm install
+
+agent-dev:
+	cd agent-server && npm run dev
+
+agent-db-push:
+	cd agent-server && npx prisma db push
+
 # ---- Container Server (Hono/TypeScript) ----
 .PHONY: container-install container-dev
 

@@ -7,6 +7,10 @@ pre-commit:
       glob: "im-server/**/*.ts"
       root: "im-server/"
       run: npx prisma generate && npx tsc --noEmit
+    agent-server-typecheck:
+      glob: "agent-server/**/*.ts"
+      root: "agent-server/"
+      run: npx prisma generate && npx tsc --noEmit
     container-server-typecheck:
       glob: "container-server/**/*.ts"
       root: "container-server/"

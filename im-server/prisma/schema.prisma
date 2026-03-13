@@ -17,16 +17,6 @@ enum AccountType {
   agent
 }
 
-/// Agent 容器运行状态
-enum AgentStatus {
-  created           // 刚创建，尚未启动
-  starting          // agent-manager 正在拉起容器
-  running           // 容器运行中，已连接 Relay
-  stopped           // 用户主动停止
-  error             // 容器崩溃或启动失败
-  api_key_exhausted // API Key 余额不足
-}
-
 /// 好友关系状态
 enum FriendshipStatus {
   pending  // 已发送请求，待对方确认
@@ -58,55 +48,23 @@ enum GroupRole {
 // 核心表
 // ============================================================
 
-/// 统一账号表 —— 人和 Agent 是一等公民，共用同一张表
-/// Agent 通过 ownerId 归属顶层人类用户，配额统一算在 owner 头上
+/// 统一账号表 —— 人和 Agent 共用，im-server 只存基础身份
+/// Agent 的详细配置由 agent-server 管理
 model Account {
   id           String      @id @default(uuid())
-  type         AccountType               // human / agent
-  name         String                    // 显示名称
-  avatar       String?                   // 头像 URL
-  email        String?     @unique       // 登录邮箱（Agent 可为空）
-  passwordHash String?                   // bcrypt 哈希（Agent 无密码）
-  ownerId      String?                   // 顶层人类 owner（Agent 才有）
-  parentId     String?                   // 直接创建者（支持 Agent 创建子 Agent）
+  type         AccountType @default(human)   // human / agent
+  name         String                        // 显示名称
+  avatar       String?                       // 头像 URL
+  email        String?     @unique           // 登录邮箱（Agent 可为空）
+  passwordHash String?                       // bcrypt 哈希（Agent 无密码）
   createdAt    DateTime    @default(now())
 
-  // 自引用关系：owner → 名下所有 Agent
-  owner  Account?  @relation("OwnerAgents", fields: [ownerId], references: [id])
-  agents Account[] @relation("OwnerAgents")
-
-  // 自引用关系：parent → 直接子级（Agent 树状层级）
-  parent   Account?  @relation("ParentChildren", fields: [parentId], references: [id])
-  children Account[] @relation("ParentChildren")
-
-  agentConfig      AgentConfig?   // Agent 专属配置（1:1）
   sentMessages     Message[]      @relation("Sender")
   groupMemberships GroupMember[]
   ownedGroups      Group[]
 
   friendshipsA Friendship[] @relation("FriendA")
   friendshipsB Friendship[] @relation("FriendB")
-}
-
-/// Agent 专属配置 —— 模型、API Key、OpenClaw 容器信息
-/// 与 Account 1:1 关联，仅 type=agent 的账号才有
-model AgentConfig {
-  id           String      @id @default(uuid())
-  accountId    String      @unique        // 关联的 Agent 账号
-  model        String                     // 模型名称（如 claude-opus-4-6）
-  apiKey       String?                    // 加密存储的 API Key
-  inheritKey   Boolean     @default(true) // 是否继承父级 API Key
-  systemPrompt String?                    // Agent 性格/系统提示词
-  openClawUrl  String?                    // OpenClaw 实例地址
-  roomId       String?                    // Relay 房间 ID
-  token        String?                    // Relay 连接 Token
-  containerId  String?                    // Docker 容器 ID
-  volumeName   String?                    // Docker Volume 名称（持久化数据）
-  status       AgentStatus @default(created) // 容器运行状态
-  startedAt    DateTime?                  // 最近启动时间
-  stoppedAt    DateTime?                  // 最近停止时间
-
-  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
 }
 
 // ============================================================
@@ -151,7 +109,7 @@ model GroupMember {
   group   Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
   account Account @relation(fields: [accountId], references: [id])
 
-  @@unique([groupId, accountId]) // 同一个人不能重复加群
+  @@unique([groupId, accountId])
 }
 
 // ============================================================
@@ -159,11 +117,11 @@ model GroupMember {
 // ============================================================
 
 /// 会话 —— 私聊或群聊的容器
-/// targetId 指向对方账号（dm）或群组（group）
+/// dm 时 targetId 为排序后的 "idA:idB"，group 时为群组 ID
 model Conversation {
   id        String           @id @default(uuid())
   type      ConversationType // dm / group
-  targetId  String           // dm=对方账号ID, group=群组ID
+  targetId  String           // dm=排序后的双方ID, group=群组ID
   updatedAt DateTime         @default(now()) @updatedAt
 
   messages Message[]

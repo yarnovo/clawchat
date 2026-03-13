@@ -44,6 +44,22 @@ services:
       - postgres
       - redis
 
+  agent-server:
+    profiles: [deploy]
+    container_name: clawchat-agent-server
+    image: registry-vpc.cn-hangzhou.aliyuncs.com/clawchat/agent-server:latest
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://clawchat:clawchat@postgres:5432/clawchat_agent
+      IM_SERVER_URL: http://im-server:3000
+      OPENCLAW_SERVER_URL: http://openclaw-server:3003
+      PORT: "3004"
+    ports:
+      - "3004:3004"
+    depends_on:
+      - postgres
+      - im-server
+
   container-server:
     profiles: [deploy]
     container_name: clawchat-container-server
