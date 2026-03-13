@@ -1,7 +1,29 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:clawchat/app.dart';
 import 'package:clawchat/services/auth_service.dart';
+import 'package:clawchat/services/api_client.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart' as http_testing;
+
+ApiClient _mockApiClient(AuthService authService) {
+  final mockClient = http_testing.MockClient((request) async {
+    final path = request.url.path;
+    if (path.endsWith('/friends')) {
+      return http.Response(jsonEncode([]), 200);
+    }
+    if (path.endsWith('/friends/requests')) {
+      return http.Response(jsonEncode([]), 200);
+    }
+    return http.Response(jsonEncode({'error': 'not found'}), 404);
+  });
+  return ApiClient(
+    baseUrl: 'http://localhost:3000',
+    authService: authService,
+    httpClient: mockClient,
+  );
+}
 
 void main() {
   group('登录页', () {
@@ -12,7 +34,10 @@ void main() {
     });
 
     testWidgets('未登录时显示登录页', (tester) async {
-      await tester.pumpWidget(ClawChatApp(authService: authService));
+      await tester.pumpWidget(ClawChatApp(
+        authService: authService,
+        apiClient: _mockApiClient(authService),
+      ));
       await tester.pumpAndSettle();
 
       expect(find.text('ClawChat'), findsOneWidget);
@@ -21,7 +46,10 @@ void main() {
     });
 
     testWidgets('邮箱和密码不能为空', (tester) async {
-      await tester.pumpWidget(ClawChatApp(authService: authService));
+      await tester.pumpWidget(ClawChatApp(
+        authService: authService,
+        apiClient: _mockApiClient(authService),
+      ));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('登录'));
@@ -38,7 +66,10 @@ void main() {
         email: 'logged@test.com',
       );
 
-      await tester.pumpWidget(ClawChatApp(authService: authService));
+      await tester.pumpWidget(ClawChatApp(
+        authService: authService,
+        apiClient: _mockApiClient(authService),
+      ));
       await tester.pumpAndSettle();
 
       expect(find.text('聊天'), findsOneWidget);
@@ -54,7 +85,10 @@ void main() {
     });
 
     testWidgets('点击注册链接进入注册页', (tester) async {
-      await tester.pumpWidget(ClawChatApp(authService: authService));
+      await tester.pumpWidget(ClawChatApp(
+        authService: authService,
+        apiClient: _mockApiClient(authService),
+      ));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('没有账号？立即注册'));
@@ -65,7 +99,10 @@ void main() {
     });
 
     testWidgets('注册页表单验证', (tester) async {
-      await tester.pumpWidget(ClawChatApp(authService: authService));
+      await tester.pumpWidget(ClawChatApp(
+        authService: authService,
+        apiClient: _mockApiClient(authService),
+      ));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('没有账号？立即注册'));
@@ -80,7 +117,10 @@ void main() {
     });
 
     testWidgets('密码少于6位提示', (tester) async {
-      await tester.pumpWidget(ClawChatApp(authService: authService));
+      await tester.pumpWidget(ClawChatApp(
+        authService: authService,
+        apiClient: _mockApiClient(authService),
+      ));
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('没有账号？立即注册'));

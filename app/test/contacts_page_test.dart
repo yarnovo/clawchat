@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'test_helpers.dart';
 
@@ -12,38 +13,30 @@ void main() {
 
       expect(find.text('新的朋友'), findsOneWidget);
       expect(find.text('群聊'), findsOneWidget);
-      expect(find.text('标签'), findsOneWidget);
-      expect(find.text('公众号'), findsOneWidget);
     });
 
-    testWidgets('显示联系人列表和字母索引', (tester) async {
+    testWidgets('无好友时显示暂无好友', (tester) async {
       await tester.pumpWidget(await loggedInApp());
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('通讯录'));
       await tester.pumpAndSettle();
 
-      // 首个字母索引和联系人可见
-      expect(find.text('C'), findsOneWidget);
-      expect(find.text('陈七'), findsOneWidget);
-
-      // 滚动到底部验证更多联系人
-      await tester.scrollUntilVisible(find.text('赵六'), 200);
-      expect(find.text('赵六'), findsOneWidget);
+      expect(find.text('暂无好友'), findsOneWidget);
     });
 
-    testWidgets('点击联系人进入聊天', (tester) async {
+    testWidgets('添加好友按钮可点击', (tester) async {
       await tester.pumpWidget(await loggedInApp());
       await tester.pumpAndSettle();
 
       await tester.tap(find.text('通讯录'));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('陈七'));
+      await tester.tap(find.byIcon(Icons.person_add_outlined));
       await tester.pumpAndSettle();
 
-      // 进入聊天详情
-      expect(find.text('你好，在吗？'), findsOneWidget);
+      expect(find.text('添加好友'), findsOneWidget);
+      expect(find.text('发送好友申请'), findsOneWidget);
     });
   });
 }

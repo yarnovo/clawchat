@@ -54,6 +54,62 @@ class ApiClient {
     );
     return ApiResponse(res.statusCode, jsonDecode(res.body));
   }
+
+  // ---- Friends ----
+
+  Future<ApiListResponse> getFriends() async {
+    final res = await _http.get(
+      Uri.parse('$baseUrl/v1/im/friends'),
+      headers: await _headers(),
+    );
+    return ApiListResponse(res.statusCode, List<Map<String, dynamic>>.from(jsonDecode(res.body)));
+  }
+
+  Future<ApiResponse> sendFriendRequest({required String email}) async {
+    final res = await _http.post(
+      Uri.parse('$baseUrl/v1/im/friends/request'),
+      headers: await _headers(),
+      body: jsonEncode({'email': email}),
+    );
+    return ApiResponse(res.statusCode, jsonDecode(res.body));
+  }
+
+  Future<ApiListResponse> getFriendRequests() async {
+    final res = await _http.get(
+      Uri.parse('$baseUrl/v1/im/friends/requests'),
+      headers: await _headers(),
+    );
+    return ApiListResponse(res.statusCode, List<Map<String, dynamic>>.from(jsonDecode(res.body)));
+  }
+
+  Future<ApiResponse> handleFriendRequest({
+    required String id,
+    required String status,
+  }) async {
+    final res = await _http.patch(
+      Uri.parse('$baseUrl/v1/im/friends/request/$id'),
+      headers: await _headers(),
+      body: jsonEncode({'status': status}),
+    );
+    return ApiResponse(res.statusCode, jsonDecode(res.body));
+  }
+
+  Future<ApiResponse> deleteFriend({required String id}) async {
+    final res = await _http.delete(
+      Uri.parse('$baseUrl/v1/im/friends/$id'),
+      headers: await _headers(),
+    );
+    return ApiResponse(res.statusCode, jsonDecode(res.body));
+  }
+}
+
+class ApiListResponse {
+  final int statusCode;
+  final List<Map<String, dynamic>> data;
+
+  ApiListResponse(this.statusCode, this.data);
+
+  bool get ok => statusCode >= 200 && statusCode < 300;
 }
 
 class ApiResponse {

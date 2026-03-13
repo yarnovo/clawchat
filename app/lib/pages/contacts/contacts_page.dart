@@ -1,70 +1,112 @@
 import 'package:flutter/material.dart';
-import '../../models/contact.dart';
+import '../../services/service_provider.dart';
+import 'add_friend_page.dart';
+import 'friend_requests_page.dart';
 
-class ContactsPage extends StatelessWidget {
+class ContactsPage extends StatefulWidget {
   const ContactsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // 按字母分组
-    final grouped = <String, List<Contact>>{};
-    for (final c in mockContacts) {
-      grouped.putIfAbsent(c.letter, () => []).add(c);
-    }
-    final letters = grouped.keys.toList()..sort();
+  State<ContactsPage> createState() => _ContactsPageState();
+}
 
+class _ContactsPageState extends State<ContactsPage> {
+  List<Map<String, dynamic>> _friends = [];
+  bool _loading = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final api = ServiceProvider.of(context);
+    final res = await api.getFriends();
+    if (mounted) {
+      setState(() {
+        _loading = false;
+        if (res.ok) _friends = res.data;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('通讯录'),
         actions: [
           IconButton(
             icon: const Icon(Icons.person_add_outlined, size: 22),
-            onPressed: () {},
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AddFriendPage()),
+              );
+              _load();
+            },
           ),
         ],
       ),
-      body: ListView(
-        children: [
-          // 功能入口
-          _FunctionEntry(
-            icon: Icons.group,
-            color: const Color(0xFF07C160),
-            title: '新的朋友',
-          ),
-          _FunctionEntry(
-            icon: Icons.people,
-            color: const Color(0xFF576B95),
-            title: '群聊',
-          ),
-          _FunctionEntry(
-            icon: Icons.local_offer,
-            color: const Color(0xFF576B95),
-            title: '标签',
-          ),
-          _FunctionEntry(
-            icon: Icons.work_outline,
-            color: const Color(0xFF576B95),
-            title: '公众号',
-          ),
-          // 联系人列表
-          for (final letter in letters) ...[
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              color: const Color(0xFFEDEDED),
-              child: Text(
-                letter,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF888888),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          children: [
+            // 功能入口
+            _FunctionEntry(
+              icon: Icons.group,
+              color: const Color(0xFF07C160),
+              title: '新的朋友',
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const FriendRequestsPage(),
+                  ),
+                );
+                _load();
+              },
             ),
-            for (final contact in grouped[letter]!)
-              _ContactItem(contact: contact),
+            _FunctionEntry(
+              icon: Icons.people,
+              color: const Color(0xFF576B95),
+              title: '群聊',
+              onTap: () {},
+            ),
+            // 好友列表
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (_friends.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(
+                  child:
+                      Text('暂无好友', style: TextStyle(color: Colors.grey)),
+                ),
+              )
+            else
+              for (final item in _friends)
+                _FriendItem(
+                  name: item['friend']['name'] ?? '',
+                  avatar: item['friend']['avatar'],
+                  email: item['friend']['email'] ?? '',
+                  onTap: () {
+                    Navigator.pushNamed(
+                      context,
+                      '/chat_detail',
+                      arguments: {
+                        'name': item['friend']['name'] ?? '',
+                        'avatar': item['friend']['avatar'] ?? '👤',
+                      },
+                    );
+                  },
+                ),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -74,11 +116,13 @@ class _FunctionEntry extends StatelessWidget {
   final IconData icon;
   final Color color;
   final String title;
+  final VoidCallback onTap;
 
   const _FunctionEntry({
     required this.icon,
     required this.color,
     required this.title,
+    required this.onTap,
   });
 
   @override
@@ -88,9 +132,10 @@ class _FunctionEntry extends StatelessWidget {
       child: Column(
         children: [
           InkWell(
-            onTap: () {},
+            onTap: onTap,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
                   Container(
@@ -124,10 +169,18 @@ class _FunctionEntry extends StatelessWidget {
   }
 }
 
-class _ContactItem extends StatelessWidget {
-  final Contact contact;
+class _FriendItem extends StatelessWidget {
+  final String name;
+  final String? avatar;
+  final String email;
+  final VoidCallback onTap;
 
-  const _ContactItem({required this.contact});
+  const _FriendItem({
+    required this.name,
+    required this.avatar,
+    required this.email,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -136,15 +189,10 @@ class _ContactItem extends StatelessWidget {
       child: Column(
         children: [
           InkWell(
-            onTap: () {
-              Navigator.pushNamed(
-                context,
-                '/chat_detail',
-                arguments: {'name': contact.name, 'avatar': contact.avatar},
-              );
-            },
+            onTap: onTap,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Row(
                 children: [
                   Container(
@@ -156,13 +204,13 @@ class _ContactItem extends StatelessWidget {
                     ),
                     alignment: Alignment.center,
                     child: Text(
-                      contact.avatar,
+                      avatar ?? '👤',
                       style: const TextStyle(fontSize: 20),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    contact.name,
+                    name,
                     style: const TextStyle(
                       fontSize: 16,
                       color: Color(0xFF191919),

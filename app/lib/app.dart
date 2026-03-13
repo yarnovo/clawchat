@@ -5,6 +5,7 @@ import 'pages/auth/login_page.dart';
 import 'pages/auth/register_page.dart';
 import 'services/api_client.dart';
 import 'services/auth_service.dart';
+import 'services/service_provider.dart';
 
 class ClawChatApp extends StatefulWidget {
   final AuthService? authService;
@@ -49,7 +50,9 @@ class _ClawChatAppState extends State<ClawChatApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return ServiceProvider(
+      apiClient: _apiClient,
+      child: MaterialApp(
       title: 'ClawChat',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -97,6 +100,7 @@ class _ClawChatAppState extends State<ClawChatApp> {
         }
         return null;
       },
+    ),
     );
   }
 
