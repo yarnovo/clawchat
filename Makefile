@@ -1,10 +1,14 @@
 VERSION := $(shell cat VERSION)
 
 # ---- App (Flutter) ----
-.PHONY: app-run app-build-web app-build-ios app-build-android
+.PHONY: app-run app-serve app-build-web app-build-ios app-build-android
 
 app-run:
 	cd app && flutter run -d chrome
+
+app-serve: app-build-web
+	@echo "Serving at http://localhost:5555"
+	cd app/build/web && python3 -m http.server 5555
 
 app-build-web:
 	cd app && flutter build web

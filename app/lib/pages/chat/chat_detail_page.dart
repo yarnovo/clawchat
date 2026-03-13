@@ -109,9 +109,10 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
                     ),
                     child: TextField(
                       controller: _controller,
+                      focusNode: _focusNode,
                       maxLines: null,
                       textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _sendMessage(),
+                      onEditingComplete: _sendMessage,
                       decoration: const InputDecoration(
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.symmetric(

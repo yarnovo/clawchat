@@ -97,7 +97,7 @@ class ProfilePage extends StatelessWidget {
 class _ProfileSection extends StatelessWidget {
   final List<_ProfileItem> items;
 
-  const _ProfileSection({super.key, required this.items});
+  const _ProfileSection({required this.items});
 
   @override
   Widget build(BuildContext context) {
@@ -124,7 +124,6 @@ class _ProfileItem extends StatelessWidget {
   final String title;
 
   const _ProfileItem({
-    super.key,
     required this.icon,
     required this.title,
   });
