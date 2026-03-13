@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags: [v*]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Read version
+        id: version
+        run: echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
+
+      # ---- Flutter web ----
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Build Flutter web
+        run: cd app && flutter pub get && flutter build web
+
+      # ---- Go CLI ----
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: cli/go.mod
+
+      - name: Build CLI (linux amd64)
+        run: cd cli && GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=${{ steps.version.outputs.version }}" -o clawchat-linux-amd64 .
+
+      - name: Build CLI (darwin arm64)
+        run: cd cli && GOOS=darwin GOARCH=arm64 go build -ldflags "-X main.version=${{ steps.version.outputs.version }}" -o clawchat-darwin-arm64 .
+
+      # ---- Upload artifacts ----
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            app/build/web/
+            cli/clawchat-linux-amd64
+            cli/clawchat-darwin-arm64
+            server/
+
+      # ---- GitHub Release (tag only) ----
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          files: |
+            cli/clawchat-linux-amd64
+            cli/clawchat-darwin-arm64
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.ECS_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H ${{ secrets.ECS_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy server
+        run: |
+          rsync -az --delete server/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/server/
+          ssh root@${{ secrets.ECS_HOST }} "cd /opt/clawchat/server && docker build -t clawchat-server . && docker rm -f clawchat-server 2>/dev/null; docker run -d --name clawchat-server --restart unless-stopped -p 8000:8000 clawchat-server"
+
+      - name: Deploy CLI
+        run: |
+          scp cli/clawchat-linux-amd64 root@${{ secrets.ECS_HOST }}:/opt/clawchat/cli/clawchat
+          ssh root@${{ secrets.ECS_HOST }} "chmod +x /opt/clawchat/cli/clawchat && ln -sf /opt/clawchat/cli/clawchat /usr/local/bin/clawchat"
+
+      - name: Deploy web
+        run: |
+          rsync -az --delete app/build/web/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/web/
+          ssh root@${{ secrets.ECS_HOST }} "nginx -t && systemctl reload nginx"

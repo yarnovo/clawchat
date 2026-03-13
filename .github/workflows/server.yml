@@ -1,0 +1,22 @@
+name: Server CI
+
+on:
+  push:
+    paths: [server/**]
+  pull_request:
+    paths: [server/**]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - run: uv sync
+      - run: uv run ruff check .
+      - run: uv run pytest
