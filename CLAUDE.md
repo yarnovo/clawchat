@@ -10,7 +10,7 @@
 
 ### 具体规则
 
-- 新增后端服务时，必须确保容器启动时自动完成数据库迁移（如 `prisma db push`），不能依赖手动操作
+- 新增后端服务时，必须确保容器启动时自动完成数据库迁移（如 `prisma migrate deploy`），不能依赖手动操作
 - Docker 服务必须加 `.dockerignore`，排除 `node_modules`、`dist`、`.env` 等，避免 rsync 和 build 变慢
 - rsync 部署时必须 `--exclude=node_modules`，Dockerfile 内 `npm ci` 重新安装
 - `docker-compose.yml` 使用 profiles 区分本地开发（db only）和线上部署（全部服务）

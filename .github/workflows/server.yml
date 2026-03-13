@@ -1,17 +1,17 @@
-name: Server CI
+name: MCP Server CI
 
 on:
   push:
-    paths: [server/**]
+    paths: [mcp-server/**]
   pull_request:
-    paths: [server/**]
+    paths: [mcp-server/**]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: server
+        working-directory: mcp-server
     steps:
       - uses: actions/checkout@v4
 

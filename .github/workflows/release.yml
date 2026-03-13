@@ -88,7 +88,7 @@ jobs:
         run: rsync -az --delete --exclude=node_modules --exclude=dist --exclude=.env --exclude=src/generated im-server/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/im-server/
 
       - name: Deploy mcp-server
-        run: rsync -az --delete mcp-server/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/mcp-server/
+        run: rsync -az --delete --exclude=.venv --exclude=__pycache__ --exclude=.env mcp-server/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/mcp-server/
 
       - name: Deploy web
         run: rsync -az --delete app/build/web/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/web/
