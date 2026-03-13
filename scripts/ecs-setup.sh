@@ -58,10 +58,14 @@ else
   echo "==> All tools already installed"
 fi
 
+# ---- Project directory ----
+echo "==> Creating project directory"
+mkdir -p /opt/clawchat/{im-server,server,cli,web,deploy}
+
 # ---- Verify ----
 echo "==> Verifying"
 docker --version
 docker compose version
 git --version
 
-echo "==> Done"
+echo "==> Done. Next: push a tag to trigger CI/CD deployment."

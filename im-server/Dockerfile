@@ -16,6 +16,8 @@ COPY src ./src
 
 RUN npx tsc
 
+COPY start.sh ./
+
 EXPOSE 3000
 
-CMD ["node", "dist/index.js"]
+CMD ["sh", "start.sh"]

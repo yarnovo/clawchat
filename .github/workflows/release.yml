@@ -85,7 +85,7 @@ jobs:
           rsync -az deploy/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/deploy/
 
       - name: Deploy im-server
-        run: rsync -az --delete im-server/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/im-server/
+        run: rsync -az --delete --exclude=node_modules --exclude=dist --exclude=.env --exclude=src/generated im-server/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/im-server/
 
       - name: Deploy server
         run: rsync -az --delete server/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/server/
