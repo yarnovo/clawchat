@@ -68,6 +68,7 @@ services:
       DATABASE_URL: postgresql://clawchat:clawchat@postgres:5432/clawchat_agent
       IM_SERVER_URL: http://im-server:3000
       OPENCLAW_SERVER_URL: http://openclaw-server:3003
+      NANOCLAW_SERVER_URL: http://nanoclaw-server:3005
       JWT_SECRET: clawchat-dev-secret
       PORT: "3004"
     ports:
@@ -107,6 +108,22 @@ services:
       - "3003:3003"
     volumes:
       - ./openclaw-server/src:/app/src
+
+  nanoclaw-server:
+    build: ./nanoclaw-server
+    container_name: clawchat-nanoclaw-server
+    restart: unless-stopped
+    command: npx tsx watch src/index.ts
+    environment:
+      PORT: "3005"
+      CONTAINER_SERVER_URL: http://container-server:3002
+      NANOCLAW_IMAGE: nanoclaw-agent:local
+      NANOCLAW_NETWORK: clawchat_default
+      IM_SERVER_CALLBACK_URL: http://im-server:3000/v1/im/internal/agent-reply
+    ports:
+      - "3005:3005"
+    volumes:
+      - ./nanoclaw-server/src:/app/src
 
   mcp-server:
     build: ./mcp-server

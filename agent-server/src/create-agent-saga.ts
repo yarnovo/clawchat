@@ -1,7 +1,7 @@
 import { runSaga, type SagaStep } from "./saga.js";
 import { prisma } from "./db.js";
 import * as imClient from "./im-client.js";
-import * as openclawClient from "./openclaw-client.js";
+import { getRuntimeClient } from "./runtime-client.js";
 
 export interface CreateAgentInput {
   ownerId: string;
@@ -12,6 +12,7 @@ export interface CreateAgentInput {
   baseUrl?: string;
   systemPrompt?: string;
   parentId?: string;
+  runtime?: "openclaw" | "nanoclaw";
 }
 
 // Mutable context shared across saga steps
@@ -42,6 +43,8 @@ const steps: SagaStep<CreateAgentContext>[] = [
   {
     name: "create-agent-record",
     execute: async (ctx) => {
+      const runtime = ctx.input.runtime || "openclaw";
+      const defaultModel = runtime === "nanoclaw" ? "claude-sonnet-4-20250514" : "qwen-max";
       const agent = await prisma.agent.create({
         data: {
           accountId: ctx.imAccountId!,
@@ -51,11 +54,12 @@ const steps: SagaStep<CreateAgentContext>[] = [
           avatar: ctx.input.avatar,
           config: {
             create: {
-              model: ctx.input.model || "qwen-max",
+              model: ctx.input.model || defaultModel,
               apiKey: ctx.input.apiKey,
               baseUrl: ctx.input.baseUrl,
               systemPrompt: ctx.input.systemPrompt,
-              gatewayToken: `agent-${ctx.imAccountId}`,
+              runtime,
+              gatewayToken: runtime === "openclaw" ? `agent-${ctx.imAccountId}` : undefined,
             },
           },
         },
@@ -85,10 +89,12 @@ const steps: SagaStep<CreateAgentContext>[] = [
     execute: async (ctx) => {
       if (!ctx.input.apiKey) return; // skip if no API key
 
-      const result = await openclawClient.createInstance({
+      const runtime = ctx.input.runtime || "openclaw";
+      const defaultModel = runtime === "nanoclaw" ? "claude-sonnet-4-20250514" : "qwen-max";
+      const result = await getRuntimeClient(runtime).createInstance({
         agentId: ctx.agentId!,
         accountId: ctx.imAccountId!,
-        model: ctx.input.model || "qwen-max",
+        model: ctx.input.model || defaultModel,
         apiKey: ctx.input.apiKey,
         baseUrl: ctx.input.baseUrl ?? undefined,
         systemPrompt: ctx.input.systemPrompt ?? undefined,
@@ -108,7 +114,8 @@ const steps: SagaStep<CreateAgentContext>[] = [
     compensate: async (ctx) => {
       if (ctx.agentId) {
         try {
-          await openclawClient.removeInstance(ctx.agentId);
+          const runtime = ctx.input.runtime || "openclaw";
+          await getRuntimeClient(runtime).removeInstance(ctx.agentId);
         } catch {
           // Container might not have been created
         }

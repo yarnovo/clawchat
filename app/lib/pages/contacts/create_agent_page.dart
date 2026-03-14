@@ -5,6 +5,8 @@ const _defaultAvatars = ['🤖', '🐱', '🐶', '🦊', '🐼', '🐸', '🦉',
 
 const _defaultBaseUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
 
+enum AgentRuntime { openclaw, nanoclaw }
+
 class CreateAgentPage extends StatefulWidget {
   const CreateAgentPage({super.key});
 
@@ -18,8 +20,22 @@ class _CreateAgentPageState extends State<CreateAgentPage> {
   final _apiKeyController = TextEditingController();
   final _baseUrlController = TextEditingController(text: _defaultBaseUrl);
   String _selectedAvatar = '🤖';
+  AgentRuntime _runtime = AgentRuntime.openclaw;
   bool _showAdvanced = false;
   bool _submitting = false;
+
+  void _onRuntimeChanged(AgentRuntime runtime) {
+    setState(() {
+      _runtime = runtime;
+      if (runtime == AgentRuntime.nanoclaw) {
+        _modelController.text = 'claude-sonnet-4-20250514';
+        _baseUrlController.text = '';
+      } else {
+        _modelController.text = 'qwen-max';
+        _baseUrlController.text = _defaultBaseUrl;
+      }
+    });
+  }
 
   Future<void> _submit() async {
     final name = _nameController.text.trim();
@@ -36,7 +52,8 @@ class _CreateAgentPageState extends State<CreateAgentPage> {
       avatar: _selectedAvatar,
       model: model.isNotEmpty ? model : null,
       apiKey: apiKey.isNotEmpty ? apiKey : null,
-      apiBaseUrl: baseUrl != _defaultBaseUrl && baseUrl.isNotEmpty ? baseUrl : null,
+      apiBaseUrl: baseUrl.isNotEmpty && baseUrl != _defaultBaseUrl ? baseUrl : null,
+      runtime: _runtime == AgentRuntime.nanoclaw ? 'nanoclaw' : null,
     );
     if (!mounted) return;
 
@@ -97,6 +114,20 @@ class _CreateAgentPageState extends State<CreateAgentPage> {
               }).toList(),
             ),
             const SizedBox(height: 24),
+            const Text('运行时', style: TextStyle(fontSize: 14, color: Colors.grey)),
+            const SizedBox(height: 8),
+            SegmentedButton<AgentRuntime>(
+              segments: const [
+                ButtonSegment(value: AgentRuntime.openclaw, label: Text('OpenClaw')),
+                ButtonSegment(value: AgentRuntime.nanoclaw, label: Text('NanoClaw')),
+              ],
+              selected: {_runtime},
+              onSelectionChanged: (v) => _onRuntimeChanged(v.first),
+              style: ButtonStyle(
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+            const SizedBox(height: 24),
             TextField(
               controller: _nameController,
               decoration: const InputDecoration(
@@ -119,10 +150,10 @@ class _CreateAgentPageState extends State<CreateAgentPage> {
             const SizedBox(height: 24),
             TextField(
               controller: _apiKeyController,
-              decoration: const InputDecoration(
-                labelText: 'API Key',
-                hintText: 'sk-...',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: _runtime == AgentRuntime.nanoclaw ? 'Anthropic API Key' : 'API Key',
+                hintText: _runtime == AgentRuntime.nanoclaw ? 'sk-ant-...' : 'sk-...',
+                border: const OutlineInputBorder(),
               ),
               obscureText: true,
             ),
@@ -146,11 +177,15 @@ class _CreateAgentPageState extends State<CreateAgentPage> {
               const SizedBox(height: 12),
               TextField(
                 controller: _baseUrlController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'API Base URL',
-                  hintText: _defaultBaseUrl,
-                  border: OutlineInputBorder(),
-                  helperText: '大多数模型厂商都兼容 OpenAI API 格式',
+                  hintText: _runtime == AgentRuntime.nanoclaw
+                      ? 'https://openrouter.ai/api'
+                      : _defaultBaseUrl,
+                  border: const OutlineInputBorder(),
+                  helperText: _runtime == AgentRuntime.nanoclaw
+                      ? '使用 OpenRouter 等代理时填写'
+                      : '大多数模型厂商都兼容 OpenAI API 格式',
                 ),
               ),
             ],

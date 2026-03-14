@@ -4,7 +4,7 @@ import { logger } from "./logger.js";
 import { requestId } from "./middleware/request-id.js";
 import { registry, httpRequestDuration, httpRequestsTotal } from "./metrics.js";
 import { prisma } from "./db.js";
-import * as openclawClient from "./openclaw-client.js";
+import { getRuntimeClient } from "./runtime-client.js";
 import { createAgentSaga } from "./create-agent-saga.js";
 import { authMiddleware } from "./auth.js";
 import type { AppEnv } from "./env.js";
@@ -68,7 +68,7 @@ async function getOwnedAgent(agentId: string, ownerId: string) {
 // Create Agent (Saga pattern — automatic rollback on failure)
 app.post("/", async (c) => {
   const ownerId = c.get("accountId");
-  const { name, avatar, model, apiKey, baseUrl, systemPrompt, parentId } =
+  const { name, avatar, model, apiKey, baseUrl, systemPrompt, parentId, runtime } =
     await c.req.json();
 
   if (!name) {
@@ -76,7 +76,7 @@ app.post("/", async (c) => {
   }
 
   const result = await createAgentSaga({
-    ownerId, name, avatar, model, apiKey, baseUrl, systemPrompt, parentId,
+    ownerId, name, avatar, model, apiKey, baseUrl, systemPrompt, parentId, runtime,
   });
 
   if (!result.success) {
@@ -104,6 +104,7 @@ app.get("/", async (c) => {
       config: {
         select: {
           model: true,
+          runtime: true,
           status: true,
           startedAt: true,
           stoppedAt: true,
@@ -159,9 +160,10 @@ app.delete("/:id", async (c) => {
   if (error === "Agent not found") return c.json({ error }, 404);
   if (error === "Forbidden") return c.json({ error }, 403);
 
-  // 1. Stop and remove OpenClaw instance
+  // 1. Stop and remove runtime instance
   try {
-    await openclawClient.removeInstance(agent!.id);
+    const runtime = agent!.config?.runtime ?? "openclaw";
+    await getRuntimeClient(runtime).removeInstance(agent!.id);
   } catch {
     // Instance might not exist
   }
@@ -188,7 +190,8 @@ app.post("/:id/start", async (c) => {
       data: { status: "starting" },
     });
 
-    const result = await openclawClient.createInstance({
+    const runtime = agent!.config!.runtime ?? "openclaw";
+    const result = await getRuntimeClient(runtime).createInstance({
       agentId: agent!.id,
       accountId: agent!.accountId,
       model: agent!.config!.model,
@@ -226,7 +229,8 @@ app.post("/:id/stop", async (c) => {
   if (error === "Forbidden") return c.json({ error }, 403);
 
   try {
-    await openclawClient.stopInstance(agent!.id);
+    const runtime = agent!.config?.runtime ?? "openclaw";
+    await getRuntimeClient(runtime).stopInstance(agent!.id);
 
     await prisma.agentConfig.update({
       where: { agentId: agent!.id },
@@ -262,7 +266,8 @@ app.post("/:id/chat", async (c) => {
   }
 
   try {
-    await openclawClient.chat({
+    const runtime = agent.config?.runtime ?? "openclaw";
+    await getRuntimeClient(runtime).chat({
       agentId: agent.id,
       message,
       sessionKey,

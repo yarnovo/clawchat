@@ -110,6 +110,7 @@ class ApiClient {
     String? model,
     String? apiKey,
     String? apiBaseUrl,
+    String? runtime,
   }) async {
     final res = await _http.post(
       Uri.parse('$baseUrl/v1/agents'),
@@ -120,6 +121,7 @@ class ApiClient {
         if (model != null) 'model': model, // ignore: use_null_aware_elements
         if (apiKey != null) 'apiKey': apiKey, // ignore: use_null_aware_elements
         if (apiBaseUrl != null) 'baseUrl': apiBaseUrl, // ignore: use_null_aware_elements
+        if (runtime != null) 'runtime': runtime, // ignore: use_null_aware_elements
       }),
     );
     return ApiResponse(res.statusCode, jsonDecode(res.body));

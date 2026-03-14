@@ -1,0 +1,25 @@
+# ClawChat NanoClaw Agent — nanoclaw-agent:latest + HTTP bridge
+# Build context: project root
+# Usage: docker build -f nanoclaw-server/Dockerfile.agent -t nanoclaw-agent:local .
+
+FROM nanoclaw-agent:latest
+
+# Install bridge
+USER root
+COPY nanoclaw-server/bridge/ /app/bridge/
+WORKDIR /app/bridge
+RUN npm ci && npm run build
+
+# Entrypoint script for bridge + agent-runner
+COPY nanoclaw-server/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+USER node
+
+# Bridge webhook port
+EXPOSE 18790
+
+HEALTHCHECK --interval=3m --timeout=10s --start-period=30s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:18790/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

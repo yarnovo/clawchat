@@ -4,6 +4,7 @@ export default defineConfig({
   testDir: "./tests",
   timeout: 60000,
   retries: 0,
+  workers: 1, // Sequential: create-agent tests share cleanup prefix
   use: {
     baseURL: process.env.BASE_URL || "http://localhost:8080",
     browserName: "chromium",

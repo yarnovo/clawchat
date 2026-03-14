@@ -11,6 +11,12 @@ datasource db {
 // 枚举
 // ============================================================
 
+/// Agent 运行时类型
+enum AgentRuntime {
+  openclaw
+  nanoclaw
+}
+
 /// Agent 容器运行状态
 enum AgentStatus {
   created           // 刚创建，尚未启动
@@ -50,7 +56,8 @@ model AgentConfig {
   baseUrl      String?                    // 自定义 API Base URL（OpenAI compatible）
   systemPrompt String?                    // Agent 性格/系统提示词
 
-  // OpenClaw 容器信息
+  // 运行时和容器信息
+  runtime      AgentRuntime @default(openclaw) // 运行时类型
   containerId  String?                    // Docker 容器 ID
   volumeName   String?                    // Docker Volume 名称
   gatewayToken String?                    // OpenClaw Gateway 连接 Token

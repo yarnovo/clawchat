@@ -9,7 +9,20 @@ vi.mock("../im-client.js", () => ({
 
 vi.mock("../openclaw-client.js", () => ({
   createInstance: vi.fn(),
+  startInstance: vi.fn(),
+  stopInstance: vi.fn(),
   removeInstance: vi.fn(),
+  getInstanceStatus: vi.fn(),
+  chat: vi.fn(),
+}));
+
+vi.mock("../nanoclaw-client.js", () => ({
+  createInstance: vi.fn(),
+  startInstance: vi.fn(),
+  stopInstance: vi.fn(),
+  removeInstance: vi.fn(),
+  getInstanceStatus: vi.fn(),
+  chat: vi.fn(),
 }));
 
 vi.mock("../db.js", () => ({
@@ -27,6 +40,7 @@ vi.mock("../db.js", () => ({
 
 import * as imClient from "../im-client.js";
 import * as openclawClient from "../openclaw-client.js";
+import * as nanoclawClient from "../nanoclaw-client.js";
 import { prisma } from "../db.js";
 import { createAgentSaga } from "../create-agent-saga.js";
 
@@ -52,6 +66,8 @@ beforeEach(() => {
   vi.mocked(prisma.agentConfig.update).mockResolvedValue({} as never);
   vi.mocked(openclawClient.createInstance).mockResolvedValue({ containerId: "ctr-1" });
   vi.mocked(openclawClient.removeInstance).mockResolvedValue(undefined);
+  vi.mocked(nanoclawClient.createInstance).mockResolvedValue({ containerId: "nc-ctr-1" });
+  vi.mocked(nanoclawClient.removeInstance).mockResolvedValue(undefined);
 });
 
 describe("createAgentSaga", () => {
@@ -142,6 +158,73 @@ describe("createAgentSaga", () => {
     expect(openclawClient.removeInstance).not.toHaveBeenCalled();
     expect(prisma.agent.delete).toHaveBeenCalled();
     expect(imClient.deleteAgentAccount).toHaveBeenCalled();
+  });
+
+  it("NanoClaw runtime — 默认 model 是 claude-sonnet-4-20250514", async () => {
+    const result = await createAgentSaga({
+      ownerId: "user-1",
+      name: "NanoBot",
+      runtime: "nanoclaw",
+    });
+
+    expect(result.success).toBe(true);
+    expect(prisma.agent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          config: expect.objectContaining({
+            create: expect.objectContaining({
+              model: "claude-sonnet-4-20250514",
+              runtime: "nanoclaw",
+            }),
+          }),
+        }),
+      }),
+    );
+    // No gatewayToken for nanoclaw
+    expect(prisma.agent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          config: expect.objectContaining({
+            create: expect.objectContaining({
+              gatewayToken: undefined,
+            }),
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("NanoClaw runtime + apiKey — 调用 nanoclawClient 而非 openclawClient", async () => {
+    const result = await createAgentSaga({
+      ownerId: "user-1",
+      name: "NanoBot",
+      apiKey: "sk-ant-test",
+      runtime: "nanoclaw",
+    });
+
+    expect(result.success).toBe(true);
+    expect(nanoclawClient.createInstance).toHaveBeenCalled();
+    expect(openclawClient.createInstance).not.toHaveBeenCalled();
+  });
+
+  it("NanoClaw 容器启动失败 — 补偿调用 nanoclawClient.removeInstance", async () => {
+    vi.mocked(nanoclawClient.createInstance).mockRejectedValueOnce(
+      new Error("nanoclaw unavailable"),
+    );
+
+    const result = await createAgentSaga({
+      ownerId: "user-1",
+      name: "NanoBot",
+      apiKey: "sk-ant-test",
+      runtime: "nanoclaw",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.failedStep).toBe("start-container");
+    }
+    // Should NOT call openclaw removeInstance
+    expect(openclawClient.removeInstance).not.toHaveBeenCalled();
   });
 
   it("DB 创建失败 — 补偿：只删 im 账号", async () => {

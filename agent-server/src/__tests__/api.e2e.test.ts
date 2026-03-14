@@ -24,11 +24,21 @@ vi.mock("../openclaw-client.js", () => ({
   chat: vi.fn(async () => "Hello from mock agent!"),
 }));
 
+vi.mock("../nanoclaw-client.js", () => ({
+  createInstance: vi.fn(async () => ({ containerId: "mock-nanoclaw-ctr-123" })),
+  startInstance: vi.fn(async () => {}),
+  stopInstance: vi.fn(async () => {}),
+  removeInstance: vi.fn(async () => {}),
+  getInstanceStatus: vi.fn(async () => ({ state: "running" })),
+  chat: vi.fn(async () => {}),
+}));
+
 import jwt from "jsonwebtoken";
 import app from "../app.js";
 import { prisma } from "../db.js";
 import * as imClient from "../im-client.js";
 import * as openclawClient from "../openclaw-client.js";
+import * as nanoclawClient from "../nanoclaw-client.js";
 
 const ts = Date.now();
 const ownerId = `owner-${ts}`;
@@ -388,5 +398,112 @@ describe("Agent Lifecycle", () => {
 
     // Clean up
     await prisma.agent.delete({ where: { id: agent.id } }).catch(() => {});
+  });
+});
+
+describe("NanoClaw Runtime", () => {
+  let ncAgentId: string;
+
+  afterAll(async () => {
+    if (ncAgentId) {
+      await prisma.agent.delete({ where: { id: ncAgentId } }).catch(() => {});
+    }
+  });
+
+  it("POST / 创建 NanoClaw Agent — runtime=nanoclaw, 默认 model", async () => {
+    const res = await request(
+      "/",
+      jsonReq("POST", {
+        name: "NanoBot",
+        avatar: "🐱",
+        runtime: "nanoclaw",
+      }),
+    );
+    expect(res.status).toBe(201);
+
+    const body = await res.json();
+    expect(body.config.runtime).toBe("nanoclaw");
+    expect(body.config.model).toBe("claude-sonnet-4-20250514");
+    expect(body.config.status).toBe("created");
+    expect(body.config.gatewayToken).toBeNull();
+
+    ncAgentId = body.id;
+  });
+
+  it("GET / 列表返回 runtime 字段", async () => {
+    const res = await request("/");
+    expect(res.status).toBe(200);
+    const agents = await res.json();
+    const nc = agents.find((a: { id: string }) => a.id === ncAgentId);
+    expect(nc).toBeDefined();
+    expect(nc.config.runtime).toBe("nanoclaw");
+  });
+
+  it("POST / NanoClaw + apiKey 调用 nanoclawClient.createInstance", async () => {
+    vi.mocked(nanoclawClient.createInstance).mockClear();
+    vi.mocked(openclawClient.createInstance).mockClear();
+
+    const res = await request(
+      "/",
+      jsonReq("POST", {
+        name: "NanoAutoStart",
+        apiKey: "sk-ant-test",
+        runtime: "nanoclaw",
+      }),
+    );
+    expect(res.status).toBe(201);
+
+    const body = await res.json();
+    expect(body.config.status).toBe("running");
+    expect(body.config.containerId).toBe("mock-nanoclaw-ctr-123");
+
+    // Should route to nanoclaw, not openclaw
+    expect(nanoclawClient.createInstance).toHaveBeenCalled();
+    expect(openclawClient.createInstance).not.toHaveBeenCalled();
+
+    await prisma.agent.delete({ where: { id: body.id } });
+  });
+
+  it("POST /:id/start NanoClaw Agent 调用 nanoclawClient", async () => {
+    // Give the agent an apiKey first
+    await prisma.agentConfig.update({
+      where: { agentId: ncAgentId },
+      data: { apiKey: "sk-ant-test" },
+    });
+
+    vi.mocked(nanoclawClient.createInstance).mockClear();
+    vi.mocked(openclawClient.createInstance).mockClear();
+
+    const res = await request(`/${ncAgentId}/start`, { method: "POST" });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.containerId).toBe("mock-nanoclaw-ctr-123");
+
+    expect(nanoclawClient.createInstance).toHaveBeenCalled();
+    expect(openclawClient.createInstance).not.toHaveBeenCalled();
+  });
+
+  it("POST /:id/stop NanoClaw Agent 调用 nanoclawClient", async () => {
+    vi.mocked(nanoclawClient.stopInstance).mockClear();
+    vi.mocked(openclawClient.stopInstance).mockClear();
+
+    const res = await request(`/${ncAgentId}/stop`, { method: "POST" });
+    expect(res.status).toBe(200);
+
+    expect(nanoclawClient.stopInstance).toHaveBeenCalled();
+    expect(openclawClient.stopInstance).not.toHaveBeenCalled();
+  });
+
+  it("DELETE /:id NanoClaw Agent 调用 nanoclawClient.removeInstance", async () => {
+    vi.mocked(nanoclawClient.removeInstance).mockClear();
+    vi.mocked(openclawClient.removeInstance).mockClear();
+
+    const res = await request(`/${ncAgentId}`, { method: "DELETE" });
+    expect(res.status).toBe(200);
+
+    expect(nanoclawClient.removeInstance).toHaveBeenCalled();
+    expect(openclawClient.removeInstance).not.toHaveBeenCalled();
+
+    ncAgentId = ""; // prevent afterAll cleanup
   });
 });
