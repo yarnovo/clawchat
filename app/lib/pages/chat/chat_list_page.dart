@@ -6,7 +6,26 @@ import '../contacts/add_friend_page.dart';
 import '../contacts/create_agent_page.dart';
 
 class ChatListPage extends StatefulWidget {
-  const ChatListPage({super.key});
+  /// 宽屏模式下点击会话的回调，为 null 时使用 Navigator.pushNamed
+  final void Function(String conversationId, String name, String avatar)?
+      onItemTap;
+
+  /// 宽屏模式下导航到二级页面的回调
+  final void Function(Widget page)? onNavigate;
+
+  /// 当前选中的会话 ID（宽屏模式下高亮用）
+  final String? selectedConversationId;
+
+  /// 嵌入模式下不包 Scaffold
+  final bool embedded;
+
+  const ChatListPage({
+    super.key,
+    this.onItemTap,
+    this.onNavigate,
+    this.selectedConversationId,
+    this.embedded = false,
+  });
 
   @override
   State<ChatListPage> createState() => ChatListPageState();
@@ -44,7 +63,6 @@ class ChatListPageState extends State<ChatListPage> {
       setState(() {
         final idx = _conversations.indexWhere((c) => c['id'] == convId);
         if (idx >= 0) {
-          // Update lastMessage and move to top
           _conversations[idx] = {
             ..._conversations[idx],
             'lastMessage': {
@@ -57,7 +75,6 @@ class ChatListPageState extends State<ChatListPage> {
             _conversations.insert(0, conv);
           }
         } else {
-          // New conversation — full reload to get friend info etc.
           _load();
         }
       });
@@ -81,8 +98,134 @@ class ChatListPageState extends State<ChatListPage> {
     }
   }
 
+  void _onMenuSelected(String value) async {
+    Widget page;
+    if (value == 'add') {
+      page = const AddFriendPage();
+    } else {
+      page = const CreateAgentPage();
+    }
+    if (widget.onNavigate != null) {
+      widget.onNavigate!(page);
+    } else {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => page),
+      );
+      _load();
+    }
+  }
+
+  void _onConversationTap(Map<String, dynamic> conv) async {
+    final friend = conv['friend'] as Map<String, dynamic>?;
+    final name = friend?['name'] ?? '未知';
+    final avatar = friend?['avatar'] ?? '👤';
+    final conversationId = conv['id'] as String;
+
+    if (widget.onItemTap != null) {
+      widget.onItemTap!(conversationId, name, avatar);
+    } else {
+      await Navigator.pushNamed(
+        context,
+        '/chat_detail',
+        arguments: {
+          'name': name,
+          'avatar': avatar,
+          'conversationId': conversationId,
+        },
+      );
+      _load();
+    }
+  }
+
+  Widget _buildAppBarActions() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          icon: const Icon(Icons.search, size: 22),
+          onPressed: () {},
+        ),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.add_circle_outline, size: 22),
+          onSelected: _onMenuSelected,
+          itemBuilder: (_) => const [
+            PopupMenuItem(value: 'add', child: Text('添加朋友')),
+            PopupMenuItem(value: 'create', child: Text('创建朋友')),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBody() {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: _conversations.isEmpty
+          ? ListView(
+              children: const [
+                SizedBox(height: 200),
+                Center(
+                  child:
+                      Text('暂无聊天', style: TextStyle(color: Colors.grey)),
+                ),
+              ],
+            )
+          : ListView.builder(
+              itemCount: _conversations.length,
+              itemBuilder: (context, index) {
+                final conv = _conversations[index];
+                final friend = conv['friend'] as Map<String, dynamic>?;
+                final lastMsg =
+                    conv['lastMessage'] as Map<String, dynamic>?;
+                final isSelected =
+                    widget.selectedConversationId == conv['id'];
+
+                return _ChatItem(
+                  name: friend?['name'] ?? '未知',
+                  avatar: friend?['avatar'] ?? '👤',
+                  lastMessage: lastMsg?['content'] ?? '',
+                  time: _formatTime(lastMsg?['createdAt']),
+                  selected: isSelected,
+                  onTap: () => _onConversationTap(conv),
+                );
+              },
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.embedded) {
+      return Column(
+        children: [
+          Container(
+            color: const Color(0xFFEDEDED),
+            padding: const EdgeInsets.only(left: 16, right: 4, top: 8),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'ClawChat',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF191919),
+                    ),
+                  ),
+                ),
+                _buildAppBarActions(),
+              ],
+            ),
+          ),
+          Expanded(child: _buildBody()),
+        ],
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('ClawChat'),
@@ -93,19 +236,7 @@ class ChatListPageState extends State<ChatListPage> {
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.add_circle_outline, size: 22),
-            onSelected: (value) async {
-              Widget page;
-              if (value == 'add') {
-                page = const AddFriendPage();
-              } else {
-                page = const CreateAgentPage();
-              }
-              await Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => page),
-              );
-              _load();
-            },
+            onSelected: _onMenuSelected,
             itemBuilder: (_) => const [
               PopupMenuItem(value: 'add', child: Text('添加朋友')),
               PopupMenuItem(value: 'create', child: Text('创建朋友')),
@@ -113,50 +244,7 @@ class ChatListPageState extends State<ChatListPage> {
           ),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _load,
-              child: _conversations.isEmpty
-                  ? ListView(
-                      children: const [
-                        SizedBox(height: 200),
-                        Center(
-                          child: Text('暂无聊天',
-                              style: TextStyle(color: Colors.grey)),
-                        ),
-                      ],
-                    )
-                  : ListView.builder(
-                      itemCount: _conversations.length,
-                      itemBuilder: (context, index) {
-                        final conv = _conversations[index];
-                        final friend =
-                            conv['friend'] as Map<String, dynamic>?;
-                        final lastMsg =
-                            conv['lastMessage'] as Map<String, dynamic>?;
-
-                        return _ChatItem(
-                          name: friend?['name'] ?? '未知',
-                          avatar: friend?['avatar'] ?? '👤',
-                          lastMessage: lastMsg?['content'] ?? '',
-                          time: _formatTime(lastMsg?['createdAt']),
-                          onTap: () async {
-                            await Navigator.pushNamed(
-                              context,
-                              '/chat_detail',
-                              arguments: {
-                                'name': friend?['name'] ?? '未知',
-                                'avatar': friend?['avatar'] ?? '👤',
-                                'conversationId': conv['id'],
-                              },
-                            );
-                            _load();
-                          },
-                        );
-                      },
-                    ),
-            ),
+      body: _buildBody(),
     );
   }
 
@@ -180,6 +268,7 @@ class _ChatItem extends StatelessWidget {
   final String avatar;
   final String lastMessage;
   final String time;
+  final bool selected;
   final VoidCallback onTap;
 
   const _ChatItem({
@@ -187,6 +276,7 @@ class _ChatItem extends StatelessWidget {
     required this.avatar,
     required this.lastMessage,
     required this.time,
+    this.selected = false,
     required this.onTap,
   });
 
@@ -195,7 +285,7 @@ class _ChatItem extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       child: Container(
-        color: Colors.white,
+        color: selected ? const Color(0xFFD8D8D8) : Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [

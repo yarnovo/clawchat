@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import '../../services/service_provider.dart';
 
 class FriendRequestsPage extends StatefulWidget {
-  const FriendRequestsPage({super.key});
+  final bool embedded;
+  final VoidCallback? onDone;
+
+  const FriendRequestsPage({super.key, this.embedded = false, this.onDone});
 
   @override
   State<FriendRequestsPage> createState() => _FriendRequestsPageState();
@@ -40,7 +43,10 @@ class _FriendRequestsPageState extends State<FriendRequestsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('新的朋友')),
+      appBar: AppBar(
+        automaticallyImplyLeading: !widget.embedded,
+        title: const Text('新的朋友'),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _requests.isEmpty

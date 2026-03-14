@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
 class DiscoverPage extends StatelessWidget {
-  const DiscoverPage({super.key});
+  final bool embedded;
+
+  const DiscoverPage({super.key, this.embedded = false});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('发现')),
-      body: ListView(
+    final body = ListView(
         children: const [
           SizedBox(height: 8),
           _DiscoverSection(
@@ -70,7 +70,35 @@ class DiscoverPage extends StatelessWidget {
             ],
           ),
         ],
-      ),
+      );
+
+    if (embedded) {
+      return Column(
+        children: [
+          Container(
+            color: const Color(0xFFEDEDED),
+            padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 8),
+            child: const Row(
+              children: [
+                Text(
+                  '发现',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF191919),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(child: body),
+        ],
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('发现')),
+      body: body,
     );
   }
 }

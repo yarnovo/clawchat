@@ -66,13 +66,16 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
                 const Icon(Icons.chat, size: 64, color: Color(0xFF07C160)),
                 const SizedBox(height: 8),
                 const Text(
@@ -132,9 +135,11 @@ class _LoginPageState extends State<LoginPage> {
                   onPressed: () => Navigator.pushNamed(context, '/register'),
                   child: const Text('没有账号？立即注册'),
                 ),
-              ],
+                ],
+              ),
             ),
           ),
+        ),
         ),
       ),
     );

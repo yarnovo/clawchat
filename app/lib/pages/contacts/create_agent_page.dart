@@ -5,10 +5,13 @@ const _defaultAvatars = ['🤖', '🐱', '🐶', '🦊', '🐼', '🐸', '🦉',
 
 const _defaultBaseUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
 
-enum AgentRuntime { openclaw, nanoclaw }
+enum AgentRuntime { openclaw, nanoclaw, ironclaw }
 
 class CreateAgentPage extends StatefulWidget {
-  const CreateAgentPage({super.key});
+  final bool embedded;
+  final VoidCallback? onDone;
+
+  const CreateAgentPage({super.key, this.embedded = false, this.onDone});
 
   @override
   State<CreateAgentPage> createState() => _CreateAgentPageState();
@@ -27,12 +30,16 @@ class _CreateAgentPageState extends State<CreateAgentPage> {
   void _onRuntimeChanged(AgentRuntime runtime) {
     setState(() {
       _runtime = runtime;
-      if (runtime == AgentRuntime.nanoclaw) {
-        _modelController.text = 'claude-sonnet-4-20250514';
-        _baseUrlController.text = '';
-      } else {
-        _modelController.text = 'qwen-max';
-        _baseUrlController.text = _defaultBaseUrl;
+      switch (runtime) {
+        case AgentRuntime.nanoclaw:
+          _modelController.text = 'claude-sonnet-4-20250514';
+          _baseUrlController.text = '';
+        case AgentRuntime.ironclaw:
+          _modelController.text = 'qwen-max';
+          _baseUrlController.text = _defaultBaseUrl;
+        case AgentRuntime.openclaw:
+          _modelController.text = 'qwen-max';
+          _baseUrlController.text = _defaultBaseUrl;
       }
     });
   }
@@ -53,7 +60,7 @@ class _CreateAgentPageState extends State<CreateAgentPage> {
       model: model.isNotEmpty ? model : null,
       apiKey: apiKey.isNotEmpty ? apiKey : null,
       apiBaseUrl: baseUrl.isNotEmpty && baseUrl != _defaultBaseUrl ? baseUrl : null,
-      runtime: _runtime == AgentRuntime.nanoclaw ? 'nanoclaw' : null,
+      runtime: _runtime == AgentRuntime.openclaw ? null : _runtime.name,
     );
     if (!mounted) return;
 
@@ -64,7 +71,11 @@ class _CreateAgentPageState extends State<CreateAgentPage> {
         await api.createConversation(friendId: accountId);
       }
       if (!mounted) return;
-      Navigator.pop(context, true);
+      if (widget.embedded) {
+        widget.onDone?.call();
+      } else {
+        Navigator.pop(context, true);
+      }
     } else {
       setState(() => _submitting = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -85,7 +96,10 @@ class _CreateAgentPageState extends State<CreateAgentPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('创建朋友')),
+      appBar: AppBar(
+        automaticallyImplyLeading: !widget.embedded,
+        title: const Text('创建朋友'),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -120,6 +134,7 @@ class _CreateAgentPageState extends State<CreateAgentPage> {
               segments: const [
                 ButtonSegment(value: AgentRuntime.openclaw, label: Text('OpenClaw')),
                 ButtonSegment(value: AgentRuntime.nanoclaw, label: Text('NanoClaw')),
+                ButtonSegment(value: AgentRuntime.ironclaw, label: Text('IronClaw')),
               ],
               selected: {_runtime},
               onSelectionChanged: (v) => _onRuntimeChanged(v.first),
@@ -151,7 +166,7 @@ class _CreateAgentPageState extends State<CreateAgentPage> {
             TextField(
               controller: _apiKeyController,
               decoration: InputDecoration(
-                labelText: _runtime == AgentRuntime.nanoclaw ? 'Anthropic API Key' : 'API Key',
+                labelText: _runtime == AgentRuntime.nanoclaw ? 'Anthropic API Key' : 'API Key (OpenAI compatible)',
                 hintText: _runtime == AgentRuntime.nanoclaw ? 'sk-ant-...' : 'sk-...',
                 border: const OutlineInputBorder(),
               ),
@@ -185,7 +200,9 @@ class _CreateAgentPageState extends State<CreateAgentPage> {
                   border: const OutlineInputBorder(),
                   helperText: _runtime == AgentRuntime.nanoclaw
                       ? '使用 OpenRouter 等代理时填写'
-                      : '大多数模型厂商都兼容 OpenAI API 格式',
+                      : _runtime == AgentRuntime.ironclaw
+                          ? 'IronClaw 支持任意 OpenAI 兼容 API'
+                          : '大多数模型厂商都兼容 OpenAI API 格式',
                 ),
               ),
             ],

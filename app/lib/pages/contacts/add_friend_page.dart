@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import '../../services/service_provider.dart';
 
 class AddFriendPage extends StatefulWidget {
-  const AddFriendPage({super.key});
+  final bool embedded;
+  final VoidCallback? onDone;
+
+  const AddFriendPage({super.key, this.embedded = false, this.onDone});
 
   @override
   State<AddFriendPage> createState() => _AddFriendPageState();
@@ -41,9 +44,7 @@ class _AddFriendPageState extends State<AddFriendPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('添加好友')),
-      body: Padding(
+    final body = Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
@@ -97,7 +98,21 @@ class _AddFriendPageState extends State<AddFriendPage> {
             ],
           ],
         ),
-      ),
+      );
+
+    if (widget.embedded) {
+      return Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          title: const Text('添加好友'),
+        ),
+        body: body,
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('添加好友')),
+      body: body,
     );
   }
 }

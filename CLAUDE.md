@@ -27,6 +27,14 @@ agent-server ──→ openclaw-server (3003) ──→ container-server (3002) 
 2. 用户发消息给 Agent → im-server → agent-server /chat → openclaw 容器
 3. Agent 回复 → openclaw 容器 callback → im-server Redis queue → Worker 存消息 + WebSocket 推送
 
+## 本地开发流程
+
+- `make dev` — 启动所有服务（Docker Compose + nginx），Web UI 在 http://localhost:8080
+- `make reload` — 前端改动后重新构建 Flutter Web + 重启 nginx，刷新即可看到效果
+- `make dev-stop` — 停止所有服务
+- **禁止用 `flutter run -d chrome` 做本地开发**，前端通过 nginx 代理访问（与后端 API 同域）
+- Playwright MCP 调试目标地址：http://localhost:8080
+
 ## 部署检查清单
 
 每次修改部署相关配置时，必须验证以下完整流程可行：

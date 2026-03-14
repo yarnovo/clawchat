@@ -8,11 +8,15 @@ class ChatDetailPage extends StatefulWidget {
   final String avatar;
   final String conversationId;
 
+  /// 嵌入模式（宽屏右侧面板），不显示返回按钮
+  final bool embedded;
+
   const ChatDetailPage({
     super.key,
     required this.name,
     required this.avatar,
     required this.conversationId,
+    this.embedded = false,
   });
 
   @override
@@ -143,6 +147,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.embedded,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -194,7 +199,9 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
               left: 8,
               right: 8,
               top: 8,
-              bottom: MediaQuery.of(context).padding.bottom + 8,
+              bottom: widget.embedded
+                  ? 8
+                  : MediaQuery.of(context).padding.bottom + 8,
             ),
             child: Row(
               children: [

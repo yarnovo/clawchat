@@ -72,13 +72,16 @@ class _RegisterPageState extends State<RegisterPage> {
         backgroundColor: Colors.white,
         title: const Text('注册'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 400),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
@@ -139,8 +142,10 @@ class _RegisterPageState extends State<RegisterPage> {
                       : const Text('注册'),
                 ),
               ),
-            ],
+              ],
+            ),
           ),
+        ),
         ),
       ),
     );

@@ -2,14 +2,13 @@ import 'package:flutter/material.dart';
 
 class ProfilePage extends StatelessWidget {
   final VoidCallback? onLogout;
+  final bool embedded;
 
-  const ProfilePage({super.key, this.onLogout});
+  const ProfilePage({super.key, this.onLogout, this.embedded = false});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('我')),
-      body: ListView(
+    final body = ListView(
         children: [
           // 个人信息卡片
           Container(
@@ -112,7 +111,35 @@ class ProfilePage extends StatelessWidget {
             ),
           ],
         ],
-      ),
+      );
+
+    if (embedded) {
+      return Column(
+        children: [
+          Container(
+            color: const Color(0xFFEDEDED),
+            padding: const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 8),
+            child: const Row(
+              children: [
+                Text(
+                  '我',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF191919),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(child: body),
+        ],
+      );
+    }
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('我')),
+      body: body,
     );
   }
 }
