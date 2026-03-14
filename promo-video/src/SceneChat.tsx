@@ -112,6 +112,57 @@ const ChatBubble: React.FC<{
   );
 };
 
+// Typing indicator — visible between first user msg and first agent reply
+const TypingIndicator: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) => {
+  // Show after first user message (frame 10), hide when tool call appears (frame 50)
+  const showAt = 25;
+  const hideAt = 50;
+  if (frame < showAt || frame >= hideAt) return null;
+
+  const ent = spring({ frame: frame - showAt, fps, config: { damping: 15, mass: 0.6 } });
+  // Pulsing dots animation
+  const dotPhase = (frame % 20) / 20;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        opacity: interpolate(ent, [0, 1], [0, 1]),
+        transform: `translateY(${interpolate(ent, [0, 1], [10, 0])}px)`,
+      }}
+    >
+      <div
+        style={{
+          fontFamily: FONT,
+          fontSize: 14,
+          color: "rgba(255,255,255,0.4)",
+          fontStyle: "italic",
+        }}
+      >
+        正在输入
+      </div>
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          style={{
+            width: 6,
+            height: 6,
+            borderRadius: 3,
+            background: "rgba(255,255,255,0.4)",
+            opacity: interpolate(
+              ((dotPhase + i * 0.3) % 1),
+              [0, 0.5, 1],
+              [0.3, 1, 0.3],
+            ),
+          }}
+        />
+      ))}
+    </div>
+  );
+};
+
 export const SceneChat: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -190,6 +241,8 @@ export const SceneChat: React.FC = () => {
             {messages.map((msg, i) => (
               <ChatBubble key={i} msg={msg} frame={frame} fps={fps} />
             ))}
+            {/* Typing indicator — shows between user message and agent reply */}
+            <TypingIndicator frame={frame} fps={fps} />
           </div>
 
           {/* Input bar */}

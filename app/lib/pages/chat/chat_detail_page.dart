@@ -28,6 +28,8 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   String? _myId;
   StreamSubscription? _wsSub;
   bool _initialized = false;
+  bool _peerTyping = false;
+  Timer? _typingTimer;
 
   @override
   void didChangeDependencies() {
@@ -53,10 +55,23 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
     _wsSub = WsService.instance.messages.listen((msg) {
       if (!mounted) return;
       final type = msg['type'] as String?;
-      if (type != 'new_message') return;
       final data = msg['data'] as Map<String, dynamic>?;
       if (data == null) return;
       if (data['conversationId'] != widget.conversationId) return;
+
+      if (type == 'typing') {
+        setState(() => _peerTyping = true);
+        _typingTimer?.cancel();
+        _typingTimer = Timer(const Duration(seconds: 30), () {
+          if (mounted) setState(() => _peerTyping = false);
+        });
+        return;
+      }
+
+      if (type != 'new_message') return;
+      // Clear typing indicator when message arrives
+      _typingTimer?.cancel();
+      if (_peerTyping) setState(() => _peerTyping = false);
       // Avoid duplicates
       final msgId = data['id'] as String?;
       if (_messages.any((m) => m['id'] == msgId)) return;
@@ -117,6 +132,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   @override
   void dispose() {
     _wsSub?.cancel();
+    _typingTimer?.cancel();
     _controller.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
@@ -127,7 +143,17 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.name),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(widget.name),
+            if (_peerTyping)
+              const Text(
+                '正在输入...',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.normal, color: Colors.grey),
+              ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.more_horiz, size: 22),

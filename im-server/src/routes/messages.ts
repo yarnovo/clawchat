@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import jwt from "jsonwebtoken";
 import { prisma } from "../db.js";
 import { authMiddleware } from "../auth.js";
+import { pushToConversationParticipants } from "../ws.js";
 import type { AppEnv } from "../env.js";
 
 const AGENT_SERVER_URL =
@@ -20,6 +21,7 @@ messages.use(authMiddleware);
 async function forwardToAgent(
   agentAccountId: string,
   conversationId: string,
+  targetId: string,
   content: string,
   senderId: string,
   senderName: string,
@@ -37,7 +39,7 @@ async function forwardToAgent(
     if (!agent?.id) return;
 
     // Send chat request (async — reply delivered via callback, no auth needed)
-    await fetch(
+    const chatRes = await fetch(
       `${AGENT_SERVER_URL}/v1/agents/${agent.id}/chat`,
       {
         method: "POST",
@@ -50,6 +52,14 @@ async function forwardToAgent(
         }),
       },
     );
+
+    // Push typing indicator after successful forward
+    if (chatRes.ok || chatRes.status === 202) {
+      pushToConversationParticipants(targetId, {
+        type: "typing",
+        data: { conversationId, senderId: agentAccountId },
+      }, agentAccountId);
+    }
   } catch {
     // Agent forward failure is non-blocking
   }
@@ -106,7 +116,7 @@ messages.post("/", async (c) => {
       if (peer?.type === "agent") {
         // Fire and forget — don't block the response
         const sender = await prisma.account.findUnique({ where: { id: accountId } });
-        forwardToAgent(peerId, conversationId, content, accountId, sender?.name || accountId);
+        forwardToAgent(peerId, conversationId, conversation.targetId, content, accountId, sender?.name || accountId);
       }
     }
   }
