@@ -28,6 +28,7 @@ describe("createInstance", () => {
     const { createInstance } = await loadClient();
     const result = await createInstance({
       agentId: "agent-1",
+      accountId: "acc-1",
       model: "gpt-4o",
       apiKey: "sk-test",
     });
@@ -43,7 +44,7 @@ describe("createInstance", () => {
 
     const { createInstance } = await loadClient();
     await expect(
-      createInstance({ agentId: "agent-1", model: "gpt-4o", apiKey: "sk-test" }),
+      createInstance({ agentId: "agent-1", accountId: "acc-1", model: "gpt-4o", apiKey: "sk-test" }),
     ).rejects.toThrow("Quota exceeded");
   });
 
@@ -56,7 +57,7 @@ describe("createInstance", () => {
 
     const { createInstance } = await loadClient();
     await expect(
-      createInstance({ agentId: "agent-1", model: "gpt-4o", apiKey: "sk-test" }),
+      createInstance({ agentId: "agent-1", accountId: "acc-1", model: "gpt-4o", apiKey: "sk-test" }),
     ).rejects.toThrow("Failed to create OpenClaw instance");
   });
 });
@@ -163,19 +164,23 @@ describe("getInstanceStatus", () => {
 });
 
 describe("chat", () => {
-  it("正常返回 → 解析 reply", async () => {
+  it("正常返回 202 → resolve", async () => {
     server.use(
       http.post(`${OPENCLAW_BASE}/v1/openclaw/instances/agent-1/chat`, async ({ request }) => {
         const body = await request.json() as Record<string, unknown>;
         expect(body.message).toBe("Hello");
         expect(body.sessionKey).toBe("sess-1");
-        return HttpResponse.json({ reply: "Hi there!" }, { status: 200 });
+        return HttpResponse.json({ ok: true }, { status: 202 });
       }),
     );
 
     const { chat } = await loadClient();
-    const reply = await chat("agent-1", "Hello", "sess-1");
-    expect(reply).toBe("Hi there!");
+    await expect(chat({
+      agentId: "agent-1",
+      message: "Hello",
+      sessionKey: "sess-1",
+      senderId: "user-1",
+    })).resolves.toBeUndefined();
   });
 
   it("失败 → 抛出错误", async () => {
@@ -186,7 +191,7 @@ describe("chat", () => {
     );
 
     const { chat } = await loadClient();
-    await expect(chat("agent-1", "Hello")).rejects.toThrow("Agent timeout");
+    await expect(chat({ agentId: "agent-1", message: "Hello" })).rejects.toThrow("Agent timeout");
   });
 
   it("无 error 字段 → 使用默认错误信息", async () => {
@@ -197,6 +202,6 @@ describe("chat", () => {
     );
 
     const { chat } = await loadClient();
-    await expect(chat("agent-1", "Hello")).rejects.toThrow("Chat failed");
+    await expect(chat({ agentId: "agent-1", message: "Hello" })).rejects.toThrow("Chat failed");
   });
 });

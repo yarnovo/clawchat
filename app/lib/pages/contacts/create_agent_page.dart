@@ -3,13 +3,7 @@ import '../../services/service_provider.dart';
 
 const _defaultAvatars = ['🤖', '🐱', '🐶', '🦊', '🐼', '🐸', '🦉', '🐙'];
 
-const _models = [
-  'gpt-4o',
-  'gpt-4o-mini',
-  'claude-sonnet-4-6',
-  'claude-haiku-4-5',
-  'deepseek-chat',
-];
+const _defaultBaseUrl = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
 
 class CreateAgentPage extends StatefulWidget {
   const CreateAgentPage({super.key});
@@ -20,17 +14,30 @@ class CreateAgentPage extends StatefulWidget {
 
 class _CreateAgentPageState extends State<CreateAgentPage> {
   final _nameController = TextEditingController();
+  final _modelController = TextEditingController(text: 'qwen-max');
+  final _apiKeyController = TextEditingController();
+  final _baseUrlController = TextEditingController(text: _defaultBaseUrl);
   String _selectedAvatar = '🤖';
-  String _selectedModel = _models.first;
+  bool _showAdvanced = false;
   bool _submitting = false;
 
   Future<void> _submit() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
 
+    final model = _modelController.text.trim();
+    final apiKey = _apiKeyController.text.trim();
+    final baseUrl = _baseUrlController.text.trim();
+
     setState(() => _submitting = true);
     final api = ServiceProvider.of(context);
-    final res = await api.createAgent(name: name, avatar: _selectedAvatar, model: _selectedModel);
+    final res = await api.createAgent(
+      name: name,
+      avatar: _selectedAvatar,
+      model: model.isNotEmpty ? model : null,
+      apiKey: apiKey.isNotEmpty ? apiKey : null,
+      apiBaseUrl: baseUrl != _defaultBaseUrl && baseUrl.isNotEmpty ? baseUrl : null,
+    );
     if (!mounted) return;
 
     if (res.ok) {
@@ -52,6 +59,9 @@ class _CreateAgentPageState extends State<CreateAgentPage> {
   @override
   void dispose() {
     _nameController.dispose();
+    _modelController.dispose();
+    _apiKeyController.dispose();
+    _baseUrlController.dispose();
     super.dispose();
   }
 
@@ -59,7 +69,7 @@ class _CreateAgentPageState extends State<CreateAgentPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('创建朋友')),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -94,21 +104,56 @@ class _CreateAgentPageState extends State<CreateAgentPage> {
                 hintText: '给你的 Agent 起个名字',
                 border: OutlineInputBorder(),
               ),
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _submit(),
+              textInputAction: TextInputAction.next,
             ),
             const SizedBox(height: 24),
-            DropdownButtonFormField<String>(
-              initialValue: _selectedModel,
+            TextField(
+              controller: _modelController,
               decoration: const InputDecoration(
                 labelText: '模型',
+                hintText: 'qwen-max',
                 border: OutlineInputBorder(),
               ),
-              items: _models.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-              onChanged: (v) {
-                if (v != null) setState(() => _selectedModel = v);
-              },
+              textInputAction: TextInputAction.next,
             ),
+            const SizedBox(height: 24),
+            TextField(
+              controller: _apiKeyController,
+              decoration: const InputDecoration(
+                labelText: 'API Key',
+                hintText: 'sk-...',
+                border: OutlineInputBorder(),
+              ),
+              obscureText: true,
+            ),
+            const SizedBox(height: 16),
+            // 高级设置折叠区
+            GestureDetector(
+              onTap: () => setState(() => _showAdvanced = !_showAdvanced),
+              child: Row(
+                children: [
+                  Icon(
+                    _showAdvanced ? Icons.expand_less : Icons.expand_more,
+                    size: 20,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(width: 4),
+                  const Text('高级设置', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                ],
+              ),
+            ),
+            if (_showAdvanced) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _baseUrlController,
+                decoration: const InputDecoration(
+                  labelText: 'API Base URL',
+                  hintText: _defaultBaseUrl,
+                  border: OutlineInputBorder(),
+                  helperText: '大多数模型厂商都兼容 OpenAI API 格式',
+                ),
+              ),
+            ],
             const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,

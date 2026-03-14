@@ -17,19 +17,22 @@ export interface ContainerInfo {
   image: string;
   state: string;
   status: string;
+  ip?: string;
+  ports?: Array<{ container: number; host: number }>;
 }
 
 export async function createContainer(opts: {
   name: string;
   image: string;
   env?: string[];
+  ports?: Record<string, number>;
   volumes?: Record<string, string>;
   network?: string;
   memory?: number;
   cpus?: number;
   cmd?: string[];
 }): Promise<{ id: string }> {
-  const res = await request("/", {
+  const res = await request("", {
     method: "POST",
     body: JSON.stringify(opts),
   });

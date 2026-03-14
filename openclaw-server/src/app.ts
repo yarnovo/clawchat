@@ -14,17 +14,19 @@ app.get("/health", (c) => c.json({ status: "ok" }));
 // Create an OpenClaw instance for an Agent
 app.post("/instances", async (c) => {
   const body = await c.req.json();
-  const { agentId, model, apiKey, systemPrompt, gatewayToken } = body;
+  const { agentId, accountId, model, apiKey, baseUrl, systemPrompt, gatewayToken } = body;
 
-  if (!agentId || !model || !apiKey) {
-    return c.json({ error: "agentId, model, and apiKey are required" }, 400);
+  if (!agentId || !accountId || !model || !apiKey) {
+    return c.json({ error: "agentId, accountId, model, and apiKey are required" }, 400);
   }
 
   try {
     const result = await instance.createInstance({
       agentId,
+      accountId,
       model,
       apiKey,
+      baseUrl,
       systemPrompt,
       gatewayToken,
     });
@@ -74,9 +76,8 @@ app.post("/instances/:agentId/stop", async (c) => {
 // Remove an instance
 app.delete("/instances/:agentId", async (c) => {
   const agentId = c.req.param("agentId");
-  const removeData = c.req.query("removeData") === "true";
   try {
-    await instance.removeInstance(agentId, removeData);
+    await instance.removeInstance(agentId);
     return c.json({ ok: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -97,10 +98,10 @@ app.get("/instances/:agentId/logs", async (c) => {
   }
 });
 
-// Send a chat message to an Agent
+// Send a chat message to an Agent (async — reply delivered via callback)
 app.post("/instances/:agentId/chat", async (c) => {
   const agentId = c.req.param("agentId");
-  const { sessionKey, message } = await c.req.json();
+  const { sessionKey, message, senderId, senderName } = await c.req.json();
 
   if (!message) {
     return c.json({ error: "message is required" }, 400);
@@ -109,12 +110,11 @@ app.post("/instances/:agentId/chat", async (c) => {
   const session = sessionKey || `session-${agentId}`;
 
   try {
-    const reply = await instance.chat(agentId, session, message);
-    return c.json({ reply });
+    await instance.chat(agentId, session, message, senderId || "unknown", senderName);
+    return c.json({ ok: true }, 202);
   } catch (err: unknown) {
-    const message =
-      err instanceof Error ? err.message : "Unknown error";
-    return c.json({ error: message }, 500);
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    return c.json({ error: msg }, 500);
   }
 });
 

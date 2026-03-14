@@ -16,8 +16,10 @@ async function request(path: string, init?: RequestInit) {
 
 export async function createInstance(opts: {
   agentId: string;
+  accountId: string;
   model: string;
   apiKey: string;
+  baseUrl?: string;
   systemPrompt?: string;
   gatewayToken?: string;
 }): Promise<{ containerId: string }> {
@@ -65,17 +67,23 @@ export async function getInstanceStatus(
   return res.data;
 }
 
-export async function chat(
-  agentId: string,
-  message: string,
-  sessionKey?: string,
-): Promise<string> {
-  const res = await request(`/instances/${agentId}/chat`, {
+export async function chat(opts: {
+  agentId: string;
+  message: string;
+  sessionKey?: string;
+  senderId?: string;
+  senderName?: string;
+}): Promise<void> {
+  const res = await request(`/instances/${opts.agentId}/chat`, {
     method: "POST",
-    body: JSON.stringify({ message, sessionKey }),
+    body: JSON.stringify({
+      message: opts.message,
+      sessionKey: opts.sessionKey,
+      senderId: opts.senderId,
+      senderName: opts.senderName,
+    }),
   });
-  if (res.status !== 200) {
+  if (res.status !== 202 && res.status !== 200) {
     throw new Error(res.data.error || "Chat failed");
   }
-  return res.data.reply;
 }

@@ -45,9 +45,9 @@ model Agent {
 model AgentConfig {
   id           String      @id @default(uuid())
   agentId      String      @unique
-  model        String                     // 模型名称（如 anthropic/claude-sonnet-4-6）
+  model        String                     // 模型名称（如 qwen-max, gpt-4o）
   apiKey       String?                    // 加密存储的 API Key
-  inheritKey   Boolean     @default(true) // 是否继承 owner 的 API Key
+  baseUrl      String?                    // 自定义 API Base URL（OpenAI compatible）
   systemPrompt String?                    // Agent 性格/系统提示词
 
   // OpenClaw 容器信息
