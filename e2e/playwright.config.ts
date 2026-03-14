@@ -5,9 +5,9 @@ export default defineConfig({
   timeout: 60000,
   retries: 0,
   use: {
-    baseURL: "http://localhost:8080",
+    baseURL: process.env.BASE_URL || "http://localhost:8080",
     browserName: "chromium",
-    headless: false,
+    headless: process.env.CI === "true",
     screenshot: "only-on-failure",
   },
 });

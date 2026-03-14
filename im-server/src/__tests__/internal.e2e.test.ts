@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import app from "../app.js";
+import { prisma } from "../db.js";
 import { redis, AGENT_REPLY_QUEUE } from "../redis.js";
 
 const request = (path: string, init?: RequestInit) =>
@@ -65,5 +66,94 @@ describe("POST /internal/agent-reply", () => {
 
     const len = await redis.llen(AGENT_REPLY_QUEUE);
     expect(len).toBe(2);
+  });
+});
+
+describe("POST /internal/cleanup-test-data", () => {
+  const PREFIX = "e2e-smoke-";
+
+  afterAll(async () => {
+    // Safety cleanup
+    await prisma.account.deleteMany({ where: { name: { startsWith: PREFIX } } });
+    await prisma.$disconnect();
+  });
+
+  it("无测试数据时返回 deleted: 0", async () => {
+    const res = await request("/internal/cleanup-test-data", { method: "POST" });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.deleted).toBe(0);
+  });
+
+  it("删除带前缀的账号及关联数据", async () => {
+    // 创建两个测试账号
+    const a1 = await prisma.account.create({
+      data: { name: `${PREFIX}user1`, email: `${PREFIX}u1@test.com`, type: "human" },
+    });
+    const a2 = await prisma.account.create({
+      data: { name: `${PREFIX}user2`, email: `${PREFIX}u2@test.com`, type: "agent" },
+    });
+
+    // 创建好友关系
+    await prisma.friendship.create({
+      data: { accountAId: a1.id, accountBId: a2.id, status: "accepted" },
+    });
+
+    // 创建会话和消息
+    const [idA, idB] = [a1.id, a2.id].sort();
+    const conv = await prisma.conversation.create({
+      data: { type: "dm", targetId: `${idA}:${idB}` },
+    });
+    await prisma.message.create({
+      data: {
+        conversationId: conv.id,
+        conversationType: "dm",
+        senderId: a1.id,
+        content: "hello",
+      },
+    });
+
+    // 调用 cleanup
+    const res = await request("/internal/cleanup-test-data", { method: "POST" });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.deleted).toBe(2);
+
+    // 验证数据已清除
+    const accounts = await prisma.account.findMany({ where: { name: { startsWith: PREFIX } } });
+    expect(accounts).toHaveLength(0);
+
+    const msgs = await prisma.message.findMany({ where: { conversationId: conv.id } });
+    expect(msgs).toHaveLength(0);
+
+    const convs = await prisma.conversation.findMany({ where: { id: conv.id } });
+    expect(convs).toHaveLength(0);
+
+    const friends = await prisma.friendship.findMany({
+      where: { OR: [{ accountAId: a1.id }, { accountBId: a1.id }] },
+    });
+    expect(friends).toHaveLength(0);
+  });
+
+  it("不影响非前缀账号", async () => {
+    // 创建一个普通账号和一个测试账号
+    const normal = await prisma.account.create({
+      data: { name: "normal-user", email: `normal-${Date.now()}@test.com`, type: "human" },
+    });
+    const test = await prisma.account.create({
+      data: { name: `${PREFIX}temp`, email: `${PREFIX}temp@test.com`, type: "human" },
+    });
+
+    const res = await request("/internal/cleanup-test-data", { method: "POST" });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.deleted).toBe(1);
+
+    // 普通账号仍在
+    const found = await prisma.account.findUnique({ where: { id: normal.id } });
+    expect(found).not.toBeNull();
+
+    // 清理
+    await prisma.account.delete({ where: { id: normal.id } });
   });
 });

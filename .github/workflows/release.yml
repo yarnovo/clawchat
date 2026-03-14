@@ -157,3 +157,44 @@ jobs:
       - name: Pull and start services
         run: |
           ssh root@${{ secrets.ECS_HOST }} "cd /opt/clawchat && docker compose pull && docker compose up -d --remove-orphans"
+
+      - name: Wait for services to be healthy
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://${{ secrets.ECS_HOST }}/v1/im/health > /dev/null 2>&1; then
+              echo "Services are healthy"
+              exit 0
+            fi
+            echo "Waiting for services... ($i/30)"
+            sleep 5
+          done
+          echo "Services did not become healthy"
+          exit 1
+
+  smoke-test:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: cd e2e && npm ci
+
+      - name: Install Playwright browsers
+        run: cd e2e && npx playwright install --with-deps chromium
+
+      - name: Run smoke tests
+        env:
+          BASE_URL: http://${{ secrets.ECS_HOST }}
+          CI: "true"
+        run: cd e2e && npx playwright test tests/smoke.spec.ts
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: smoke-test-results
+          path: e2e/test-results/

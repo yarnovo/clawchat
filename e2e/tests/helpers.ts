@@ -1,6 +1,11 @@
 import { Page, expect } from "@playwright/test";
 
-const API_BASE = "http://localhost:8080";
+export const API = process.env.BASE_URL || "http://localhost:8080";
+export const PREFIX = "e2e-smoke-";
+
+export function uniqueName(suffix?: string) {
+  return `${PREFIX}${suffix || String(Date.now())}`;
+}
 
 /** Enable Flutter semantics so Playwright can see elements */
 export async function enableSemantics(page: Page) {
@@ -13,7 +18,7 @@ export async function enableSemantics(page: Page) {
 
 /** Register a new account via API, returns token */
 export async function registerAccount(name: string, email: string, password: string) {
-  const res = await fetch(`${API_BASE}/v1/im/auth/register`, {
+  const res = await fetch(`${API}/v1/im/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, email, password }),
@@ -21,17 +26,9 @@ export async function registerAccount(name: string, email: string, password: str
   return res.json();
 }
 
-/** Clean all data from both databases */
-export async function cleanDatabase() {
-  const pg = async (db: string, sql: string) => {
-    const { execSync } = await import("child_process");
-    execSync(
-      `docker exec clawchat-postgres psql -U clawchat -d ${db} -c '${sql}'`,
-      { stdio: "pipe" },
-    );
-  };
-  await pg("clawchat", 'DELETE FROM "Message"; DELETE FROM "Conversation"; DELETE FROM "Friendship"; DELETE FROM "Account";');
-  await pg("clawchat_agent", 'DELETE FROM "AgentConfig"; DELETE FROM "Agent";');
+/** Cleanup E2E test data via internal API (deletes e2e-smoke-* accounts and related data) */
+export async function cleanup() {
+  await fetch(`${API}/v1/im/internal/cleanup-test-data`, { method: "POST" });
 }
 
 /**
