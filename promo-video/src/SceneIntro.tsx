@@ -14,9 +14,10 @@ export const SceneIntro: React.FC = () => {
   const { fps } = useVideoConfig();
 
   const logoScale = spring({ frame, fps, config: { damping: 12, mass: 0.8 } });
+  const ringScale = spring({ frame: frame - 3, fps, config: { damping: 18, mass: 1.2 } });
 
-  // Typewriter effect
-  const text = "Remotion Demo";
+  // Typewriter
+  const text = "ClawChat";
   const charsVisible = Math.min(Math.floor((frame - 15) / 3), text.length);
   const displayText = frame >= 15 ? text.slice(0, Math.max(0, charsVisible)) : "";
   const cursorOn = frame % 16 < 10 && charsVisible < text.length;
@@ -26,56 +27,83 @@ export const SceneIntro: React.FC = () => {
     extrapolateRight: "clamp",
   });
 
+  const glow = interpolate(Math.sin(frame * 0.06), [-1, 1], [0.3, 0.7]);
+
   return (
     <AbsoluteFill>
       <GradientBg />
       <Particles />
       <AbsoluteFill
-        style={{ justifyContent: "center", alignItems: "center", flexDirection: "column", gap: 24 }}
+        style={{
+          justifyContent: "center",
+          alignItems: "center",
+          flexDirection: "column",
+          gap: 24,
+          paddingBottom: 120,
+        }}
       >
-        {/* App icon */}
-        <div
-          style={{
-            transform: `scale(${logoScale})`,
-            width: 120,
-            height: 120,
-            borderRadius: 30,
-            background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.accent})`,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            fontSize: 60,
-            boxShadow: "0 20px 60px rgba(108,99,255,0.4)",
-          }}
-        >
-          🎬
+        {/* Logo with glowing ring */}
+        <div style={{ position: "relative" }}>
+          {/* Outer glow ring */}
+          <div
+            style={{
+              position: "absolute",
+              inset: -20,
+              borderRadius: 56,
+              border: `2px solid rgba(108,99,255,${glow * 0.5})`,
+              boxShadow: `0 0 40px rgba(108,99,255,${glow * 0.3}), inset 0 0 40px rgba(108,99,255,${glow * 0.1})`,
+              transform: `scale(${ringScale})`,
+            }}
+          />
+          <div
+            style={{
+              transform: `scale(${logoScale})`,
+              width: 140,
+              height: 140,
+              borderRadius: 36,
+              background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.accent})`,
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              fontSize: 72,
+              boxShadow: `0 20px 80px rgba(108,99,255,${glow}), 0 0 120px rgba(7,193,96,${glow * 0.3})`,
+            }}
+          >
+            🐾
+          </div>
         </div>
 
-        {/* Typewriter title */}
+        {/* App name — gradient text */}
         <div
           style={{
             fontFamily: FONT,
-            fontSize: 72,
-            fontWeight: 700,
-            color: COLORS.white,
-            marginTop: 16,
+            fontSize: 88,
+            fontWeight: 800,
+            letterSpacing: -2,
+            marginTop: 20,
+            background: "linear-gradient(135deg, #ffffff 0%, #a78bfa 50%, #07C160 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
           }}
         >
           {displayText}
-          {cursorOn && <span>|</span>}
+          {cursorOn && (
+            <span style={{ WebkitTextFillColor: COLORS.accent }}>|</span>
+          )}
         </div>
 
-        {/* Subtitle */}
+        {/* Slogan */}
         <div
           style={{
             opacity: subOpacity,
             fontFamily: FONT,
-            fontSize: 28,
-            color: "rgba(255,255,255,0.55)",
-            letterSpacing: 4,
+            fontSize: 32,
+            fontWeight: 300,
+            color: "rgba(255,255,255,0.6)",
+            letterSpacing: 8,
           }}
         >
-          React 驱动的视频创作
+          不只是聊天，是创造朋友
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

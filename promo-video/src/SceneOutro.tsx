@@ -13,50 +13,82 @@ export const SceneOutro: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const scale = spring({ frame, fps, config: { damping: 12 } });
-  const urlOp = interpolate(frame, [30, 50], [0, 1], {
+  const logoScale = spring({ frame, fps, config: { damping: 12, mass: 0.8 } });
+  const textScale = spring({ frame: frame - 8, fps, config: { damping: 12 } });
+  const ctaOp = interpolate(frame, [40, 60], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const glow = interpolate(Math.sin(frame * 0.08), [-1, 1], [0.3, 0.6]);
+  const glow = interpolate(Math.sin(frame * 0.06), [-1, 1], [0.3, 0.8]);
 
   return (
     <AbsoluteFill>
       <GradientBg />
       <Particles />
       <AbsoluteFill
-        style={{ justifyContent: "center", alignItems: "center", flexDirection: "column", gap: 30 }}
+        style={{
+          justifyContent: "center",
+          alignItems: "center",
+          flexDirection: "column",
+          gap: 36,
+          paddingBottom: 120,
+        }}
       >
-        <div style={{ transform: `scale(${scale})`, textAlign: "center" }}>
+        {/* Logo with pulsing glow */}
+        <div
+          style={{
+            transform: `scale(${logoScale})`,
+            width: 100,
+            height: 100,
+            borderRadius: 28,
+            background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.accent})`,
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            fontSize: 52,
+            boxShadow: `0 20px 80px rgba(108,99,255,${glow}), 0 0 120px rgba(7,193,96,${glow * 0.3})`,
+          }}
+        >
+          🐾
+        </div>
+
+        {/* Main text — gradient */}
+        <div style={{ transform: `scale(${textScale})`, textAlign: "center" }}>
           <div
             style={{
               fontFamily: FONT,
-              fontSize: 64,
+              fontSize: 56,
               fontWeight: 800,
-              color: COLORS.white,
-              textShadow: `0 0 40px rgba(108,99,255,${glow})`,
+              lineHeight: 1.4,
+              background: "linear-gradient(135deg, #ffffff 0%, #a78bfa 40%, #07C160 100%)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              filter: `drop-shadow(0 0 30px rgba(108,99,255,${glow * 0.4}))`,
             }}
           >
-            开始创作吧
-          </div>
-          <div style={{ fontFamily: FONT, fontSize: 28, color: "rgba(255,255,255,0.5)", marginTop: 16 }}>
-            用代码，让创意动起来
+            你的下一个朋友
+            <br />
+            不一定是人类
           </div>
         </div>
 
+        {/* CTA with animated border */}
         <div
           style={{
-            opacity: urlOp,
-            fontFamily: "monospace",
-            fontSize: 22,
+            opacity: ctaOp,
+            fontFamily: FONT,
+            fontSize: 24,
+            fontWeight: 600,
             color: COLORS.accent,
-            padding: "12px 28px",
-            border: `1px solid rgba(0,210,255,0.25)`,
-            borderRadius: 12,
-            background: "rgba(0,210,255,0.08)",
+            padding: "14px 40px",
+            borderRadius: 16,
+            background: "rgba(7,193,96,0.06)",
+            border: `1px solid rgba(7,193,96,${interpolate(Math.sin(frame * 0.08), [-1, 1], [0.2, 0.5])})`,
+            boxShadow: `0 0 30px rgba(7,193,96,${interpolate(Math.sin(frame * 0.08), [-1, 1], [0.05, 0.15])})`,
+            letterSpacing: 4,
           }}
         >
-          remotion.dev
+          ClawChat
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

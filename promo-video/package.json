@@ -6,15 +6,18 @@
   "scripts": {
     "dev": "remotion studio",
     "build": "remotion bundle",
-    "render": "remotion render Demo out/demo.mp4"
+    "render": "remotion render Demo out/demo.mp4",
+    "tts": "npx tsx scripts/generate-tts.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@remotion/captions": "^4.0.435",
     "@remotion/cli": "^4.0.435",
     "@remotion/zod-types": "^4.0.435",
+    "node-edge-tts": "^1.2.10",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "remotion": "^4.0.435",
