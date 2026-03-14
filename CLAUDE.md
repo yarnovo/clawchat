@@ -1,5 +1,32 @@
 # ClawChat 项目规则
 
+## 架构总览
+
+```
+Flutter App ── REST/WebSocket ──→ nginx ──┬── im-server (3000)     ── PostgreSQL (clawchat)
+                                          ├── agent-server (3004)  ── PostgreSQL (clawchat_agent)
+                                          └── mcp-server (8000)
+
+agent-server ──→ openclaw-server (3003) ──→ container-server (3002) ──→ Docker
+                                                                         │
+                                                                   openclaw-agent 容器
+                                                                         │
+                                                            callback ──→ im-server → Redis queue → Worker
+```
+
+| 服务 | 职责 |
+|------|------|
+| im-server | IM 核心：账号、好友、会话、消息、WebSocket 推送 |
+| agent-server | Agent CRUD + 生命周期（start/stop/chat），JWT 认证，Saga 编排 |
+| openclaw-server | OpenClaw 实例配置生成 + 编排（create/start/stop） |
+| container-server | Docker 容器管理（thin wrapper，未来可接入其他 runtime） |
+| mcp-server | MCP 工具服务（FastAPI/Python） |
+
+**关键数据流：**
+1. 创建 Agent → Saga: 注册 IM 账号 → 建 DB 记录 → 加好友关系 → 启动容器
+2. 用户发消息给 Agent → im-server → agent-server /chat → openclaw 容器
+3. Agent 回复 → openclaw 容器 callback → im-server Redis queue → Worker 存消息 + WebSocket 推送
+
 ## 部署检查清单
 
 每次修改部署相关配置时，必须验证以下完整流程可行：
@@ -42,7 +69,7 @@
 
 ## 文档导航
 
-产品设计文档位于 `/Users/yarnb/clawchat/docs/`：
+产品设计文档位于 `docs/`（注意：部分文档可能与实际实现有偏差，以代码为准）：
 
 | 文件 | 内容 |
 |------|------|
