@@ -20,9 +20,11 @@
     "@prisma/client": "^7.5.0",
     "dotenv": "^17.3.1",
     "hono": "^4.12.7",
+    "jsonwebtoken": "^9.0.3",
     "pg": "^8.20.0"
   },
   "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.5.0",
     "msw": "^2.12.10",
     "prisma": "^7.5.0",

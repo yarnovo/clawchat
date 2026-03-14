@@ -24,15 +24,25 @@ vi.mock("../openclaw-client.js", () => ({
   chat: vi.fn(async () => "Hello from mock agent!"),
 }));
 
+import jwt from "jsonwebtoken";
 import app from "../app.js";
 import { prisma } from "../db.js";
 import * as imClient from "../im-client.js";
 import * as openclawClient from "../openclaw-client.js";
 
+const ts = Date.now();
+const ownerId = `owner-${ts}`;
+const token = jwt.sign({ sub: ownerId, type: "human" }, "clawchat-dev-secret", { expiresIn: "1h" });
+
 const request = (path: string, init?: RequestInit) => {
-  // Avoid trailing slash: "/" → "/v1/agents", "?q=x" → "/v1/agents?q=x"
   const suffix = path === "/" ? "" : path;
-  return app.request(`/v1/agents${suffix}`, init);
+  return app.request(`/v1/agents${suffix}`, {
+    ...init,
+    headers: {
+      ...init?.headers,
+      Authorization: `Bearer ${token}`,
+    },
+  });
 };
 
 const jsonReq = (method: string, body?: object) => ({
@@ -40,9 +50,6 @@ const jsonReq = (method: string, body?: object) => ({
   headers: { "Content-Type": "application/json" },
   ...(body && { body: JSON.stringify(body) }),
 });
-
-const ts = Date.now();
-const ownerId = `owner-${ts}`;
 let agentId: string;
 
 beforeAll(async () => {
@@ -67,7 +74,7 @@ describe("Health", () => {
 
 describe("Agent CRUD", () => {
   it("POST / 缺少必填字段返回 400", async () => {
-    const res = await request("/", jsonReq("POST", { ownerId }));
+    const res = await request("/", jsonReq("POST", {}));
     expect(res.status).toBe(400);
   });
 
@@ -75,10 +82,9 @@ describe("Agent CRUD", () => {
     const res = await request(
       "/",
       jsonReq("POST", {
-        ownerId,
         name: "TestBot",
         avatar: "🤖",
-        model: "gpt-4o",
+        model: "qwen-max",
       }),
     );
     expect(res.status).toBe(201);
@@ -88,7 +94,7 @@ describe("Agent CRUD", () => {
     expect(body.avatar).toBe("🤖");
     expect(body.ownerId).toBe(ownerId);
     expect(body.config).toBeDefined();
-    expect(body.config.model).toBe("gpt-4o");
+    expect(body.config.model).toBe("qwen-max");
 
     // im-client should have been called
     expect(imClient.registerAgentAccount).toHaveBeenCalledWith({
@@ -103,29 +109,85 @@ describe("Agent CRUD", () => {
     agentId = body.id;
   });
 
-  it("POST / 默认 model 是 gpt-4o", async () => {
+  it("POST / 默认 model 是 qwen-max", async () => {
     const res = await request(
       "/",
-      jsonReq("POST", { ownerId, name: "DefaultModelBot" }),
+      jsonReq("POST", { name: "DefaultModelBot" }),
     );
     expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.config.model).toBe("gpt-4o");
+    expect(body.config.model).toBe("qwen-max");
+    // Without apiKey, status should remain 'created'
+    expect(body.config.status).toBe("created");
     // Clean up
     await prisma.agent.delete({ where: { id: body.id } });
   });
 
-  it("GET /?ownerId= 列出当前用户的 Agent", async () => {
-    const res = await request(`?ownerId=${ownerId}`);
+  it("POST / 带 apiKey 创建时自动启动容器", async () => {
+    const res = await request(
+      "/",
+      jsonReq("POST", {
+        name: "AutoStartBot",
+        apiKey: "sk-test-auto",
+        model: "qwen-max",
+      }),
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+
+    // Should have called openclaw createInstance
+    expect(openclawClient.createInstance).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentId: body.id,
+        model: "qwen-max",
+        apiKey: "sk-test-auto",
+      }),
+    );
+
+    // Status should be running with containerId
+    expect(body.config.status).toBe("running");
+    expect(body.config.containerId).toBe("mock-container-123");
+    expect(body.config.startedAt).toBeDefined();
+
+    // Verify via GET API
+    const detail = await request(`/${body.id}`);
+    const detailBody = await detail.json();
+    expect(detailBody.config.status).toBe("running");
+    expect(detailBody.config.containerId).toBe("mock-container-123");
+
+    // Clean up
+    await prisma.agent.delete({ where: { id: body.id } });
+  });
+
+  it("POST / 带 apiKey 但容器启动失败 → Saga 回滚，返回 500", async () => {
+    vi.mocked(openclawClient.createInstance).mockRejectedValueOnce(
+      new Error("Container creation failed"),
+    );
+
+    const res = await request(
+      "/",
+      jsonReq("POST", {
+        name: "FailStartBot",
+        apiKey: "sk-test-fail",
+      }),
+    );
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toContain("start-container");
+
+    // Saga rolled back — agent should NOT exist in DB
+    const agents = await prisma.agent.findMany({
+      where: { name: "FailStartBot" },
+    });
+    expect(agents.length).toBe(0);
+  });
+
+  it("GET / 列出当前用户的 Agent（基于 JWT token）", async () => {
+    const res = await request("/");
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.length).toBeGreaterThanOrEqual(1);
     expect(body[0].ownerId).toBe(ownerId);
-  });
-
-  it("GET / 缺少 ownerId 返回 400", async () => {
-    const res = await request("/");
-    expect(res.status).toBe(400);
   });
 
   it("GET /:id 获取 Agent 详情", async () => {
@@ -182,7 +244,6 @@ describe("Agent Lifecycle", () => {
     const res = await request(
       "/",
       jsonReq("POST", {
-        ownerId,
         name: "LifecycleBot",
         apiKey: "sk-test-key",
       }),
@@ -227,7 +288,7 @@ describe("Agent Lifecycle", () => {
     // Create agent without apiKey
     const createRes = await request(
       "/",
-      jsonReq("POST", { ownerId, name: "NoKeyBot" }),
+      jsonReq("POST", { name: "NoKeyBot" }),
     );
     const agent = await createRes.json();
 
@@ -309,7 +370,7 @@ describe("Agent Lifecycle", () => {
     // Create a brand new agent that has never been started
     const createRes = await request(
       "/",
-      jsonReq("POST", { ownerId, name: "NeverStartedBot", apiKey: "sk-key" }),
+      jsonReq("POST", { name: "NeverStartedBot", apiKey: "sk-key" }),
     );
     const agent = await createRes.json();
 

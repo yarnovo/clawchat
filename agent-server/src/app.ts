@@ -2,77 +2,74 @@ import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { cors } from "hono/cors";
 import { prisma } from "./db.js";
-import * as imClient from "./im-client.js";
 import * as openclawClient from "./openclaw-client.js";
+import { createAgentSaga } from "./create-agent-saga.js";
+import { authMiddleware } from "./auth.js";
+import type { AppEnv } from "./env.js";
 
-const app = new Hono().basePath("/v1/agents");
+const app = new Hono<AppEnv>().basePath("/v1/agents");
 
 app.use("*", cors());
 app.use("*", logger());
 
-// Health check
+// Health check (no auth)
 app.get("/health", (c) => c.json({ status: "ok" }));
 
-// Create Agent
-app.post("/", async (c) => {
-  const { ownerId, name, avatar, model, apiKey, systemPrompt, parentId } =
-    await c.req.json();
-
-  if (!ownerId || !name) {
-    return c.json({ error: "ownerId and name are required" }, 400);
+// Chat endpoint is called by im-server internally (no auth)
+// Auth required for all other routes
+app.use("*", async (c, next) => {
+  if (c.req.path.endsWith("/chat") && c.req.method === "POST") {
+    return next();
   }
-
-  // 1. Register Agent account in im-server
-  const imAccount = await imClient.registerAgentAccount({ name, avatar });
-
-  // 2. Create Agent record in our DB
-  const agent = await prisma.agent.create({
-    data: {
-      accountId: imAccount.id,
-      ownerId,
-      parentId,
-      name,
-      avatar,
-      config: {
-        create: {
-          model: model || "gpt-4o",
-          apiKey,
-          systemPrompt,
-          gatewayToken: `agent-${imAccount.id}`,
-        },
-      },
-    },
-    include: { config: true },
-  });
-
-  // 3. Auto-add friendship between owner and agent
-  try {
-    await imClient.addDirectFriend(ownerId, imAccount.id);
-  } catch (err) {
-    // Compensate: roll back local DB record and im-server account
-    try {
-      await prisma.agent.delete({ where: { id: agent.id } });
-    } catch { /* best effort */ }
-    try {
-      await imClient.deleteAgentAccount(imAccount.id);
-    } catch { /* best effort */ }
-
-    const message = err instanceof Error ? err.message : "Unknown error";
-    return c.json({ error: `Failed to add friendship: ${message}` }, 500);
-  }
-
-  return c.json(agent, 201);
+  return authMiddleware(c, next);
 });
 
-// List Agents (by owner)
-app.get("/", async (c) => {
-  const ownerId = c.req.query("ownerId");
-  if (!ownerId) {
-    return c.json({ error: "ownerId query param is required" }, 400);
+// ---- Helper: verify ownership ----
+async function getOwnedAgent(agentId: string, ownerId: string) {
+  const agent = await prisma.agent.findUnique({
+    where: { id: agentId },
+    include: { config: true },
+  });
+  if (!agent) return { agent: null, error: "Agent not found" as const };
+  if (agent.ownerId !== ownerId) return { agent: null, error: "Forbidden" as const };
+  return { agent, error: null };
+}
+
+// Create Agent (Saga pattern — automatic rollback on failure)
+app.post("/", async (c) => {
+  const ownerId = c.get("accountId");
+  const { name, avatar, model, apiKey, baseUrl, systemPrompt, parentId } =
+    await c.req.json();
+
+  if (!name) {
+    return c.json({ error: "name is required" }, 400);
   }
 
+  const result = await createAgentSaga({
+    ownerId, name, avatar, model, apiKey, baseUrl, systemPrompt, parentId,
+  });
+
+  if (!result.success) {
+    const detail = result.compensationErrors.length > 0
+      ? ` (compensation issues: ${result.compensationErrors.map((e) => `${e.step}: ${e.error}`).join(", ")})`
+      : "";
+    return c.json({
+      error: `Failed at step "${result.failedStep}": ${result.error}${detail}`,
+    }, 500);
+  }
+
+  return c.json(result.agent, 201);
+});
+
+// List my Agents
+app.get("/", async (c) => {
+  const ownerId = c.get("accountId");
+  const accountId = c.req.query("accountId");
+
+  const where = accountId ? { accountId } : { ownerId };
+
   const agents = await prisma.agent.findMany({
-    where: { ownerId },
+    where,
     include: {
       config: {
         select: {
@@ -91,32 +88,23 @@ app.get("/", async (c) => {
 
 // Get Agent detail
 app.get("/:id", async (c) => {
-  const id = c.req.param("id");
-
-  const agent = await prisma.agent.findUnique({
-    where: { id },
-    include: { config: true },
-  });
-
-  if (!agent) {
-    return c.json({ error: "Agent not found" }, 404);
-  }
+  const { agent, error } = await getOwnedAgent(c.req.param("id"), c.get("accountId"));
+  if (error === "Agent not found") return c.json({ error }, 404);
+  if (error === "Forbidden") return c.json({ error }, 403);
 
   return c.json(agent);
 });
 
 // Update Agent config
 app.patch("/:id", async (c) => {
-  const id = c.req.param("id");
-  const { name, avatar, model, apiKey, systemPrompt } = await c.req.json();
+  const { agent, error } = await getOwnedAgent(c.req.param("id"), c.get("accountId"));
+  if (error === "Agent not found") return c.json({ error }, 404);
+  if (error === "Forbidden") return c.json({ error }, 403);
 
-  const agent = await prisma.agent.findUnique({ where: { id } });
-  if (!agent) {
-    return c.json({ error: "Agent not found" }, 404);
-  }
+  const { name, avatar, model, apiKey, baseUrl, systemPrompt } = await c.req.json();
 
   const updated = await prisma.agent.update({
-    where: { id },
+    where: { id: agent!.id },
     data: {
       ...(name && { name }),
       ...(avatar !== undefined && { avatar }),
@@ -124,6 +112,7 @@ app.patch("/:id", async (c) => {
         update: {
           ...(model && { model }),
           ...(apiKey !== undefined && { apiKey }),
+          ...(baseUrl !== undefined && { baseUrl }),
           ...(systemPrompt !== undefined && { systemPrompt }),
         },
       },
@@ -136,71 +125,51 @@ app.patch("/:id", async (c) => {
 
 // Delete Agent
 app.delete("/:id", async (c) => {
-  const id = c.req.param("id");
-
-  const agent = await prisma.agent.findUnique({
-    where: { id },
-    include: { config: true },
-  });
-  if (!agent) {
-    return c.json({ error: "Agent not found" }, 404);
-  }
+  const { agent, error } = await getOwnedAgent(c.req.param("id"), c.get("accountId"));
+  if (error === "Agent not found") return c.json({ error }, 404);
+  if (error === "Forbidden") return c.json({ error }, 403);
 
   // 1. Stop and remove OpenClaw instance
   try {
-    await openclawClient.removeInstance(agent.id);
+    await openclawClient.removeInstance(agent!.id);
   } catch {
     // Instance might not exist
   }
 
-  // 2. Delete from im-server
-  try {
-    await imClient.deleteAgentAccount(agent.accountId);
-  } catch {
-    // Account might not exist
-  }
-
-  // 3. Delete from our DB (cascades to config)
-  await prisma.agent.delete({ where: { id } });
+  // 2. Delete from our DB (cascades to config)
+  await prisma.agent.delete({ where: { id: agent!.id } });
 
   return c.json({ ok: true });
 });
 
 // Start Agent (launch OpenClaw container)
 app.post("/:id/start", async (c) => {
-  const id = c.req.param("id");
+  const { agent, error } = await getOwnedAgent(c.req.param("id"), c.get("accountId"));
+  if (error === "Agent not found") return c.json({ error }, 404);
+  if (error === "Forbidden") return c.json({ error }, 403);
 
-  const agent = await prisma.agent.findUnique({
-    where: { id },
-    include: { config: true },
-  });
-  if (!agent || !agent.config) {
-    return c.json({ error: "Agent not found" }, 404);
-  }
-
-  if (!agent.config.apiKey) {
+  if (!agent!.config?.apiKey) {
     return c.json({ error: "API key is required to start Agent" }, 400);
   }
 
   try {
-    // Update status to starting
     await prisma.agentConfig.update({
-      where: { agentId: id },
+      where: { agentId: agent!.id },
       data: { status: "starting" },
     });
 
-    // Create OpenClaw instance
     const result = await openclawClient.createInstance({
-      agentId: agent.id,
-      model: agent.config.model,
-      apiKey: agent.config.apiKey,
-      systemPrompt: agent.config.systemPrompt ?? undefined,
-      gatewayToken: agent.config.gatewayToken ?? undefined,
+      agentId: agent!.id,
+      accountId: agent!.accountId,
+      model: agent!.config!.model,
+      apiKey: agent!.config!.apiKey!,
+      baseUrl: agent!.config!.baseUrl ?? undefined,
+      systemPrompt: agent!.config!.systemPrompt ?? undefined,
+      gatewayToken: agent!.config!.gatewayToken ?? undefined,
     });
 
-    // Update status to running
     await prisma.agentConfig.update({
-      where: { agentId: id },
+      where: { agentId: agent!.id },
       data: {
         status: "running",
         containerId: result.containerId,
@@ -210,9 +179,8 @@ app.post("/:id/start", async (c) => {
 
     return c.json({ ok: true, containerId: result.containerId });
   } catch (err: unknown) {
-    // Update status to error
     await prisma.agentConfig.update({
-      where: { agentId: id },
+      where: { agentId: agent!.id },
       data: { status: "error" },
     });
 
@@ -223,21 +191,15 @@ app.post("/:id/start", async (c) => {
 
 // Stop Agent
 app.post("/:id/stop", async (c) => {
-  const id = c.req.param("id");
-
-  const agent = await prisma.agent.findUnique({
-    where: { id },
-    include: { config: true },
-  });
-  if (!agent) {
-    return c.json({ error: "Agent not found" }, 404);
-  }
+  const { agent, error } = await getOwnedAgent(c.req.param("id"), c.get("accountId"));
+  if (error === "Agent not found") return c.json({ error }, 404);
+  if (error === "Forbidden") return c.json({ error }, 403);
 
   try {
-    await openclawClient.stopInstance(agent.id);
+    await openclawClient.stopInstance(agent!.id);
 
     await prisma.agentConfig.update({
-      where: { agentId: id },
+      where: { agentId: agent!.id },
       data: { status: "stopped", stoppedAt: new Date() },
     });
 
@@ -248,10 +210,11 @@ app.post("/:id/stop", async (c) => {
   }
 });
 
-// Chat with Agent (proxy to openclaw-server)
+// Chat with Agent (async — forwards to container webhook, reply via callback)
+// Called by im-server internally, no ownership check
 app.post("/:id/chat", async (c) => {
   const id = c.req.param("id");
-  const { message, sessionKey } = await c.req.json();
+  const { message, sessionKey, senderId, senderName } = await c.req.json();
 
   if (!message) {
     return c.json({ error: "message is required" }, 400);
@@ -269,8 +232,14 @@ app.post("/:id/chat", async (c) => {
   }
 
   try {
-    const reply = await openclawClient.chat(agent.id, message, sessionKey);
-    return c.json({ reply });
+    await openclawClient.chat({
+      agentId: agent.id,
+      message,
+      sessionKey,
+      senderId,
+      senderName,
+    });
+    return c.json({ ok: true }, 202);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     return c.json({ error: msg }, 500);

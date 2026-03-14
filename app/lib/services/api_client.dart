@@ -108,16 +108,18 @@ class ApiClient {
     required String name,
     String? avatar,
     String? model,
+    String? apiKey,
+    String? apiBaseUrl,
   }) async {
-    final me = await getMe();
     final res = await _http.post(
       Uri.parse('$baseUrl/v1/agents'),
       headers: await _headers(),
       body: jsonEncode({
-        'ownerId': me.data['id'],
         'name': name,
         'avatar': avatar,
         if (model != null) 'model': model, // ignore: use_null_aware_elements
+        if (apiKey != null) 'apiKey': apiKey, // ignore: use_null_aware_elements
+        if (apiBaseUrl != null) 'baseUrl': apiBaseUrl, // ignore: use_null_aware_elements
       }),
     );
     return ApiResponse(res.statusCode, jsonDecode(res.body));
