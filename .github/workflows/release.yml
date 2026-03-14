@@ -143,7 +143,7 @@ jobs:
 
       - name: Deploy compose and config
         run: |
-          scp docker-compose.yml root@${{ secrets.ECS_HOST }}:/opt/clawchat/
+          scp docker-compose.deploy.yml root@${{ secrets.ECS_HOST }}:/opt/clawchat/docker-compose.yml
           rsync -az deploy/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/deploy/
 
       - name: Deploy web
@@ -156,4 +156,4 @@ jobs:
 
       - name: Pull and start services
         run: |
-          ssh root@${{ secrets.ECS_HOST }} "cd /opt/clawchat && docker compose --profile deploy pull && docker compose --profile deploy up -d --remove-orphans"
+          ssh root@${{ secrets.ECS_HOST }} "cd /opt/clawchat && docker compose pull && docker compose up -d --remove-orphans"

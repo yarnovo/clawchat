@@ -1,14 +1,63 @@
 VERSION := $(shell cat VERSION)
 
+# ---- 本地开发（全 Docker）----
+.PHONY: dev dev-stop reload logs
+
+dev:
+	docker compose up -d --build
+	@echo "All services starting. Logs: make logs"
+	@echo "Web UI: http://localhost:8080"
+
+dev-stop:
+	docker compose down
+	@echo "All dev services stopped"
+
+reload: app-build-web
+	docker compose restart nginx
+	@echo "Ready at http://localhost:8080"
+
+logs:
+	docker compose logs -f
+
+# 单服务日志/重启
+.PHONY: logs-im logs-agent logs-container logs-openclaw logs-mcp
+.PHONY: restart-im restart-agent restart-container restart-openclaw restart-mcp
+
+logs-im:
+	docker compose logs -f im-server
+
+logs-agent:
+	docker compose logs -f agent-server
+
+logs-container:
+	docker compose logs -f container-server
+
+logs-openclaw:
+	docker compose logs -f openclaw-server
+
+logs-mcp:
+	docker compose logs -f mcp-server
+
+restart-im:
+	docker compose restart im-server
+
+restart-agent:
+	docker compose restart agent-server
+
+restart-container:
+	docker compose restart container-server
+
+restart-openclaw:
+	docker compose restart openclaw-server
+
+restart-mcp:
+	docker compose restart mcp-server
+
 # ---- App (Flutter) ----
-.PHONY: app-run app-serve app-build-web app-build-ios app-build-android
+.PHONY: app-run app-build-web app-build-ios app-build-android
 
 app-run:
 	cd app && flutter run -d chrome
-
-app-serve: app-build-web
-	@echo "Serving at http://localhost:5555"
-	cd app/build/web && python3 -m http.server 5555
 
 app-build-web:
 	cd app && flutter build web
@@ -28,59 +77,23 @@ cli-build:
 cli-run: cli-build
 	./cli/clawchat
 
-# ---- IM Server (Hono/TypeScript) ----
-.PHONY: im-dev im-install im-db-push
+# ---- DB 管理（通过容器执行）----
+.PHONY: db-push db-studio
 
-im-install:
-	cd im-server && npm install
+db-push:
+	docker compose exec im-server npx prisma db push
 
-im-dev:
-	cd im-server && npm run dev
+db-studio:
+	cd im-server && npx prisma studio --port 5556
 
-im-db-push:
-	cd im-server && npx prisma db push
-
-# ---- Agent Server (Hono/TypeScript + Prisma) ----
-.PHONY: agent-install agent-dev agent-db-push
-
-agent-install:
-	cd agent-server && npm install
-
-agent-dev:
-	cd agent-server && npm run dev
-
-agent-db-push:
-	cd agent-server && npx prisma db push
-
-# ---- Container Server (Hono/TypeScript) ----
-.PHONY: container-install container-dev
-
-container-install:
-	cd container-server && npm install
-
-container-dev:
-	cd container-server && npm run dev
-
-# ---- OpenClaw Server (Hono/TypeScript) ----
-.PHONY: openclaw-install openclaw-dev openclaw-build-image
-
-openclaw-install:
-	cd openclaw-server && npm install
-
-openclaw-dev:
-	cd openclaw-server && npm run dev
+# ---- OpenClaw 镜像 ----
+.PHONY: openclaw-build-image openclaw-build-agent
 
 openclaw-build-image:
 	cd openclaw && docker build -t openclaw:local .
 
-# ---- MCP Server (Python/FastAPI) ----
-.PHONY: mcp-dev mcp-install
-
-mcp-install:
-	cd mcp-server && uv sync
-
-mcp-dev:
-	cd mcp-server && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+openclaw-build-agent:
+	docker build -f openclaw-server/Dockerfile.agent -t openclaw-agent:local .
 
 # ---- Promo Video (Remotion) ----
 .PHONY: promo-install promo-dev promo-render
@@ -94,37 +107,17 @@ promo-dev:
 promo-render:
 	cd promo-video && npm run render
 
-# ---- Docker ----
-.PHONY: dev-up dev-down dev-logs deploy-up deploy-down
-
-dev-up:
-	docker compose up -d
-
-dev-down:
-	docker compose down
-
-dev-logs:
-	docker compose logs -f
+# ---- 线上部署 ----
+.PHONY: deploy-up deploy-down deploy-logs
 
 deploy-up:
-	docker compose --profile deploy up -d --build
+	docker compose -f docker-compose.deploy.yml up -d --build
 
 deploy-down:
-	docker compose --profile deploy down
+	docker compose -f docker-compose.deploy.yml down
 
-# ---- Dev (local full-stack) ----
-.PHONY: dev dev-web
-
-dev:
-	docker compose up -d
-	make im-dev &
-	make agent-dev &
-	@sleep 2
-	make dev-web
-
-dev-web: app-build-web
-	docker compose restart dev-nginx
-	@echo "Ready at http://localhost:8080"
+deploy-logs:
+	docker compose -f docker-compose.deploy.yml logs -f
 
 # ---- E2E Tests (Playwright) ----
 .PHONY: e2e-install e2e-test

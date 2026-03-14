@@ -22,6 +22,7 @@ export interface ContainerInfo {
   status: string;
   ports: Array<{ container: number; host: number }>;
   createdAt: string;
+  ip?: string;
 }
 
 function parseContainerInfo(data: Dockerode.ContainerInfo): ContainerInfo {
@@ -100,6 +101,10 @@ export async function getContainer(
   try {
     const container = docker.getContainer(idOrName);
     const info = await container.inspect();
+    // Get first available IP from any network
+    const networks = info.NetworkSettings.Networks ?? {};
+    const ip = Object.values(networks).find((n: any) => n.IPAddress)?.IPAddress;
+
     return {
       id: info.Id.slice(0, 12),
       name: info.Name.replace(/^\//, ""),
@@ -113,6 +118,7 @@ export async function getContainer(
         }),
       ),
       createdAt: info.Created,
+      ip,
     };
   } catch {
     return null;
