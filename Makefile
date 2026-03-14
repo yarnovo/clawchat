@@ -20,8 +20,8 @@ logs:
 	docker compose logs -f
 
 # 单服务日志/重启
-.PHONY: logs-im logs-agent logs-container logs-openclaw logs-nanoclaw logs-mcp
-.PHONY: restart-im restart-agent restart-container restart-openclaw restart-nanoclaw restart-mcp
+.PHONY: logs-im logs-agent logs-container logs-openclaw logs-nanoclaw logs-ironclaw logs-mcp
+.PHONY: restart-im restart-agent restart-container restart-openclaw restart-nanoclaw restart-ironclaw restart-mcp
 
 logs-im:
 	docker compose logs -f im-server
@@ -37,6 +37,9 @@ logs-openclaw:
 
 logs-nanoclaw:
 	docker compose logs -f nanoclaw-server
+
+logs-ironclaw:
+	docker compose logs -f ironclaw-server
 
 logs-mcp:
 	docker compose logs -f mcp-server
@@ -55,6 +58,9 @@ restart-openclaw:
 
 restart-nanoclaw:
 	docker compose restart nanoclaw-server
+
+restart-ironclaw:
+	docker compose restart ironclaw-server
 
 restart-mcp:
 	docker compose restart mcp-server
@@ -122,6 +128,16 @@ nanoclaw-build:
 
 nanoclaw-build-agent:
 	docker build -f nanoclaw-server/Dockerfile.agent -t nanoclaw-agent:local .
+
+# ---- IronClaw 镜像 ----
+.PHONY: ironclaw-build ironclaw-build-agent
+
+ironclaw-build:
+	cd ironclaw && docker build -t ironclaw:local .
+
+ironclaw-build-agent:
+	@echo "IronClaw agent uses ironclaw:local directly (no wrapper needed)"
+	@echo "Run 'make ironclaw-build' first"
 
 # ---- Promo Video (Remotion) ----
 .PHONY: promo-install promo-dev promo-render

@@ -66,6 +66,8 @@ services:
       DATABASE_URL: postgresql://clawchat:clawchat@postgres:5432/clawchat_agent
       IM_SERVER_URL: http://im-server:3000
       OPENCLAW_SERVER_URL: http://openclaw-server:3003
+      NANOCLAW_SERVER_URL: http://nanoclaw-server:3005
+      IRONCLAW_SERVER_URL: http://ironclaw-server:3006
       JWT_SECRET: ${JWT_SECRET:-clawchat-prod-secret}
       PORT: "3004"
     ports:
@@ -116,6 +118,28 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3003/v1/openclaw/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  ironclaw-server:
+    container_name: clawchat-ironclaw-server
+    image: registry-vpc.cn-hangzhou.aliyuncs.com/clawchat/ironclaw-server:latest
+    restart: unless-stopped
+    environment:
+      PORT: "3006"
+      CONTAINER_SERVER_URL: http://container-server:3002
+      IRONCLAW_IMAGE: ${IRONCLAW_IMAGE:-ironclaw:local}
+      IRONCLAW_NETWORK: clawchat_default
+      IM_SERVER_CALLBACK_URL: http://im-server:3000/v1/im/internal/agent-reply
+    ports:
+      - "3006:3006"
+    depends_on:
+      container-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3006/v1/ironclaw/health"]
       interval: 10s
       timeout: 5s
       retries: 5

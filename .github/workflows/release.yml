@@ -75,6 +75,13 @@ jobs:
                        openclaw-server/
           docker push ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/openclaw-server --all-tags
 
+      - name: Build and push ironclaw-server
+        run: |
+          docker build -t ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/ironclaw-server:latest \
+                       -t ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/ironclaw-server:${{ steps.version.outputs.version }} \
+                       ironclaw-server/
+          docker push ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/ironclaw-server --all-tags
+
       - name: Build and push mcp-server
         run: |
           docker build -t ${{ env.ACR_REGISTRY }}/${{ env.ACR_NAMESPACE }}/mcp-server:latest \

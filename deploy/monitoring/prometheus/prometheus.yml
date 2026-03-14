@@ -22,3 +22,8 @@ scrape_configs:
     static_configs:
       - targets: ["container-server:3002"]
     metrics_path: /v1/containers/metrics
+
+  - job_name: "ironclaw-server"
+    static_configs:
+      - targets: ["ironclaw-server:3006"]
+    metrics_path: /v1/ironclaw/metrics

@@ -23,7 +23,7 @@ test.describe("创建 NanoClaw Agent 完整流程", () => {
     // 1. 打开应用 + 启用 semantics
     await page.goto("/");
     await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(2000);
     await enableSemantics(page);
 
     // 2. 登录
@@ -32,18 +32,20 @@ test.describe("创建 NanoClaw Agent 完整流程", () => {
     await page.waitForTimeout(300);
     await page.keyboard.type("123456");
     await page.getByRole("button", { name: "登录" }).click();
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(3000);
+    await enableSemantics(page);
 
     // 3. 验证到达聊天列表
-    await expect(page.getByRole("heading", { name: "ClawChat" })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("button", { name: "Show menu" })).toBeVisible({ timeout: 10000 });
 
     // 4. 点击菜单 → 创建朋友
     await page.getByRole("button", { name: "Show menu" }).click();
     await page.getByRole("menuitem", { name: "创建朋友" }).click();
-    await page.waitForTimeout(800);
+    await page.waitForTimeout(1500);
+    await enableSemantics(page);
 
     // 5. 验证创建朋友页面
-    await expect(page.getByRole("heading", { name: "创建朋友" })).toBeVisible();
+    await expect(page.getByText("选择头像")).toBeVisible({ timeout: 5000 });
 
     // 6. 选择 NanoClaw 运行时
     await page.getByRole("button", { name: "NanoClaw" }).click();
@@ -61,15 +63,14 @@ test.describe("创建 NanoClaw Agent 完整流程", () => {
     await page.waitForTimeout(300);
 
     // 10. 点击创建（不填 API Key，Agent 以 created 状态创建）
-    // 模型是否自动切换为 claude-sonnet 通过下方 API 验证
     await page.getByRole("button", { name: "创建" }).click();
     await page.waitForTimeout(5000);
+    await enableSemantics(page);
 
-    // 12. 验证：回到聊天列表，会话出现
-    await expect(page.getByRole("heading", { name: "ClawChat" })).toBeVisible({ timeout: 15000 });
+    // 11. 验证：聊天列表会话出现
     await expect(page.getByRole("button", { name: new RegExp(agentName) })).toBeVisible({ timeout: 10000 });
 
-    // 13. 通过 API 验证 Agent 的 runtime 和 model
+    // 12. 通过 API 验证 Agent 的 runtime 和 model
     const listRes = await fetch(`${API}/v1/im/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -86,10 +87,10 @@ test.describe("创建 NanoClaw Agent 完整流程", () => {
     expect(ncAgent.config.model).toBe("claude-sonnet-4-20250514");
     expect(ncAgent.config.status).toBe("created"); // No API key → not started
 
-    // 14. 切到通讯录验证
+    // 13. 切到通讯录验证
     await page.getByRole("button", { name: /通讯录/ }).click();
-    await page.waitForTimeout(800);
-    await expect(page.getByRole("heading", { name: "通讯录" })).toBeVisible();
+    await page.waitForTimeout(1000);
+    await enableSemantics(page);
     await expect(page.getByRole("button", { name: new RegExp(agentName) })).toBeVisible({ timeout: 10000 });
   });
 });

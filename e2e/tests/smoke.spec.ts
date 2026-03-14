@@ -48,8 +48,10 @@ test.describe("CD Smoke Test", () => {
 
     // 5. Click login
     await page.getByRole("button", { name: "登录" }).click();
+    await page.waitForTimeout(3000);
+    await enableSemantics(page);
 
-    // 6. Verify chat list loaded
-    await expect(page.getByRole("heading", { name: "ClawChat" })).toBeVisible({ timeout: 15000 });
+    // 6. Verify chat list loaded (desktop layout uses Show menu button as marker)
+    await expect(page.getByRole("button", { name: "Show menu" })).toBeVisible({ timeout: 15000 });
   });
 });

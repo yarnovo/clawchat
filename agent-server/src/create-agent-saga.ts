@@ -12,7 +12,7 @@ export interface CreateAgentInput {
   baseUrl?: string;
   systemPrompt?: string;
   parentId?: string;
-  runtime?: "openclaw" | "nanoclaw";
+  runtime?: "openclaw" | "nanoclaw" | "ironclaw";
 }
 
 // Mutable context shared across saga steps
@@ -44,7 +44,12 @@ const steps: SagaStep<CreateAgentContext>[] = [
     name: "create-agent-record",
     execute: async (ctx) => {
       const runtime = ctx.input.runtime || "openclaw";
-      const defaultModel = runtime === "nanoclaw" ? "claude-sonnet-4-20250514" : "qwen-max";
+      const defaultModels: Record<string, string> = {
+        openclaw: "qwen-max",
+        nanoclaw: "claude-sonnet-4-20250514",
+        ironclaw: "qwen-max",
+      };
+      const defaultModel = defaultModels[runtime] || "qwen-max";
       const agent = await prisma.agent.create({
         data: {
           accountId: ctx.imAccountId!,
@@ -90,7 +95,12 @@ const steps: SagaStep<CreateAgentContext>[] = [
       if (!ctx.input.apiKey) return; // skip if no API key
 
       const runtime = ctx.input.runtime || "openclaw";
-      const defaultModel = runtime === "nanoclaw" ? "claude-sonnet-4-20250514" : "qwen-max";
+      const startDefaultModels: Record<string, string> = {
+        openclaw: "qwen-max",
+        nanoclaw: "claude-sonnet-4-20250514",
+        ironclaw: "qwen-max",
+      };
+      const defaultModel = startDefaultModels[runtime] || "qwen-max";
       const result = await getRuntimeClient(runtime).createInstance({
         agentId: ctx.agentId!,
         accountId: ctx.imAccountId!,

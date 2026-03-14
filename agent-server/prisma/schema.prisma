@@ -15,6 +15,7 @@ datasource db {
 enum AgentRuntime {
   openclaw
   nanoclaw
+  ironclaw
 }
 
 /// Agent 容器运行状态

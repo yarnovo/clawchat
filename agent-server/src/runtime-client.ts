@@ -1,7 +1,8 @@
-// Runtime abstraction — route calls to the appropriate backend (openclaw or nanoclaw)
+// Runtime abstraction — route calls to the appropriate backend (openclaw, nanoclaw, or ironclaw)
 
 import * as openclawClient from "./openclaw-client.js";
 import * as nanoclawClient from "./nanoclaw-client.js";
+import * as ironclawClient from "./ironclaw-client.js";
 
 export interface CreateInstanceOpts {
   agentId: string;
@@ -44,6 +45,19 @@ const nanoclawAdapter: RuntimeClient = {
   chat: nanoclawClient.chat,
 };
 
-export function getRuntimeClient(runtime: "openclaw" | "nanoclaw"): RuntimeClient {
-  return runtime === "nanoclaw" ? nanoclawAdapter : openclawAdapter;
+const ironclawAdapter: RuntimeClient = {
+  createInstance: ironclawClient.createInstance,
+  stopInstance: ironclawClient.stopInstance,
+  removeInstance: (agentId, requestId) => ironclawClient.removeInstance(agentId, false, requestId),
+  chat: ironclawClient.chat,
+};
+
+const runtimeMap: Record<string, RuntimeClient> = {
+  openclaw: openclawAdapter,
+  nanoclaw: nanoclawAdapter,
+  ironclaw: ironclawAdapter,
+};
+
+export function getRuntimeClient(runtime: "openclaw" | "nanoclaw" | "ironclaw"): RuntimeClient {
+  return runtimeMap[runtime] ?? openclawAdapter;
 }
