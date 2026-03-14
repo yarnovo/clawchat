@@ -19,7 +19,15 @@
 
 ## 测试规则
 
-- 每次新增功能必须同步编写测试（单元测试 + Widget/API 测试）
+### 测试分层
+
+- **L1 单元/Widget**：mock HTTP，CI 每次 push 跑。Flutter widget + im-server JWT 单元测试
+- **L2 API e2e**：真实 DB，CI 每次 push 跑。im-server 用 app.request() 直连测试数据库
+- **L3 全链路集成**：Flutter + 真实 im-server + 真实 DB，覆盖注册→登录→加好友→私聊。本地/CD 前跑
+
+### 具体规则
+
+- 每次新增功能必须同步编写测试：每个新 API 补 L2 测试，每个新页面补 L1 widget 测试
 - Flutter 测试中使用 `InMemoryTokenStore` 注入 `AuthService`，不依赖真实 SharedPreferences
 - im-server 测试使用 `vitest`，e2e 测试通过 Hono `app.request()` 直连测试数据库
 - 提交前 lefthook 自动检查：Flutter analyze + TypeScript typecheck
@@ -55,3 +63,17 @@
 | 15-error-handling.md | 错误处理 |
 
 项目路线图：`ROADMAP.md`
+
+## 宣传视频（Remotion）
+
+- 视频有全局字幕层（`Subtitle` 组件，固定在 `bottom: 80`），场景内容排版必须通过 `paddingBottom` 为字幕留出空间，避免场景内的文字与字幕重叠
+- TTS 音频由 `edge-tts`（node-edge-tts）生成，字幕时间戳文件在 `src/words/`，音频文件在 `public/audio/`
+- 每段旁白时长必须短于对应场景时长（减去 delayFrames 和淡出），修改文案后需重新运行 `npm run tts` 生成音频
+
+## 踩坑笔记
+
+开发过程中的踩坑记录位于 `notes/` 目录：
+
+| 文件 | 内容 |
+|------|------|
+| openclaw-plugin-pitfalls.md | OpenClaw Channel Plugin 开发踩坑：插件加载条件、manifest 格式、config 校验、formatAllowFrom 类型、Docker 网络寻址、Dockerfile 分层等 |
