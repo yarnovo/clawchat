@@ -1,3 +1,6 @@
 [submodule "openclaw"]
 	path = openclaw
 	url = git@github.com:yarnovo/openclaw.git
+[submodule "nanoclaw"]
+	path = nanoclaw
+	url = git@github.com:yarnovo/nanoclaw.git
