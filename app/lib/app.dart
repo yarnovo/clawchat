@@ -6,6 +6,7 @@ import 'pages/auth/register_page.dart';
 import 'services/api_client.dart';
 import 'services/auth_service.dart';
 import 'services/service_provider.dart';
+import 'services/ws_service.dart';
 
 class ClawChatApp extends StatefulWidget {
   final AuthService? authService;
@@ -36,14 +37,25 @@ class _ClawChatAppState extends State<ClawChatApp> {
 
   Future<void> _checkLogin() async {
     final loggedIn = await _authService.isLoggedIn();
+    if (loggedIn) _connectWs();
     setState(() => _isLoggedIn = loggedIn);
   }
 
   void _onAuthSuccess() {
+    _connectWs();
     setState(() => _isLoggedIn = true);
   }
 
+  Future<void> _connectWs() async {
+    final token = await _authService.getToken();
+    if (token != null) {
+      final baseUrl = _apiClient.baseUrl;
+      WsService.instance.connect(baseUrl, token);
+    }
+  }
+
   void _onLogout() async {
+    WsService.instance.disconnect();
     await _authService.logout();
     setState(() => _isLoggedIn = false);
   }

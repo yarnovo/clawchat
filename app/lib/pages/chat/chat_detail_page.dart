@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/service_provider.dart';
+import '../../services/ws_service.dart';
 
 class ChatDetailPage extends StatefulWidget {
   final String name;
@@ -24,11 +26,16 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   List<Map<String, dynamic>> _messages = [];
   bool _loading = true;
   String? _myId;
+  StreamSubscription? _wsSub;
+  bool _initialized = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _loadInitial();
+    if (!_initialized) {
+      _initialized = true;
+      _loadInitial();
+    }
   }
 
   Future<void> _loadInitial() async {
@@ -38,6 +45,26 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
       _myId = meRes.data['id'] as String;
     }
     await _loadMessages();
+    _listenWs();
+  }
+
+  void _listenWs() {
+    _wsSub?.cancel();
+    _wsSub = WsService.instance.messages.listen((msg) {
+      if (!mounted) return;
+      final type = msg['type'] as String?;
+      if (type != 'new_message') return;
+      final data = msg['data'] as Map<String, dynamic>?;
+      if (data == null) return;
+      if (data['conversationId'] != widget.conversationId) return;
+      // Avoid duplicates
+      final msgId = data['id'] as String?;
+      if (_messages.any((m) => m['id'] == msgId)) return;
+      setState(() {
+        _messages.add(data);
+      });
+      _scrollToBottom();
+    });
   }
 
   Future<void> _loadMessages() async {
@@ -89,6 +116,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
 
   @override
   void dispose() {
+    _wsSub?.cancel();
     _controller.dispose();
     _scrollController.dispose();
     _focusNode.dispose();

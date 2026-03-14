@@ -3,8 +3,48 @@ import { prisma } from "../db.js";
 import { authMiddleware } from "../auth.js";
 import type { AppEnv } from "../env.js";
 
+const AGENT_SERVER_URL =
+  process.env["AGENT_SERVER_URL"] || "http://localhost:3004";
+
 const messages = new Hono<AppEnv>();
 messages.use(authMiddleware);
+
+// Forward message to Agent via webhook (async — reply comes back via callback)
+async function forwardToAgent(
+  agentAccountId: string,
+  conversationId: string,
+  content: string,
+  senderId: string,
+  senderName: string,
+) {
+  try {
+    // Look up agent by accountId
+    const agentRes = await fetch(
+      `${AGENT_SERVER_URL}/v1/agents?accountId=${agentAccountId}`,
+    );
+    if (!agentRes.ok) return;
+    const agents = await agentRes.json();
+    const agent = Array.isArray(agents) ? agents[0] : agents;
+    if (!agent?.id) return;
+
+    // Send chat request (async — reply delivered via callback)
+    await fetch(
+      `${AGENT_SERVER_URL}/v1/agents/${agent.id}/chat`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: content,
+          sessionKey: conversationId,
+          senderId,
+          senderName,
+        }),
+      },
+    );
+  } catch {
+    // Agent forward failure is non-blocking
+  }
+}
 
 // 发送消息
 messages.post("/", async (c) => {
@@ -47,6 +87,20 @@ messages.post("/", async (c) => {
     where: { id: conversationId },
     data: { updatedAt: new Date() },
   });
+
+  // Check if peer is an Agent, forward message asynchronously
+  if (conversation.type === "dm") {
+    const peerIds = conversation.targetId.split(":").filter((id: string) => id !== accountId);
+    const peerId = peerIds[0];
+    if (peerId) {
+      const peer = await prisma.account.findUnique({ where: { id: peerId } });
+      if (peer?.type === "agent") {
+        // Fire and forget — don't block the response
+        const sender = await prisma.account.findUnique({ where: { id: accountId } });
+        forwardToAgent(peerId, conversationId, content, accountId, sender?.name || accountId);
+      }
+    }
+  }
 
   return c.json(message, 201);
 });
