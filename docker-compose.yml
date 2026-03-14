@@ -143,6 +143,34 @@ services:
     volumes:
       - ./ironclaw-server/src:/app/src
 
+  skill-browser:
+    build: ./skill-browser
+    container_name: clawchat-skill-browser
+    restart: unless-stopped
+    command: npx vite --host 0.0.0.0 --port 5173
+    environment:
+      API_HOST: skill-registry-server
+      API_PORT: "3007"
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./skill-browser/src:/app/src
+      - ./skill-browser/index.html:/app/index.html
+
+  skill-registry-server:
+    build: ./skill-registry-server
+    container_name: clawchat-skill-registry-server
+    restart: unless-stopped
+    command: npx tsx watch src/index.ts
+    environment:
+      PORT: "3007"
+      SKILLS_DIR: /skills
+    ports:
+      - "3007:3007"
+    volumes:
+      - ./skill-registry-server/src:/app/src
+      - ./skills/skills:/skills:ro
+
   mcp-server:
     build: ./mcp-server
     container_name: clawchat-mcp-server
@@ -215,6 +243,7 @@ services:
     volumes:
       - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ./app/build/web:/usr/share/nginx/html:ro
+      - ./skill-browser/dist:/usr/share/nginx/skills:ro
 
 volumes:
   pgdata:

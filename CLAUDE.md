@@ -3,14 +3,17 @@
 ## 架构总览
 
 ```
-Flutter App ── REST/WebSocket ──→ nginx ──┬── im-server (3000)     ── PostgreSQL (clawchat)
-                                          ├── agent-server (3004)  ── PostgreSQL (clawchat_agent)
+Flutter App ── REST/WebSocket ──→ nginx ──┬── im-server (3000)            ── PostgreSQL (clawchat)
+Skill Browser ── /skills/ ──→ nginx      ├── agent-server (3004)         ── PostgreSQL (clawchat_agent)
+                                          ├── skill-registry-server (3007) ── skills/ submodule
                                           └── mcp-server (8000)
 
 agent-server ──→ openclaw-server (3003) ──→ container-server (3002) ──→ Docker
                                                                          │
                                                                    openclaw-agent 容器
-                                                                         │
+                                                                     │         │
+                                                  CLAWHUB_REGISTRY ──┘         │
+                                                  → skill-registry-server      │
                                                             callback ──→ im-server → Redis queue → Worker
 ```
 
@@ -20,6 +23,7 @@ agent-server ──→ openclaw-server (3003) ──→ container-server (3002) 
 | agent-server | Agent CRUD + 生命周期（start/stop/chat），JWT 认证，Saga 编排 |
 | openclaw-server | OpenClaw 实例配置生成 + 编排（create/start/stop） |
 | container-server | Docker 容器管理（thin wrapper，未来可接入其他 runtime） |
+| skill-registry-server | ClawHub 兼容的技能注册表，从 skills/ submodule 提供搜索/下载 |
 | mcp-server | MCP 工具服务（FastAPI/Python） |
 
 **关键数据流：**
@@ -74,6 +78,8 @@ agent-server ──→ openclaw-server (3003) ──→ container-server (3002) 
 - `/v1/containers/*` — container-server (Hono/TypeScript)，Docker 容器管理
 - `/v1/openclaw/*` — openclaw-server (Hono/TypeScript)，OpenClaw 实例编排
 - `/v1/mcp/*` — mcp-server (FastAPI/Python)，MCP 服务
+- `/api/v1/*` — skill-registry-server (Hono/TypeScript)，ClawHub 兼容技能注册表
+- `/.well-known/clawhub.json` — skill-registry-server，Registry 发现协议
 
 ## 文档导航
 

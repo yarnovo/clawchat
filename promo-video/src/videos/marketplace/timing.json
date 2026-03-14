@@ -1,0 +1,27 @@
+[
+  {
+    "id": "mp-intro",
+    "startMs": 95,
+    "endMs": 8886
+  },
+  {
+    "id": "mp-demo",
+    "startMs": 9409,
+    "endMs": 21840
+  },
+  {
+    "id": "mp-speed",
+    "startMs": 22363,
+    "endMs": 29704
+  },
+  {
+    "id": "mp-safe",
+    "startMs": 30215,
+    "endMs": 38874
+  },
+  {
+    "id": "mp-cta",
+    "startMs": 39386,
+    "endMs": 45295
+  }
+]

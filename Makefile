@@ -12,7 +12,7 @@ dev-stop:
 	docker compose down
 	@echo "All dev services stopped"
 
-reload: app-build-web
+reload: app-build-web skill-build-web
 	docker compose restart nginx
 	@echo "Ready at http://localhost:8080"
 
@@ -20,8 +20,8 @@ logs:
 	docker compose logs -f
 
 # 单服务日志/重启
-.PHONY: logs-im logs-agent logs-container logs-openclaw logs-nanoclaw logs-ironclaw logs-mcp
-.PHONY: restart-im restart-agent restart-container restart-openclaw restart-nanoclaw restart-ironclaw restart-mcp
+.PHONY: logs-im logs-agent logs-container logs-openclaw logs-nanoclaw logs-ironclaw logs-mcp logs-skill-registry logs-skill-browser
+.PHONY: restart-im restart-agent restart-container restart-openclaw restart-nanoclaw restart-ironclaw restart-mcp restart-skill-registry restart-skill-browser
 
 logs-im:
 	docker compose logs -f im-server
@@ -65,6 +65,18 @@ restart-ironclaw:
 restart-mcp:
 	docker compose restart mcp-server
 
+logs-skill-registry:
+	docker compose logs -f skill-registry-server
+
+restart-skill-registry:
+	docker compose restart skill-registry-server
+
+logs-skill-browser:
+	docker compose logs -f skill-browser
+
+restart-skill-browser:
+	docker compose restart skill-browser
+
 # 监控日志
 diagnose:
 	@bash scripts/diagnose.sh
@@ -86,6 +98,9 @@ app-run:
 
 app-build-web:
 	cd app && flutter build web
+
+skill-build-web:
+	cd skill-browser && npm run build
 
 app-build-ios:
 	cd app && flutter build ios
@@ -184,6 +199,14 @@ e2e-install:
 
 e2e-test:
 	cd e2e && npx playwright test
+
+# ---- Submodule ----
+.PHONY: skills-sync
+
+skills-sync:
+	git submodule update --remote skills
+	cd skills && git diff --name-only | xargs -r git update-index --assume-unchanged
+	@echo "skills submodule synced & macOS case-sensitivity diff suppressed"
 
 # ---- Common ----
 .PHONY: setup version clean

@@ -1,0 +1,10 @@
+[
+  {"id": "dev-intro", "text": "这个视频是skill-registry-server的代码走读。整个服务从零到可用，只有六个源文件，我带你过一遍核心逻辑。"},
+  {"id": "dev-store", "text": "store.ts是数据层。启动时扫描skills子模块目录，读每个技能的meta.json和SKILL.md，建内存索引。两万五千个技能，三秒建完。搜索用关键词匹配，对slug、displayName和description分别打分排序。"},
+  {"id": "dev-api", "text": "api-v1.ts实现ClawHub兼容的五个核心端点。search接受q和limit参数，resolve返回版本信息，download把技能目录打成ZIP返回。所有响应格式都对齐ClawHub的schema，clawhub CLI直接就能用。"},
+  {"id": "dev-zip", "text": "zip.ts负责把技能目录打包成ZIP。用fflate库做压缩，排除meta.json和隐藏文件。下载时实时打包，不预生成，省磁盘空间。"},
+  {"id": "dev-wellknown", "text": "well-known.ts实现发现协议。CLI访问这个端点拿到apiBase地址，就知道API在哪里。这是ClawHub协议的入口点。"},
+  {"id": "dev-inject", "text": "最关键的集成点在openclaw-server的instance.ts。buildEnv函数里加了一行CLAWHUB_REGISTRY环境变量，Agent容器启动后自动走我们的注册表。改动极小，但打通了整条链路。"},
+  {"id": "dev-infra", "text": "基础设施改了四个文件：docker-compose加服务定义，nginx加三条路由，Makefile加日志和重启命令，CLAUDE.md更新架构图。新增服务的标准流程，所有改动都有迹可循。"},
+  {"id": "dev-outro", "text": "回顾一下：六个源文件，一个环境变量注入，四个基础设施配置。整个服务的设计原则就是不造轮子，兼容协议，最小改动。后续可以加数据库持久化、官方同步和发布功能。"}
+]

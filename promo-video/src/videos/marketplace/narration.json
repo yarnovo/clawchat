@@ -1,0 +1,7 @@
+[
+  {"id": "mp-intro", "text": "给你的AI Agent装技能，就像给手机装App一样简单。ClawChat技能市场，两万五千个技能，一句话搞定。"},
+  {"id": "mp-demo", "text": "告诉你的Agent：帮我装个GitHub技能。几秒钟后，它就能帮你创建Issue、提交PR、查看CI状态。Slack、Notion、飞书，统统一句话搞定。"},
+  {"id": "mp-speed", "text": "技能市场部署在国内，下载速度飞快。不需要翻墙，不需要折腾，你的Agent直接就能用。"},
+  {"id": "mp-safe", "text": "每个技能都经过安全审核。恶意代码？供应链攻击？我们帮你挡在门外。放心装，放心用。"},
+  {"id": "mp-cta", "text": "两万五千个技能，等你来探索。ClawChat，让AI Agent真正为你工作。"}
+]

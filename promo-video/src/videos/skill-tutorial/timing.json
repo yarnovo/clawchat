@@ -1,0 +1,27 @@
+[
+  {
+    "id": "tut-intro",
+    "startMs": 95,
+    "endMs": 6693
+  },
+  {
+    "id": "tut-chat",
+    "startMs": 7215,
+    "endMs": 19670
+  },
+  {
+    "id": "tut-search",
+    "startMs": 20181,
+    "endMs": 30977
+  },
+  {
+    "id": "tut-list",
+    "startMs": 31488,
+    "endMs": 42636
+  },
+  {
+    "id": "tut-outro",
+    "startMs": 43159,
+    "endMs": 52340
+  }
+]

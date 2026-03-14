@@ -1,0 +1,32 @@
+[
+  {
+    "id": "agentdb-intro",
+    "startMs": 95,
+    "endMs": 9579
+  },
+  {
+    "id": "agentdb-agent",
+    "startMs": 10102,
+    "endMs": 28079
+  },
+  {
+    "id": "agentdb-config",
+    "startMs": 28602,
+    "endMs": 42454
+  },
+  {
+    "id": "agentdb-enums",
+    "startMs": 42977,
+    "endMs": 59306
+  },
+  {
+    "id": "agentdb-erd",
+    "startMs": 59818,
+    "endMs": 76147
+  },
+  {
+    "id": "agentdb-outro",
+    "startMs": 76670,
+    "endMs": 87715
+  }
+]

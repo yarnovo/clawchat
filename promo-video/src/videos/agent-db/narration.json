@@ -1,0 +1,8 @@
+[
+  {"id": "agentdb-intro", "text": "现在来看agent-server的数据库。这个服务专门管理AI Agent的身份和配置，只有两张表加两个枚举，设计非常简洁。"},
+  {"id": "agentdb-agent", "text": "Agent主表存放身份信息。最关键的是accountId，它对应im-server的Account表，让Agent在聊天系统里拥有完整的身份。ownerId记录谁创建了这个Agent，parentId支持树形结构，一个Agent可以创建子Agent。"},
+  {"id": "agentdb-config", "text": "AgentConfig表管理技术配置。模型名称、API Key、系统提示词，还有容器运行的所有信息：容器ID、Volume名、连接令牌。配置和身份分离，方便独立管理。"},
+  {"id": "agentdb-enums", "text": "两个枚举类型定义了运行时和状态。AgentRuntime支持三种引擎，OpenClaw、NanoClaw和IronClaw。AgentStatus是一个状态机，从创建到启动、运行、停止、出错，完整追踪容器的生命周期。"},
+  {"id": "agentdb-erd", "text": "从关系图来看，Agent和AgentConfig一对一绑定，删除Agent会级联删除配置。Agent的自关联支持树形结构。而accountId把agent-server和im-server连接起来，让Agent跨服务共享同一个身份。"},
+  {"id": "agentdb-outro", "text": "总结一下：两张表加两个枚举，身份与配置分离设计，accountId跨服务共享身份，状态机追踪容器全生命周期。简洁而完整。"}
+]

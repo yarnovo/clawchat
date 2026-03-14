@@ -2,3 +2,7 @@ screenshots/
 .env
 .playwright-mcp/
 backups/
+
+# Node.js services
+**/node_modules/
+**/dist/

@@ -15,6 +15,11 @@ const IM_SERVER_CALLBACK_URL =
 
 const WEBHOOK_PORT = 18790;
 
+// Skill registry URL for clawhub CLI inside Agent containers
+const CLAWHUB_REGISTRY =
+  process.env["CLAWHUB_REGISTRY"] ||
+  "http://skill-registry-server:3007";
+
 export interface InstanceConfig {
   agentId: string;
   accountId: string; // Agent's IM account ID
@@ -46,6 +51,7 @@ function buildEnv(config: InstanceConfig): string[] {
     `CLAWCHAT_CALLBACK_URL=${IM_SERVER_CALLBACK_URL}`,
     `CLAWCHAT_AGENT_ACCOUNT_ID=${config.accountId}`,
     ...(config.systemPrompt ? [`CLAWCHAT_SYSTEM_PROMPT=${config.systemPrompt}`] : []),
+    `CLAWHUB_REGISTRY=${CLAWHUB_REGISTRY}`,
   ];
 }
 

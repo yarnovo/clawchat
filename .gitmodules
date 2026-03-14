@@ -7,3 +7,9 @@
 [submodule "ironclaw"]
 	path = ironclaw
 	url = git@github.com:yarnovo/ironclaw.git
+[submodule "clawhub"]
+	path = clawhub
+	url = git@github.com:yarnovo/clawhub.git
+[submodule "skills"]
+	path = skills
+	url = git@github.com:yarnovo/skills.git
