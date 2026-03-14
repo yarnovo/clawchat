@@ -31,7 +31,9 @@ describe("Health", () => {
   it("GET /health 返回 ok", async () => {
     const res = await request("/health");
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ status: "ok" });
+    const body = await res.json();
+    expect(body.status).toBe("ok");
+    expect(body.checks).toBeDefined();
   });
 });
 
@@ -49,6 +51,7 @@ describe("Instances", () => {
       "/instances",
       jsonReq("POST", {
         agentId: "agent-1",
+        accountId: "account-1",
         model: "gpt-4o",
         apiKey: "sk-test",
       }),
@@ -102,8 +105,8 @@ describe("Chat", () => {
       "/instances/agent-1/chat",
       jsonReq("POST", { message: "Hello" }),
     );
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     const body = await res.json();
-    expect(body.reply).toBe("Hello from OpenClaw!");
+    expect(body.ok).toBe(true);
   });
 });
