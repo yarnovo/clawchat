@@ -1,0 +1,9 @@
+{
+  "name": "@openclaw/clawchat",
+  "version": "0.1.0",
+  "description": "OpenClaw ClawChat channel plugin",
+  "type": "module",
+  "openclaw": {
+    "extensions": ["./index.ts"]
+  }
+}

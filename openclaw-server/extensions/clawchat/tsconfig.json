@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "paths": {
+      "openclaw/plugin-sdk/compat": ["../../../openclaw/src/plugin-sdk/compat.ts"]
+    }
+  },
+  "include": ["*.ts", "src/**/*.ts"]
+}
