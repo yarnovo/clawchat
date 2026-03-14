@@ -47,7 +47,7 @@ const Scene: React.FC<{ children: React.ReactNode; dur: number; isLast?: boolean
   return <AbsoluteFill style={{ opacity }}>{children}</AbsoluteFill>;
 };
 
-export const SkillsDemo: React.FC = () => (
+export const Skills: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: "#0f0c29" }}>
     <Audio src={staticFile("audio/skills/skills.mp3")} volume={0.9} />
     {scenes.map((s, i) => {

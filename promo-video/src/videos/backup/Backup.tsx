@@ -1,20 +1,26 @@
 import { AbsoluteFill, Audio, interpolate, Sequence, staticFile, useCurrentFrame } from "remotion";
-import { SceneIntro } from "./SceneIntro";
-import { ScenePainPoints } from "./ScenePainPoints";
-import { SceneSolution } from "./SceneSolution";
-import { SceneChat } from "./SceneChat";
-import { SceneCapabilities } from "./SceneCapabilities";
-import { ScenePositioning } from "./ScenePositioning";
-import { SceneOutro } from "./SceneOutro";
+import { SceneBackupCover } from "./SceneBackupCover";
+import { SceneBackupRisks } from "./SceneBackupRisks";
+import { SceneBackupAnalogy } from "./SceneBackupAnalogy";
+import { SceneBackupOverview } from "./SceneBackupOverview";
+import { SceneBackupDaily } from "./SceneBackupDaily";
+import { SceneBackupDeploy } from "./SceneBackupDeploy";
+import { SceneBackupRedis } from "./SceneBackupRedis";
+import { SceneBackupCommands } from "./SceneBackupCommands";
+import { SceneBackupRestore } from "./SceneBackupRestore";
+import { SceneBackupOutro } from "./SceneBackupOutro";
 import { Subtitle } from "../../Subtitle";
 
-import introWords from "./words/intro-words.json";
-import painpointsWords from "./words/painpoints-words.json";
-import solutionWords from "./words/solution-words.json";
-import chatWords from "./words/chat-words.json";
-import capabilitiesWords from "./words/capabilities-words.json";
-import positioningWords from "./words/positioning-words.json";
-import outroWords from "./words/outro-words.json";
+import coverWords from "./words/backup-cover-words.json";
+import risksWords from "./words/backup-risks-words.json";
+import analogyWords from "./words/backup-analogy-words.json";
+import overviewWords from "./words/backup-overview-words.json";
+import dailyWords from "./words/backup-daily-words.json";
+import deployWords from "./words/backup-deploy-words.json";
+import redisWords from "./words/backup-redis-words.json";
+import commandsWords from "./words/backup-commands-words.json";
+import restoreWords from "./words/backup-restore-words.json";
+import outroWords from "./words/backup-outro-words.json";
 import timingData from "./timing.json";
 
 const FPS = 30;
@@ -23,12 +29,13 @@ const INTRO_PAD = 10;
 const OUTRO_PAD = 30;
 
 const SCENE_COMPS = [
-  SceneIntro, ScenePainPoints, SceneSolution,
-  SceneChat, SceneCapabilities, ScenePositioning, SceneOutro,
+  SceneBackupCover, SceneBackupRisks, SceneBackupAnalogy,
+  SceneBackupOverview, SceneBackupDaily, SceneBackupDeploy,
+  SceneBackupRedis, SceneBackupCommands, SceneBackupRestore, SceneBackupOutro,
 ];
 const SCENE_WORDS = [
-  introWords, painpointsWords, solutionWords,
-  chatWords, capabilitiesWords, positioningWords, outroWords,
+  coverWords, risksWords, analogyWords, overviewWords, dailyWords,
+  deployWords, redisWords, commandsWords, restoreWords, outroWords,
 ];
 
 const scenes = timingData.map((t, i) => {
@@ -49,9 +56,9 @@ const Scene: React.FC<{ children: React.ReactNode; dur: number; isLast?: boolean
   return <AbsoluteFill style={{ opacity }}>{children}</AbsoluteFill>;
 };
 
-export const Demo: React.FC = () => (
+export const Backup: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: "#0f0c29" }}>
-    <Audio src={staticFile("audio/main/main.mp3")} volume={0.9} />
+    <Audio src={staticFile("audio/backup/backup.mp3")} volume={0.9} />
     {scenes.map((s, i) => {
       const isLast = i === scenes.length - 1;
       const seqDur = isLast ? s.dur : s.dur + FADE;

@@ -70,7 +70,7 @@ const Scene: React.FC<{ children: React.ReactNode; dur: number; isLast?: boolean
   return <AbsoluteFill style={{ opacity }}>{children}</AbsoluteFill>;
 };
 
-export const DbDemo: React.FC = () => {
+export const Db: React.FC = () => {
   return (
     <AbsoluteFill style={{ backgroundColor: "#0f0c29" }}>
       <Audio src={staticFile("audio/db/db.mp3")} volume={0.9} />
