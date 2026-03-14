@@ -53,6 +53,19 @@ restart-openclaw:
 restart-mcp:
 	docker compose restart mcp-server
 
+# 监控日志
+diagnose:
+	@bash scripts/diagnose.sh
+
+logs-grafana:
+	docker compose logs -f grafana
+
+logs-loki:
+	docker compose logs -f loki
+
+logs-prometheus:
+	docker compose logs -f prometheus
+
 # ---- App (Flutter) ----
 .PHONY: app-run app-build-web app-build-ios app-build-android
 

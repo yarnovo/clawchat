@@ -13,10 +13,14 @@ export interface ImAccount {
 export async function registerAgentAccount(opts: {
   name: string;
   avatar?: string;
+  requestId?: string;
 }): Promise<ImAccount> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (opts.requestId) headers["x-request-id"] = opts.requestId;
+
   const res = await fetch(`${IM_SERVER_URL}/v1/im/auth/register-agent`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ name: opts.name, avatar: opts.avatar }),
   });
 
@@ -30,10 +34,17 @@ export async function registerAgentAccount(opts: {
 }
 
 // Add direct friendship between owner and agent
-export async function addDirectFriend(accountAId: string, accountBId: string): Promise<void> {
+export async function addDirectFriend(
+  accountAId: string,
+  accountBId: string,
+  requestId?: string,
+): Promise<void> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (requestId) headers["x-request-id"] = requestId;
+
   const res = await fetch(`${IM_SERVER_URL}/v1/im/friends/add-direct`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ accountAId, accountBId }),
   });
 
@@ -44,10 +55,16 @@ export async function addDirectFriend(accountAId: string, accountBId: string): P
 }
 
 // Delete an Agent account from im-server
-export async function deleteAgentAccount(accountId: string): Promise<void> {
+export async function deleteAgentAccount(
+  accountId: string,
+  requestId?: string,
+): Promise<void> {
+  const headers: Record<string, string> = {};
+  if (requestId) headers["x-request-id"] = requestId;
+
   const res = await fetch(
     `${IM_SERVER_URL}/v1/im/accounts/${accountId}`,
-    { method: "DELETE" },
+    { method: "DELETE", headers },
   );
 
   if (!res.ok && res.status !== 404) {

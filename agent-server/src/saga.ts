@@ -1,5 +1,7 @@
 // Saga pattern — execute steps in order, compensate in reverse on failure
 
+import { logger } from "./logger.js";
+
 export interface SagaStep<TContext> {
   name: string;
   execute: (ctx: TContext) => Promise<void>;
@@ -32,7 +34,7 @@ export async function runSaga<TContext>(
       completed.push(step);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
-      console.error(`[saga] step "${step.name}" failed:`, error.message);
+      logger.error({ step: step.name, err: error.message }, "saga step failed");
 
       // Compensate completed steps in reverse order
       const compensationErrors = await compensate(completed, context);
@@ -64,14 +66,14 @@ async function compensate<TContext>(
     for (let attempt = 1; attempt <= COMPENSATE_MAX_RETRIES; attempt++) {
       try {
         await step.compensate(context);
-        console.log(`[saga] compensated "${step.name}"`);
+        logger.info({ step: step.name }, "saga compensated");
         lastError = undefined;
         break;
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
-        console.warn(
-          `[saga] compensate "${step.name}" attempt ${attempt}/${COMPENSATE_MAX_RETRIES} failed:`,
-          lastError.message,
+        logger.warn(
+          { step: step.name, attempt, maxAttempts: COMPENSATE_MAX_RETRIES, err: lastError.message },
+          "saga compensate attempt failed",
         );
         if (attempt < COMPENSATE_MAX_RETRIES) {
           await new Promise((r) => setTimeout(r, 500 * attempt));
@@ -80,8 +82,9 @@ async function compensate<TContext>(
     }
 
     if (lastError) {
-      console.error(
-        `[saga] compensate "${step.name}" failed after ${COMPENSATE_MAX_RETRIES} attempts`,
+      logger.error(
+        { step: step.name, maxAttempts: COMPENSATE_MAX_RETRIES },
+        "saga compensate failed after all attempts",
       );
       errors.push({ step: step.name, error: lastError });
     }

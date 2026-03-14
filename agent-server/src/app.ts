@@ -1,6 +1,8 @@
 import { Hono } from "hono";
-import { logger } from "hono/logger";
 import { cors } from "hono/cors";
+import { logger } from "./logger.js";
+import { requestId } from "./middleware/request-id.js";
+import { registry, httpRequestDuration, httpRequestsTotal } from "./metrics.js";
 import { prisma } from "./db.js";
 import * as openclawClient from "./openclaw-client.js";
 import { createAgentSaga } from "./create-agent-saga.js";
@@ -10,10 +12,38 @@ import type { AppEnv } from "./env.js";
 const app = new Hono<AppEnv>().basePath("/v1/agents");
 
 app.use("*", cors());
-app.use("*", logger());
+app.use("*", requestId);
+app.use("*", async (c, next) => {
+  const start = Date.now();
+  await next();
+  const ms = Date.now() - start;
+  const route = c.req.routePath || c.req.path;
+  const status = String(c.res.status);
+  httpRequestDuration.observe({ method: c.req.method, route, status }, ms / 1000);
+  httpRequestsTotal.inc({ method: c.req.method, route, status });
+  logger.info(
+    { requestId: c.get("requestId"), method: c.req.method, path: c.req.path, status: c.res.status, ms },
+    `${c.req.method} ${c.req.path} ${c.res.status}`,
+  );
+});
 
 // Health check (no auth)
-app.get("/health", (c) => c.json({ status: "ok" }));
+app.get("/health", async (c) => {
+  const checks: Record<string, "ok" | "error"> = {};
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    checks.db = "ok";
+  } catch {
+    checks.db = "error";
+  }
+  const status = checks.db === "ok" ? "ok" : "degraded";
+  return c.json({ status, checks }, status === "ok" ? 200 : 503);
+});
+
+app.get("/metrics", async (c) => {
+  const metrics = await registry.metrics();
+  return c.text(metrics, 200, { "Content-Type": registry.contentType });
+});
 
 // Chat endpoint is called by im-server internally (no auth)
 // Auth required for all other routes

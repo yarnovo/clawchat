@@ -68,7 +68,9 @@ describe("Health", () => {
   it("GET /health 返回 ok", async () => {
     const res = await request("/health");
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ status: "ok" });
+    const body = await res.json();
+    expect(body.status).toBe("ok");
+    expect(body.checks).toBeDefined();
   });
 });
 

@@ -3,10 +3,18 @@
 const CONTAINER_SERVER_URL =
   process.env["CONTAINER_SERVER_URL"] || "http://localhost:3002";
 
-async function request(path: string, init?: RequestInit) {
+async function request(path: string, init?: RequestInit, requestId?: string) {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...Object.fromEntries(
+      Object.entries(init?.headers || {}).map(([k, v]) => [k, String(v)]),
+    ),
+  };
+  if (requestId) headers["x-request-id"] = requestId;
+
   const res = await fetch(`${CONTAINER_SERVER_URL}/v1/containers${path}`, {
     ...init,
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers,
   });
   return { status: res.status, data: await res.json() };
 }
@@ -31,11 +39,13 @@ export async function createContainer(opts: {
   memory?: number;
   cpus?: number;
   cmd?: string[];
+  requestId?: string;
 }): Promise<{ id: string }> {
+  const { requestId: reqId, ...body } = opts;
   const res = await request("", {
     method: "POST",
-    body: JSON.stringify(opts),
-  });
+    body: JSON.stringify(body),
+  }, reqId);
   if (res.status !== 201) {
     throw new Error(res.data.error || "Failed to create container");
   }
@@ -50,22 +60,22 @@ export async function getContainer(
   return res.data;
 }
 
-export async function startContainer(id: string): Promise<void> {
-  const res = await request(`/${id}/start`, { method: "POST" });
+export async function startContainer(id: string, requestId?: string): Promise<void> {
+  const res = await request(`/${id}/start`, { method: "POST" }, requestId);
   if (res.status !== 200) {
     throw new Error(res.data.error || "Failed to start container");
   }
 }
 
-export async function stopContainer(id: string): Promise<void> {
-  const res = await request(`/${id}/stop`, { method: "POST" });
+export async function stopContainer(id: string, requestId?: string): Promise<void> {
+  const res = await request(`/${id}/stop`, { method: "POST" }, requestId);
   if (res.status !== 200) {
     throw new Error(res.data.error || "Failed to stop container");
   }
 }
 
-export async function removeContainer(id: string): Promise<void> {
-  const res = await request(`/${id}`, { method: "DELETE" });
+export async function removeContainer(id: string, requestId?: string): Promise<void> {
+  const res = await request(`/${id}`, { method: "DELETE" }, requestId);
   if (res.status !== 200) {
     throw new Error(res.data.error || "Failed to remove container");
   }

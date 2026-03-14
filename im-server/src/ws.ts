@@ -1,6 +1,8 @@
 import { WebSocketServer, WebSocket } from "ws";
 import type { IncomingMessage } from "http";
 import { verifyToken } from "./auth.js";
+import { logger } from "./logger.js";
+import { wsConnectionsActive } from "./metrics.js";
 
 // userId → Set of connected WebSocket clients
 const clients = new Map<string, Set<WebSocket>>();
@@ -43,7 +45,8 @@ export function setupWebSocket(server: ReturnType<typeof import("@hono/node-serv
       clients.set(userId, new Set());
     }
     clients.get(userId)!.add(ws);
-    console.log(`[ws] connected: ${userId} (${clients.get(userId)!.size} connections)`);
+    wsConnectionsActive.inc();
+    logger.info({ userId, connections: clients.get(userId)!.size }, "ws connected");
 
     ws.on("close", () => {
       const set = clients.get(userId);
@@ -51,7 +54,8 @@ export function setupWebSocket(server: ReturnType<typeof import("@hono/node-serv
         set.delete(ws);
         if (set.size === 0) clients.delete(userId);
       }
-      console.log(`[ws] disconnected: ${userId}`);
+      wsConnectionsActive.dec();
+      logger.info({ userId }, "ws disconnected");
     });
 
     ws.on("error", () => {
