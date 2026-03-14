@@ -1,10 +1,17 @@
 import { Hono } from "hono";
+import jwt from "jsonwebtoken";
 import { prisma } from "../db.js";
 import { authMiddleware } from "../auth.js";
 import type { AppEnv } from "../env.js";
 
 const AGENT_SERVER_URL =
   process.env["AGENT_SERVER_URL"] || "http://localhost:3004";
+const JWT_SECRET = process.env["JWT_SECRET"] || "clawchat-dev-secret";
+
+// Generate a service-to-service JWT for internal calls to agent-server
+function serviceToken(accountId: string): string {
+  return jwt.sign({ sub: accountId, type: "service" }, JWT_SECRET, { expiresIn: "5m" });
+}
 
 const messages = new Hono<AppEnv>();
 messages.use(authMiddleware);
@@ -18,16 +25,18 @@ async function forwardToAgent(
   senderName: string,
 ) {
   try {
+    const token = serviceToken(senderId);
     // Look up agent by accountId
     const agentRes = await fetch(
       `${AGENT_SERVER_URL}/v1/agents?accountId=${agentAccountId}`,
+      { headers: { Authorization: `Bearer ${token}` } },
     );
     if (!agentRes.ok) return;
     const agents = await agentRes.json();
     const agent = Array.isArray(agents) ? agents[0] : agents;
     if (!agent?.id) return;
 
-    // Send chat request (async — reply delivered via callback)
+    // Send chat request (async — reply delivered via callback, no auth needed)
     await fetch(
       `${AGENT_SERVER_URL}/v1/agents/${agent.id}/chat`,
       {

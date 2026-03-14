@@ -43,6 +43,7 @@ services:
       DATABASE_URL: postgresql://clawchat:clawchat@postgres:5432/clawchat
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET:-clawchat-prod-secret}
+      AGENT_SERVER_URL: http://agent-server:3004
     ports:
       - "3000:3000"
     depends_on:
