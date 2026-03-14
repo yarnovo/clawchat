@@ -55,7 +55,9 @@ Future<ClawChatApp> loggedInApp() async {
 }
 
 /// 创建 mock ApiClient，可在单独页面测试中使用
-Future<ApiClient> mockApiClient() async {
+Future<ApiClient> mockApiClient({
+  List<Map<String, dynamic>>? conversations,
+}) async {
   final authService = AuthService(store: InMemoryTokenStore());
   await authService.saveLogin(
     token: 'test-token',
@@ -65,7 +67,7 @@ Future<ApiClient> mockApiClient() async {
   return ApiClient(
     baseUrl: 'http://localhost:3000',
     authService: authService,
-    httpClient: mockHttpClient(),
+    httpClient: mockHttpClient(conversations: conversations),
   );
 }
 
@@ -77,7 +79,10 @@ http.Response _jsonResponse(Object data, int statusCode) {
   );
 }
 
-http_testing.MockClient mockHttpClient() {
+http_testing.MockClient mockHttpClient({
+  List<Map<String, dynamic>>? conversations,
+}) {
+  final convs = conversations ?? mockConversations;
   return http_testing.MockClient((request) async {
     final path = request.url.path;
     final method = request.method;
@@ -97,7 +102,7 @@ http_testing.MockClient mockHttpClient() {
       return _jsonResponse([], 200);
     }
     if (path.endsWith('/conversations') && method == 'GET') {
-      return _jsonResponse(mockConversations, 200);
+      return _jsonResponse(convs, 200);
     }
     if (path.endsWith('/messages') && method == 'GET') {
       return _jsonResponse(mockMessages, 200);

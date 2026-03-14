@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/service_provider.dart';
+import '../../services/ws_service.dart';
 import '../contacts/add_friend_page.dart';
 import '../contacts/create_agent_page.dart';
 
@@ -14,11 +16,58 @@ class ChatListPageState extends State<ChatListPage> {
   void reload() => _load();
   List<Map<String, dynamic>> _conversations = [];
   bool _loading = true;
+  StreamSubscription? _wsSub;
+  bool _initialized = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _load();
+    if (!_initialized) {
+      _initialized = true;
+      _load();
+      _listenWs();
+    }
+  }
+
+  void _listenWs() {
+    _wsSub?.cancel();
+    _wsSub = WsService.instance.messages.listen((msg) {
+      if (!mounted) return;
+      final type = msg['type'] as String?;
+      if (type != 'new_message') return;
+      final data = msg['data'] as Map<String, dynamic>?;
+      if (data == null) return;
+
+      final convId = data['conversationId'] as String?;
+      if (convId == null) return;
+
+      setState(() {
+        final idx = _conversations.indexWhere((c) => c['id'] == convId);
+        if (idx >= 0) {
+          // Update lastMessage and move to top
+          _conversations[idx] = {
+            ..._conversations[idx],
+            'lastMessage': {
+              'content': data['content'],
+              'createdAt': data['createdAt'],
+            },
+          };
+          if (idx > 0) {
+            final conv = _conversations.removeAt(idx);
+            _conversations.insert(0, conv);
+          }
+        } else {
+          // New conversation — full reload to get friend info etc.
+          _load();
+        }
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _wsSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
