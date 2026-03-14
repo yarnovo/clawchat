@@ -6,6 +6,7 @@ import accounts from "./routes/accounts.js";
 import friends from "./routes/friends.js";
 import conversations from "./routes/conversations.js";
 import messages from "./routes/messages.js";
+import internal from "./routes/internal.js";
 import health from "./routes/health.js";
 
 const app = new Hono().basePath("/v1/im");
@@ -19,5 +20,6 @@ app.route("/accounts", accounts);
 app.route("/friends", friends);
 app.route("/conversations", conversations);
 app.route("/messages", messages);
+app.route("/internal", internal);
 
 export default app;
