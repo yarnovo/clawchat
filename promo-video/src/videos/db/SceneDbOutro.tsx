@@ -7,13 +7,13 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { COLORS, FONT, MONO } from "../../constants";
+import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
 const stats = [
-  { label: "核心表", value: "6", color: "#a78bfa" },
-  { label: "枚举类型", value: "5", color: "#60a5fa" },
-  { label: "唯一约束", value: "3", color: "#34d399" },
-  { label: "外键关系", value: "8", color: "#f59e0b" },
+  { label: "核心表", value: "6", color: COLORS.text },
+  { label: "枚举类型", value: "5", color: COLORS.muted },
+  { label: "唯一约束", value: "3", color: COLORS.accent },
+  { label: "外键关系", value: "8", color: COLORS.accent },
 ];
 
 export const SceneDbOutro: React.FC = () => {
@@ -23,7 +23,6 @@ export const SceneDbOutro: React.FC = () => {
   const titleProg = spring({ frame, fps, config: { damping: 12, mass: 0.8 } });
   const statsProg = spring({ frame: frame - 12, fps, config: { damping: 14 } });
   const sloganProg = spring({ frame: frame - 30, fps, config: { damping: 14 } });
-  const glow = interpolate(Math.sin(frame * 0.06), [-1, 1], [0.3, 0.7]);
 
   return (
     <AbsoluteFill>
@@ -35,22 +34,14 @@ export const SceneDbOutro: React.FC = () => {
           alignItems: "center",
           flexDirection: "column",
           gap: 40,
-          paddingBottom: 120,
+          paddingBottom: 140,
         }}
       >
         {/* Icon */}
         <div
           style={{
             transform: `scale(${titleProg})`,
-            width: 90,
-            height: 90,
-            borderRadius: 24,
-            background: `linear-gradient(135deg, ${COLORS.primary}, #00D2FF)`,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            fontSize: 48,
-            boxShadow: `0 20px 80px rgba(108,99,255,${glow}), 0 0 120px rgba(0,210,255,${glow * 0.3})`,
+            fontSize: 80,
           }}
         >
           🗄️
@@ -60,7 +51,7 @@ export const SceneDbOutro: React.FC = () => {
         <div
           style={{
             display: "flex",
-            gap: 40,
+            gap: 48,
             opacity: interpolate(statsProg, [0, 1], [0, 1]),
             transform: `translateY(${interpolate(statsProg, [0, 1], [20, 0])}px)`,
           }}
@@ -72,13 +63,18 @@ export const SceneDbOutro: React.FC = () => {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                gap: 6,
+                gap: 8,
+                padding: "20px 32px",
+                background: COLORS.card,
+                borderRadius: 12,
+                border: `1px solid ${COLORS.border}`,
+                boxShadow: COLORS.cardShadow,
               }}
             >
               <div
                 style={{
                   fontFamily: MONO,
-                  fontSize: 44,
+                  fontSize: 48,
                   fontWeight: 800,
                   color: s.color,
                 }}
@@ -87,9 +83,9 @@ export const SceneDbOutro: React.FC = () => {
               </div>
               <div
                 style={{
-                  fontFamily: FONT,
-                  fontSize: 16,
-                  color: "rgba(255,255,255,0.5)",
+                  fontFamily: FONT_SANS,
+                  fontSize: 28,
+                  color: COLORS.muted,
                 }}
               >
                 {s.label}
@@ -109,13 +105,10 @@ export const SceneDbOutro: React.FC = () => {
           <div
             style={{
               fontFamily: FONT,
-              fontSize: 44,
-              fontWeight: 800,
+              fontSize: 48,
+              fontWeight: 700,
               lineHeight: 1.4,
-              background: "linear-gradient(135deg, #ffffff 0%, #00D2FF 50%, #6C63FF 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              filter: `drop-shadow(0 0 30px rgba(0,210,255,${glow * 0.3}))`,
+              color: COLORS.text,
             }}
           >
             简洁的表设计

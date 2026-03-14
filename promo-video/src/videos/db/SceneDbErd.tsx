@@ -7,18 +7,17 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { FONT, MONO } from "../../constants";
+import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
 const tables = [
-  { name: "Account", emoji: "👤", color: "#a78bfa", x: 480, y: 100, fields: "id, type, name, email, searchable" },
-  { name: "Friendship", emoji: "💚", color: "#34d399", x: 160, y: 340, fields: "accountAId → accountBId" },
-  { name: "Group", emoji: "👥", color: "#60a5fa", x: 800, y: 340, fields: "ownerId → Account" },
-  { name: "GroupMember", emoji: "🛡️", color: "#818cf8", x: 1080, y: 340, fields: "groupId + accountId" },
-  { name: "Conversation", emoji: "💬", color: "#f59e0b", x: 380, y: 560, fields: "type: dm | group" },
-  { name: "Message", emoji: "✉️", color: "#f87171", x: 740, y: 560, fields: "text, image, voice" },
+  { name: "Account", color: COLORS.text, x: 480, y: 100, fields: "id, type, name, email, searchable" },
+  { name: "Friendship", color: COLORS.accent, x: 160, y: 340, fields: "accountAId → accountBId" },
+  { name: "Group", color: COLORS.text, x: 800, y: 340, fields: "ownerId → Account" },
+  { name: "GroupMember", color: COLORS.muted, x: 1080, y: 340, fields: "groupId + accountId" },
+  { name: "Conversation", color: COLORS.accent, x: 380, y: 560, fields: "type: dm | group" },
+  { name: "Message", color: COLORS.text, x: 740, y: 560, fields: "text, image, voice" },
 ];
 
-// Relationships as lines between table centers
 const relationships = [
   { from: 0, to: 1, label: "1:N" },
   { from: 0, to: 2, label: "1:N" },
@@ -36,14 +35,14 @@ export const SceneDbErd: React.FC = () => {
 
   return (
     <AbsoluteFill>
-      <GradientBg colors={["#0c0a2e", "#1a1a3e", "#0c0a2e"]} />
+      <GradientBg />
       <Particles />
       <AbsoluteFill
         style={{
           justifyContent: "center",
           alignItems: "center",
           flexDirection: "column",
-          paddingBottom: 120,
+          paddingBottom: 140,
         }}
       >
         {/* Title */}
@@ -61,17 +60,14 @@ export const SceneDbErd: React.FC = () => {
           <div
             style={{
               fontFamily: FONT,
-              fontSize: 48,
-              fontWeight: 800,
-              background: "linear-gradient(135deg, #fff 20%, #00D2FF 60%, #6C63FF 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
+              fontSize: 60,
+              fontWeight: 700,
+              color: COLORS.text,
               display: "inline-flex",
               alignItems: "center",
               gap: 16,
             }}
           >
-            <span style={{ fontSize: 44, WebkitTextFillColor: "initial" }}>🔗</span>
             实体关系总览
           </div>
         </div>
@@ -99,7 +95,7 @@ export const SceneDbErd: React.FC = () => {
                 fps,
                 config: { damping: 16, mass: 0.8 },
               });
-              const pathOpacity = interpolate(lineProg, [0, 1], [0, 0.3]);
+              const pathOpacity = interpolate(lineProg, [0, 1], [0, 0.25]);
               const cx = (fromT.x + 100 + toT.x + 100) / 2;
               const cy = (fromT.y + 35 + toT.y + 35) / 2;
 
@@ -110,7 +106,7 @@ export const SceneDbErd: React.FC = () => {
                     y1={fromT.y + 35}
                     x2={toT.x + 100}
                     y2={toT.y + 35}
-                    stroke={fromT.color}
+                    stroke={COLORS.muted}
                     strokeWidth={1.5}
                     strokeDasharray="6,4"
                     opacity={pathOpacity}
@@ -119,9 +115,9 @@ export const SceneDbErd: React.FC = () => {
                     x={cx}
                     y={cy - 6}
                     textAnchor="middle"
-                    fill="rgba(255,255,255,0.35)"
+                    fill={COLORS.muted}
                     fontSize={12}
-                    fontFamily="JetBrains Mono, monospace"
+                    fontFamily={MONO}
                     opacity={pathOpacity * 2}
                   >
                     {rel.label}
@@ -139,7 +135,6 @@ export const SceneDbErd: React.FC = () => {
               fps,
               config: { damping: 14, mass: 0.7 },
             });
-            const glow = interpolate(Math.sin(frame * 0.04 + i * 1.2), [-1, 1], [0.06, 0.15]);
 
             return (
               <div
@@ -150,10 +145,10 @@ export const SceneDbErd: React.FC = () => {
                   top: t.y,
                   width: 200,
                   padding: "12px 16px",
-                  borderRadius: 16,
-                  background: "rgba(255,255,255,0.04)",
-                  border: `1px solid ${t.color}30`,
-                  boxShadow: `0 6px 30px ${t.color}${Math.round(glow * 255).toString(16).padStart(2, "0")}`,
+                  borderRadius: 12,
+                  background: COLORS.card,
+                  border: `1px solid ${COLORS.border}`,
+                  boxShadow: COLORS.cardShadow,
                   opacity: interpolate(nodeProg, [0, 1], [0, 1]),
                   transform: `scale(${interpolate(nodeProg, [0, 1], [0.8, 1])})`,
                   display: "flex",
@@ -163,11 +158,10 @@ export const SceneDbErd: React.FC = () => {
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 22 }}>{t.emoji}</span>
                   <span
                     style={{
                       fontFamily: FONT,
-                      fontSize: 18,
+                      fontSize: 28,
                       fontWeight: 700,
                       color: t.color,
                     }}
@@ -178,8 +172,8 @@ export const SceneDbErd: React.FC = () => {
                 <div
                   style={{
                     fontFamily: MONO,
-                    fontSize: 11,
-                    color: "rgba(255,255,255,0.4)",
+                    fontSize: 24,
+                    color: COLORS.muted,
                     textAlign: "center",
                     lineHeight: 1.5,
                   }}

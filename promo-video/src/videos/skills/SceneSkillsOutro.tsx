@@ -7,7 +7,7 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { COLORS, FONT } from "../../constants";
+import { COLORS, FONT, FONT_SANS } from "../../constants";
 
 export const SceneSkillsOutro: React.FC = () => {
   const frame = useCurrentFrame();
@@ -19,10 +19,9 @@ export const SceneSkillsOutro: React.FC = () => {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const glow = interpolate(Math.sin(frame * 0.06), [-1, 1], [0.3, 0.8]);
 
-  // Floating skill icons around the logo
-  const floatingIcons = ["🔍", "💻", "📊", "🌐", "📧", "🔧"];
+  // Floating skill labels around the logo
+  const floatingLabels = ["搜索", "代码", "分析", "网络", "邮件", "工具"];
 
   return (
     <AbsoluteFill>
@@ -34,13 +33,13 @@ export const SceneSkillsOutro: React.FC = () => {
           alignItems: "center",
           flexDirection: "column",
           gap: 32,
-          paddingBottom: 120,
+          paddingBottom: 140,
         }}
       >
-        {/* Logo with floating skill icons */}
+        {/* Logo with floating skill labels */}
         <div style={{ position: "relative" }}>
-          {floatingIcons.map((icon, i) => {
-            const angle = (i / floatingIcons.length) * Math.PI * 2 + frame * 0.02;
+          {floatingLabels.map((label, i) => {
+            const angle = (i / floatingLabels.length) * Math.PI * 2 + frame * 0.02;
             const radius = 70 + Math.sin(frame * 0.03 + i) * 10;
             const x = Math.cos(angle) * radius;
             const y = Math.sin(angle) * radius;
@@ -50,13 +49,20 @@ export const SceneSkillsOutro: React.FC = () => {
                 key={i}
                 style={{
                   position: "absolute",
-                  left: 50 + x - 14,
-                  top: 50 + y - 14,
-                  fontSize: 18,
+                  left: 50 + x - 20,
+                  top: 50 + y - 12,
+                  fontFamily: FONT_SANS,
+                  fontSize: 24,
+                  color: COLORS.muted,
+                  padding: "3px 10px",
+                  borderRadius: 6,
+                  background: COLORS.card,
+                  border: `1px solid ${COLORS.border}`,
+                  boxShadow: COLORS.cardShadow,
                   opacity: 0.5 + Math.sin(frame * 0.05 + i) * 0.3,
                 }}
               >
-                {icon}
+                {label}
               </div>
             );
           })}
@@ -66,12 +72,13 @@ export const SceneSkillsOutro: React.FC = () => {
               width: 100,
               height: 100,
               borderRadius: 28,
-              background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.accent})`,
+              background: COLORS.card,
+              border: `1px solid ${COLORS.border}`,
+              boxShadow: COLORS.cardShadow,
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
-              fontSize: 52,
-              boxShadow: `0 20px 80px rgba(108,99,255,${glow}), 0 0 120px rgba(7,193,96,${glow * 0.3})`,
+              fontSize: 56,
             }}
           >
             🐾
@@ -83,13 +90,10 @@ export const SceneSkillsOutro: React.FC = () => {
           <div
             style={{
               fontFamily: FONT,
-              fontSize: 52,
-              fontWeight: 800,
+              fontSize: 60,
+              fontWeight: 700,
               lineHeight: 1.4,
-              background: "linear-gradient(135deg, #ffffff 0%, #a78bfa 40%, #60a5fa 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              filter: `drop-shadow(0 0 30px rgba(108,99,255,${glow * 0.4}))`,
+              color: COLORS.text,
             }}
           >
             给你的 Agent
@@ -103,14 +107,14 @@ export const SceneSkillsOutro: React.FC = () => {
           style={{
             opacity: ctaOp,
             fontFamily: FONT,
-            fontSize: 24,
-            fontWeight: 600,
+            fontSize: 36,
+            fontWeight: 700,
             color: COLORS.accent,
             padding: "14px 40px",
-            borderRadius: 16,
-            background: "rgba(7,193,96,0.06)",
-            border: `1px solid rgba(7,193,96,${interpolate(Math.sin(frame * 0.08), [-1, 1], [0.2, 0.5])})`,
-            boxShadow: `0 0 30px rgba(7,193,96,${interpolate(Math.sin(frame * 0.08), [-1, 1], [0.05, 0.15])})`,
+            borderRadius: 12,
+            background: COLORS.card,
+            border: `1px solid ${COLORS.border}`,
+            boxShadow: COLORS.cardShadow,
             letterSpacing: 4,
           }}
         >

@@ -7,7 +7,7 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { FONT, MONO } from "../../constants";
+import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
 export const SceneBackupRedis: React.FC = () => {
   const frame = useCurrentFrame();
@@ -34,7 +34,7 @@ export const SceneBackupRedis: React.FC = () => {
 
   return (
     <AbsoluteFill>
-      <GradientBg colors={["#0a1a15", "#0e2e22", "#0a1a15"]} />
+      <GradientBg />
       <Particles />
       <AbsoluteFill
         style={{
@@ -42,10 +42,10 @@ export const SceneBackupRedis: React.FC = () => {
           alignItems: "center",
           flexDirection: "column",
           gap: 40,
-          paddingBottom: 120,
+          paddingBottom: 140,
         }}
       >
-        {/* 标题 */}
+        {/* Title */}
         <div
           style={{
             display: "flex",
@@ -57,14 +57,14 @@ export const SceneBackupRedis: React.FC = () => {
         >
           <div
             style={{
-              fontFamily: FONT,
-              fontSize: 20,
+              fontFamily: FONT_SANS,
+              fontSize: 24,
               fontWeight: 600,
-              color: "#34d399",
+              color: COLORS.accent,
               padding: "6px 16px",
-              background: "rgba(52,211,153,0.1)",
+              background: "rgba(218,119,86,0.08)",
               borderRadius: 8,
-              border: "1px solid rgba(52,211,153,0.2)",
+              border: `1px solid rgba(218,119,86,0.15)`,
             }}
           >
             防线 3
@@ -72,18 +72,16 @@ export const SceneBackupRedis: React.FC = () => {
           <div
             style={{
               fontFamily: FONT,
-              fontSize: 48,
-              fontWeight: 800,
-              background: "linear-gradient(135deg, #ffffff 20%, #34d399 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
+              fontSize: 60,
+              fontWeight: 700,
+              color: COLORS.text,
             }}
           >
             Redis 持久化
           </div>
         </div>
 
-        {/* 对比：Before / After */}
+        {/* Before / After comparison */}
         <div style={{ display: "flex", gap: 40, alignItems: "stretch" }}>
           {/* Before */}
           <div
@@ -92,20 +90,21 @@ export const SceneBackupRedis: React.FC = () => {
               flexDirection: "column",
               gap: 16,
               padding: "28px 32px",
-              background: "rgba(255,60,60,0.04)",
-              borderRadius: 20,
-              border: "1px solid rgba(255,60,60,0.12)",
+              background: "#fff",
+              borderRadius: 12,
+              border: `1px solid ${COLORS.border}`,
               width: 360,
               opacity: interpolate(beforeEnt, [0, 1], [0, 1]),
               transform: `translateX(${interpolate(beforeEnt, [0, 1], [-40, 0])}px)`,
+              boxShadow: COLORS.cardShadow,
             }}
           >
             <div
               style={{
-                fontFamily: FONT,
-                fontSize: 14,
+                fontFamily: FONT_SANS,
+                fontSize: 28,
                 fontWeight: 600,
-                color: "#ff6b6b",
+                color: COLORS.muted,
                 textTransform: "uppercase",
                 letterSpacing: 2,
               }}
@@ -115,27 +114,27 @@ export const SceneBackupRedis: React.FC = () => {
             <div
               style={{
                 fontFamily: MONO,
-                fontSize: 16,
-                color: "rgba(255,255,255,0.5)",
+                fontSize: 28,
+                color: COLORS.text,
                 padding: "12px 16px",
-                background: "rgba(0,0,0,0.3)",
-                borderRadius: 10,
+                background: "rgba(0,0,0,0.02)",
+                borderRadius: 8,
                 lineHeight: 1.8,
               }}
             >
               image: redis:7<br />
-              <span style={{ color: "rgba(255,255,255,0.25)" }}># 无 command 配置</span><br />
-              <span style={{ color: "rgba(255,255,255,0.25)" }}># 数据仅存内存</span>
+              <span style={{ color: COLORS.subtle }}># 无 command 配置</span><br />
+              <span style={{ color: COLORS.subtle }}># 数据仅存内存</span>
             </div>
             <div
               style={{
-                fontFamily: FONT,
-                fontSize: 15,
-                color: "#ff6b6b",
+                fontFamily: FONT_SANS,
+                fontSize: 28,
+                color: COLORS.muted,
                 padding: "8px 12px",
-                background: "rgba(255,60,60,0.06)",
+                background: "rgba(0,0,0,0.02)",
                 borderRadius: 8,
-                borderLeft: "3px solid #ff6b6b",
+                borderLeft: `3px solid ${COLORS.subtle}`,
               }}
             >
               容器重启 → 队列消息全部丢失
@@ -148,9 +147,9 @@ export const SceneBackupRedis: React.FC = () => {
               display: "flex",
               alignItems: "center",
               fontFamily: FONT,
-              fontSize: 24,
-              fontWeight: 800,
-              color: "rgba(255,255,255,0.15)",
+              fontSize: 28,
+              fontWeight: 700,
+              color: COLORS.subtle,
             }}
           >
             VS
@@ -163,20 +162,21 @@ export const SceneBackupRedis: React.FC = () => {
               flexDirection: "column",
               gap: 16,
               padding: "28px 32px",
-              background: "rgba(52,211,153,0.04)",
-              borderRadius: 20,
-              border: "1px solid rgba(52,211,153,0.12)",
+              background: "#fff",
+              borderRadius: 12,
+              border: `2px solid ${COLORS.accent}`,
               width: 360,
               opacity: interpolate(afterEnt, [0, 1], [0, 1]),
               transform: `translateX(${interpolate(afterEnt, [0, 1], [40, 0])}px)`,
+              boxShadow: "0 4px 24px rgba(218,119,86,0.1)",
             }}
           >
             <div
               style={{
-                fontFamily: FONT,
-                fontSize: 14,
+                fontFamily: FONT_SANS,
+                fontSize: 28,
                 fontWeight: 600,
-                color: "#34d399",
+                color: COLORS.accent,
                 textTransform: "uppercase",
                 letterSpacing: 2,
               }}
@@ -186,27 +186,27 @@ export const SceneBackupRedis: React.FC = () => {
             <div
               style={{
                 fontFamily: MONO,
-                fontSize: 16,
-                color: "rgba(255,255,255,0.5)",
+                fontSize: 28,
+                color: COLORS.text,
                 padding: "12px 16px",
-                background: "rgba(0,0,0,0.3)",
-                borderRadius: 10,
+                background: "rgba(0,0,0,0.02)",
+                borderRadius: 8,
                 lineHeight: 1.8,
               }}
             >
               image: redis:7<br />
-              <span style={{ color: "#34d399" }}>command: redis-server</span><br />
-              <span style={{ color: "#34d399" }}>  --save 60 1 --save 300 100</span>
+              <span style={{ color: COLORS.accent }}>command: redis-server</span><br />
+              <span style={{ color: COLORS.accent }}>  --save 60 1 --save 300 100</span>
             </div>
             <div
               style={{
-                fontFamily: FONT,
-                fontSize: 15,
-                color: "#34d399",
+                fontFamily: FONT_SANS,
+                fontSize: 28,
+                color: COLORS.accent,
                 padding: "8px 12px",
-                background: "rgba(52,211,153,0.06)",
+                background: "rgba(218,119,86,0.06)",
                 borderRadius: 8,
-                borderLeft: "3px solid #34d399",
+                borderLeft: `3px solid ${COLORS.accent}`,
               }}
             >
               容器重启 → 自动从 RDB 恢复数据
@@ -214,7 +214,7 @@ export const SceneBackupRedis: React.FC = () => {
           </div>
         </div>
 
-        {/* 配置说明 */}
+        {/* Config explanation */}
         <div
           style={{
             display: "flex",
@@ -225,12 +225,13 @@ export const SceneBackupRedis: React.FC = () => {
           <div
             style={{
               fontFamily: MONO,
-              fontSize: 14,
-              color: "rgba(52,211,153,0.5)",
+              fontSize: 28,
+              color: COLORS.muted,
               padding: "6px 14px",
-              background: "rgba(52,211,153,0.05)",
+              background: "#fff",
               borderRadius: 8,
-              border: "1px solid rgba(52,211,153,0.1)",
+              border: `1px solid ${COLORS.border}`,
+              boxShadow: COLORS.cardShadow,
             }}
           >
             --save 60 1 → 60秒内有1次写入就存盘
@@ -238,12 +239,13 @@ export const SceneBackupRedis: React.FC = () => {
           <div
             style={{
               fontFamily: MONO,
-              fontSize: 14,
-              color: "rgba(52,211,153,0.5)",
+              fontSize: 28,
+              color: COLORS.muted,
               padding: "6px 14px",
-              background: "rgba(52,211,153,0.05)",
+              background: "#fff",
               borderRadius: 8,
-              border: "1px solid rgba(52,211,153,0.1)",
+              border: `1px solid ${COLORS.border}`,
+              boxShadow: COLORS.cardShadow,
             }}
           >
             --save 300 100 → 5分钟内100次写入也存盘

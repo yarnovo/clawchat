@@ -7,16 +7,16 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { FONT, MONO } from "../../constants";
+import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
 const fields = [
-  { name: "id", type: "UUID", desc: "主键", icon: "🔑" },
-  { name: "type", type: "AccountType", desc: "human / agent", icon: "🏷️" },
-  { name: "name", type: "String", desc: "显示名称", icon: "👤" },
-  { name: "avatar", type: "String?", desc: "头像 URL", icon: "🖼️" },
-  { name: "email", type: "String?", desc: "登录邮箱（Agent 可为空）", icon: "📧" },
-  { name: "passwordHash", type: "String?", desc: "bcrypt 哈希", icon: "🔒" },
-  { name: "searchable", type: "Boolean", desc: "是否可被搜索发现", icon: "🔍" },
+  { name: "id", type: "UUID", desc: "主键" },
+  { name: "type", type: "AccountType", desc: "human / agent" },
+  { name: "name", type: "String", desc: "显示名称" },
+  { name: "avatar", type: "String?", desc: "头像 URL" },
+  { name: "email", type: "String?", desc: "登录邮箱（Agent 可为空）" },
+  { name: "passwordHash", type: "String?", desc: "bcrypt 哈希" },
+  { name: "searchable", type: "Boolean", desc: "是否可被搜索发现" },
 ];
 
 export const SceneDbAccount: React.FC = () => {
@@ -27,15 +27,15 @@ export const SceneDbAccount: React.FC = () => {
 
   return (
     <AbsoluteFill>
-      <GradientBg colors={["#0c0a2e", "#1a1040", "#0c0a2e"]} />
+      <GradientBg />
       <Particles />
       <AbsoluteFill
         style={{
           justifyContent: "center",
           alignItems: "center",
           flexDirection: "column",
-          gap: 36,
-          paddingBottom: 120,
+          gap: 32,
+          paddingBottom: 140,
         }}
       >
         {/* Title */}
@@ -48,15 +48,12 @@ export const SceneDbAccount: React.FC = () => {
             transform: `translateY(${interpolate(titleProg, [0, 1], [-30, 0])}px)`,
           }}
         >
-          <span style={{ fontSize: 48 }}>👥</span>
           <div
             style={{
               fontFamily: FONT,
-              fontSize: 48,
-              fontWeight: 800,
-              background: "linear-gradient(135deg, #fff 30%, #a78bfa 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
+              fontSize: 60,
+              fontWeight: 700,
+              color: COLORS.text,
             }}
           >
             Account 统一账号表
@@ -68,67 +65,65 @@ export const SceneDbAccount: React.FC = () => {
           style={{
             display: "flex",
             gap: 24,
+            alignItems: "center",
             opacity: interpolate(titleProg, [0, 1], [0, 1]),
           }}
         >
           {[
-            { label: "人类用户", emoji: "🧑", color: "#60a5fa" },
-            { label: "+", emoji: "", color: "rgba(255,255,255,0.3)" },
-            { label: "AI Agent", emoji: "🤖", color: "#a78bfa" },
-            { label: "=", emoji: "", color: "rgba(255,255,255,0.3)" },
-            { label: "统一身份", emoji: "🪪", color: "#34d399" },
+            { label: "人类用户", color: COLORS.text },
+            { label: "+", color: COLORS.muted, isOp: true },
+            { label: "AI Agent", color: COLORS.muted },
+            { label: "=", color: COLORS.muted, isOp: true },
+            { label: "统一身份", color: COLORS.accent },
           ].map((item) => (
             <div
               key={item.label}
               style={{
-                fontFamily: FONT,
-                fontSize: item.emoji ? 22 : 28,
+                fontFamily: FONT_SANS,
+                fontSize: item.isOp ? 28 : 24,
                 fontWeight: 600,
                 color: item.color,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
               }}
             >
-              {item.emoji && <span style={{ fontSize: 28 }}>{item.emoji}</span>}
               {item.label}
             </div>
           ))}
         </div>
 
-        {/* Fields table */}
+        {/* Fields table card */}
         <div
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: 4,
-            background: "rgba(255,255,255,0.03)",
-            borderRadius: 20,
-            border: "1px solid rgba(167,139,250,0.15)",
+            gap: 0,
+            background: COLORS.card,
+            borderRadius: 12,
+            border: `1px solid ${COLORS.border}`,
             padding: "8px 0",
-            width: 900,
-            boxShadow: "0 8px 40px rgba(108,99,255,0.08)",
+            width: 860,
+            boxShadow: COLORS.cardShadow,
+            overflow: "hidden",
           }}
         >
           {/* Header */}
           <div
             style={{
               display: "flex",
-              padding: "8px 28px",
-              borderBottom: "1px solid rgba(255,255,255,0.08)",
+              padding: "10px 28px",
+              borderBottom: `1px solid ${COLORS.border}`,
             }}
           >
-            {["", "字段", "类型", "说明"].map((h, idx) => (
+            {["字段", "类型", "说明"].map((h, idx) => (
               <div
-                key={h || idx}
+                key={h}
                 style={{
-                  fontFamily: FONT,
-                  fontSize: 14,
+                  fontFamily: FONT_SANS,
+                  fontSize: 26,
                   fontWeight: 600,
-                  color: "rgba(255,255,255,0.4)",
+                  color: COLORS.muted,
                   textTransform: "uppercase",
                   letterSpacing: 2,
-                  width: idx === 0 ? 40 : idx === 3 ? 340 : 200,
+                  width: idx === 2 ? 360 : 220,
                   flexShrink: 0,
                 }}
               >
@@ -156,19 +151,16 @@ export const SceneDbAccount: React.FC = () => {
                   opacity: interpolate(rowProg, [0, 1], [0, 1]),
                   transform: `translateX(${interpolate(rowProg, [0, 1], [40, 0])}px)`,
                   background:
-                    i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.02)",
+                    i % 2 === 0 ? "transparent" : "rgba(0,0,0,0.015)",
                 }}
               >
-                <div style={{ width: 40, fontSize: 20, flexShrink: 0 }}>
-                  {f.icon}
-                </div>
                 <div
                   style={{
                     fontFamily: MONO,
-                    fontSize: 18,
+                    fontSize: 24,
                     fontWeight: 600,
-                    color: "#a78bfa",
-                    width: 200,
+                    color: COLORS.text,
+                    width: 220,
                     flexShrink: 0,
                   }}
                 >
@@ -177,9 +169,9 @@ export const SceneDbAccount: React.FC = () => {
                 <div
                   style={{
                     fontFamily: MONO,
-                    fontSize: 16,
-                    color: "#60a5fa",
-                    width: 200,
+                    fontSize: 28,
+                    color: COLORS.accent,
+                    width: 220,
                     flexShrink: 0,
                   }}
                 >
@@ -187,10 +179,10 @@ export const SceneDbAccount: React.FC = () => {
                 </div>
                 <div
                   style={{
-                    fontFamily: FONT,
-                    fontSize: 16,
-                    color: "rgba(255,255,255,0.6)",
-                    width: 340,
+                    fontFamily: FONT_SANS,
+                    fontSize: 28,
+                    color: COLORS.muted,
+                    width: 360,
                     flexShrink: 0,
                   }}
                 >

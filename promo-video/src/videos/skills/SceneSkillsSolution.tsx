@@ -7,7 +7,7 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { COLORS, FONT } from "../../constants";
+import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
 const skills = [
   { icon: "🌐", name: "web-search", desc: "网页搜索", downloads: "12.3k" },
@@ -29,7 +29,7 @@ export const SceneSkillsSolution: React.FC = () => {
 
   return (
     <AbsoluteFill>
-      <GradientBg colors={["#0a0c2e", "#0a1a3e", "#0a0c2e"]} />
+      <GradientBg />
       <Particles />
       <AbsoluteFill
         style={{
@@ -37,20 +37,18 @@ export const SceneSkillsSolution: React.FC = () => {
           alignItems: "center",
           flexDirection: "column",
           gap: 40,
-          paddingBottom: 120,
+          paddingBottom: 140,
         }}
       >
         {/* Title */}
         <div
           style={{
             fontFamily: FONT,
-            fontSize: 48,
-            fontWeight: 800,
+            fontSize: 64,
+            fontWeight: 700,
+            color: COLORS.text,
             opacity: interpolate(titleProg, [0, 1], [0, 1]),
             transform: `translateY(${titleY}px)`,
-            background: "linear-gradient(135deg, #ffffff 30%, #60a5fa 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
           }}
         >
           ClawHub 技能市场
@@ -61,11 +59,10 @@ export const SceneSkillsSolution: React.FC = () => {
           style={{
             fontFamily: FONT,
             fontSize: 72,
-            fontWeight: 800,
+            fontWeight: 700,
+            color: COLORS.accent,
             opacity: interpolate(countProg, [0, 1], [0, 1]),
             transform: `scale(${interpolate(countProg, [0, 1], [0.7, 1])})`,
-            color: COLORS.cyan,
-            textShadow: "0 0 40px rgba(0,210,255,0.3)",
           }}
         >
           {Math.floor(interpolate(countProg, [0, 1], [0, 13700])).toLocaleString()}+
@@ -73,9 +70,9 @@ export const SceneSkillsSolution: React.FC = () => {
 
         <div
           style={{
-            fontFamily: FONT,
-            fontSize: 22,
-            color: "rgba(255,255,255,0.5)",
+            fontFamily: FONT_SANS,
+            fontSize: 24,
+            color: COLORS.muted,
             marginTop: -20,
             opacity: interpolate(countProg, [0, 1], [0, 1]),
           }}
@@ -100,11 +97,6 @@ export const SceneSkillsSolution: React.FC = () => {
               fps,
               config: { damping: 14, mass: 0.6 },
             });
-            const glow = interpolate(
-              Math.sin(frame * 0.04 + i * 1.2),
-              [-1, 1],
-              [0.05, 0.15],
-            );
 
             return (
               <div
@@ -114,31 +106,31 @@ export const SceneSkillsSolution: React.FC = () => {
                   alignItems: "center",
                   gap: 12,
                   padding: "12px 20px",
-                  background: `rgba(96,165,250,0.04)`,
-                  borderRadius: 14,
-                  border: `1px solid rgba(96,165,250,${glow + 0.08})`,
+                  background: COLORS.card,
+                  borderRadius: 12,
+                  border: `1px solid ${COLORS.border}`,
+                  boxShadow: COLORS.cardShadow,
                   opacity: interpolate(ent, [0, 1], [0, 1]),
                   transform: `scale(${interpolate(ent, [0, 1], [0.8, 1])})`,
-                  boxShadow: `0 4px 20px rgba(96,165,250,${glow})`,
                 }}
               >
                 <div style={{ fontSize: 28 }}>{s.icon}</div>
                 <div>
                   <div
                     style={{
-                      fontFamily: FONT,
-                      fontSize: 16,
+                      fontFamily: FONT_SANS,
+                      fontSize: 24,
                       fontWeight: 600,
-                      color: "rgba(255,255,255,0.9)",
+                      color: COLORS.text,
                     }}
                   >
                     {s.desc}
                   </div>
                   <div
                     style={{
-                      fontFamily: "JetBrains Mono, SF Mono, monospace",
-                      fontSize: 12,
-                      color: "rgba(255,255,255,0.35)",
+                      fontFamily: MONO,
+                      fontSize: 24,
+                      color: COLORS.muted,
                     }}
                   >
                     {s.name} · {s.downloads}

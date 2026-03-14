@@ -7,7 +7,7 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { FONT } from "../../constants";
+import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
 const agents = [
   { name: "法律顾问", prompt: "你是一个法律顾问..." },
@@ -21,48 +21,47 @@ export const SceneSkillsProblem: React.FC = () => {
   const { fps } = useVideoConfig();
 
   const titleProg = spring({ frame, fps, config: { damping: 15 } });
-  const titleY = interpolate(titleProg, [0, 1], [-40, 0]);
+  const titleY = interpolate(titleProg, [0, 1], [-30, 0]);
 
   return (
     <AbsoluteFill>
-      <GradientBg colors={["#1a0a0a", "#2e1a1a", "#1a0a0a"]} />
+      <GradientBg />
       <Particles />
       <AbsoluteFill
         style={{
           justifyContent: "center",
           alignItems: "center",
           flexDirection: "column",
-          gap: 50,
-          paddingBottom: 120,
+          gap: 60,
+          paddingBottom: 140,
         }}
       >
         {/* Title */}
         <div
           style={{
             fontFamily: FONT,
-            fontSize: 48,
-            fontWeight: 800,
+            fontSize: 60,
+            fontWeight: 700,
+            color: COLORS.text,
             opacity: interpolate(titleProg, [0, 1], [0, 1]),
             transform: `translateY(${titleY}px)`,
-            background: "linear-gradient(135deg, #ffffff 30%, #ff6b6b 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
           }}
         >
-          换个提示词 ≠ 新 Agent
+          换个提示词{" "}
+          <span style={{ fontWeight: 700, color: COLORS.accent }}>≠</span>{" "}
+          新 Agent
         </div>
 
-        {/* Agent cards — all look the same */}
-        <div style={{ display: "flex", gap: 24 }}>
+        {/* Agent cards */}
+        <div style={{ display: "flex", gap: 32 }}>
           {agents.map((a, i) => {
-            const delay = 20 + i * 15;
+            const delay = 15 + i * 10;
             const ent = spring({
               frame: frame - delay,
               fps,
               config: { damping: 14, mass: 0.8 },
             });
 
-            // Subtle "sameness" visual — all cards identical structure
             return (
               <div
                 key={a.name}
@@ -70,54 +69,53 @@ export const SceneSkillsProblem: React.FC = () => {
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
-                  gap: 12,
-                  padding: "28px 24px",
-                  background: "rgba(255,60,60,0.03)",
-                  borderRadius: 20,
-                  border: "1px solid rgba(255,80,80,0.1)",
-                  width: 260,
+                  gap: 16,
+                  padding: "36px 32px",
+                  background: COLORS.card,
+                  border: `1px solid ${COLORS.border}`,
+                  borderRadius: 12,
+                  boxShadow: COLORS.cardShadow,
+                  width: 240,
                   opacity: interpolate(ent, [0, 1], [0, 1]),
-                  transform: `translateY(${interpolate(ent, [0, 1], [50, 0])}px)`,
+                  transform: `translateY(${interpolate(ent, [0, 1], [40, 0])}px)`,
                 }}
               >
-                {/* Same robot icon for all */}
-                <div style={{ fontSize: 44 }}>🤖</div>
                 <div
                   style={{
                     fontFamily: FONT,
-                    fontSize: 22,
+                    fontSize: 28,
                     fontWeight: 700,
-                    color: "#ff8a8a",
+                    color: COLORS.text,
+                    letterSpacing: 2,
                   }}
                 >
                   {a.name}
                 </div>
-                {/* System prompt preview — all start the same */}
                 <div
                   style={{
-                    fontFamily: "JetBrains Mono, SF Mono, monospace",
-                    fontSize: 13,
-                    color: "rgba(255,255,255,0.3)",
+                    fontFamily: MONO,
+                    fontSize: 26,
+                    color: COLORS.muted,
                     textAlign: "center",
-                    padding: "8px 12px",
-                    background: "rgba(255,255,255,0.02)",
+                    padding: "10px 16px",
+                    border: `1px dashed ${COLORS.border}`,
                     borderRadius: 8,
                     width: "100%",
                   }}
                 >
                   {a.prompt}
                 </div>
-                {/* Empty skills area */}
                 <div
                   style={{
-                    fontFamily: FONT,
-                    fontSize: 13,
-                    color: "rgba(255,255,255,0.2)",
-                    padding: "6px 12px",
-                    border: "1px dashed rgba(255,255,255,0.1)",
+                    fontFamily: FONT_SANS,
+                    fontSize: 28,
+                    color: COLORS.subtle,
+                    padding: "8px 16px",
+                    border: `1px dashed ${COLORS.border}`,
                     borderRadius: 8,
                     width: "100%",
                     textAlign: "center",
+                    letterSpacing: 2,
                   }}
                 >
                   暂无技能
@@ -127,14 +125,16 @@ export const SceneSkillsProblem: React.FC = () => {
           })}
         </div>
 
-        {/* "equals" sign animation */}
-        {frame > 80 && (
+        {/* Bottom tagline */}
+        {frame > 60 && (
           <div
             style={{
-              fontFamily: FONT,
-              fontSize: 20,
-              color: "rgba(255,100,100,0.6)",
-              opacity: interpolate(frame, [80, 100], [0, 1], {
+              fontFamily: FONT_SANS,
+              fontSize: 28,
+              fontWeight: 400,
+              color: COLORS.muted,
+              letterSpacing: 3,
+              opacity: interpolate(frame, [60, 80], [0, 1], {
                 extrapolateLeft: "clamp",
                 extrapolateRight: "clamp",
               }),

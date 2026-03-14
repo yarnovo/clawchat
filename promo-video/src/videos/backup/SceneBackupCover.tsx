@@ -7,20 +7,27 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { FONT } from "../../constants";
+import { COLORS, FONT, FONT_SANS } from "../../constants";
 
 export const SceneBackupCover: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const logoScale = spring({ frame, fps, config: { damping: 12, mass: 0.8 } });
-  const glow = interpolate(Math.sin(frame * 0.06), [-1, 1], [0.3, 0.7]);
 
   const titleOpacity = interpolate(frame, [15, 35], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
+  const titleY = interpolate(frame, [15, 35], [30, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
   const subOpacity = interpolate(frame, [40, 60], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const subY = interpolate(frame, [40, 60], [20, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -31,7 +38,7 @@ export const SceneBackupCover: React.FC = () => {
 
   return (
     <AbsoluteFill>
-      <GradientBg colors={["#0c0a2e", "#1e1a4e", "#0c0a2e"]} />
+      <GradientBg />
       <Particles />
       <AbsoluteFill
         style={{
@@ -39,59 +46,66 @@ export const SceneBackupCover: React.FC = () => {
           alignItems: "center",
           flexDirection: "column",
           gap: 28,
-          paddingBottom: 120,
+          paddingBottom: 140,
         }}
       >
-        {/* 盾牌 Logo */}
+        {/* Shield icon */}
         <div
           style={{
             transform: `scale(${logoScale})`,
-            fontSize: 90,
-            filter: `drop-shadow(0 0 ${glow * 40}px rgba(96,165,250,${glow * 0.5}))`,
+            width: 120,
+            height: 120,
+            borderRadius: 32,
+            background: "#fff",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            fontSize: 64,
+            boxShadow: COLORS.cardShadow,
+            border: `1px solid ${COLORS.border}`,
           }}
         >
           🛡️
         </div>
 
-        {/* 主标题 */}
+        {/* Title */}
         <div
           style={{
             fontFamily: FONT,
-            fontSize: 64,
-            fontWeight: 800,
+            fontSize: 72,
+            fontWeight: 700,
+            color: COLORS.text,
             opacity: titleOpacity,
-            background:
-              "linear-gradient(135deg, #ffffff 20%, #60a5fa 50%, #34d399 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
+            transform: `translateY(${titleY}px)`,
             letterSpacing: 2,
           }}
         >
           数据备份方案
         </div>
 
-        {/* 副标题 */}
+        {/* Subtitle */}
         <div
           style={{
-            fontFamily: FONT,
-            fontSize: 28,
+            fontFamily: FONT_SANS,
+            fontSize: 32,
             fontWeight: 300,
-            color: "rgba(255,255,255,0.5)",
+            color: COLORS.muted,
             letterSpacing: 6,
             opacity: subOpacity,
+            transform: `translateY(${subY}px)`,
           }}
         >
           ClawChat 内部技术分享
         </div>
 
-        {/* 日期 */}
+        {/* Date */}
         <div
           style={{
-            fontFamily: FONT,
-            fontSize: 18,
-            color: "rgba(255,255,255,0.25)",
+            fontFamily: FONT_SANS,
+            fontSize: 24,
+            color: COLORS.subtle,
             opacity: metaOpacity,
-            marginTop: 20,
+            marginTop: 12,
           }}
         >
           2026.03

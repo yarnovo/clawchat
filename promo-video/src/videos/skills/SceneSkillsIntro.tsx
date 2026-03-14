@@ -7,7 +7,7 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { COLORS, FONT } from "../../constants";
+import { COLORS, FONT, FONT_SANS } from "../../constants";
 
 export const SceneSkillsIntro: React.FC = () => {
   const frame = useCurrentFrame();
@@ -19,14 +19,13 @@ export const SceneSkillsIntro: React.FC = () => {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const glow = interpolate(Math.sin(frame * 0.06), [-1, 1], [0.3, 0.7]);
 
-  // Orbiting skill icons
-  const skillIcons = ["🔍", "🔧", "📊", "🌐", "📝", "🔒"];
+  // Orbiting skill labels
+  const skillLabels = ["搜索", "工具", "分析", "网络", "写作", "安全"];
 
   return (
     <AbsoluteFill>
-      <GradientBg colors={["#0c0a2e", "#1a1040", "#0c0a2e"]} />
+      <GradientBg />
       <Particles />
       <AbsoluteFill
         style={{
@@ -34,14 +33,14 @@ export const SceneSkillsIntro: React.FC = () => {
           alignItems: "center",
           flexDirection: "column",
           gap: 24,
-          paddingBottom: 120,
+          paddingBottom: 140,
         }}
       >
         {/* Central Agent icon with orbiting skills */}
         <div style={{ position: "relative", width: 200, height: 200 }}>
-          {/* Orbiting skill icons */}
-          {skillIcons.map((icon, i) => {
-            const angle = (i / skillIcons.length) * Math.PI * 2 + frame * 0.015;
+          {/* Orbiting skill labels */}
+          {skillLabels.map((label, i) => {
+            const angle = (i / skillLabels.length) * Math.PI * 2 + frame * 0.015;
             const radius = 85;
             const x = Math.cos(angle) * radius;
             const y = Math.sin(angle) * radius;
@@ -56,22 +55,24 @@ export const SceneSkillsIntro: React.FC = () => {
                 key={i}
                 style={{
                   position: "absolute",
-                  left: 100 + x - 20,
-                  top: 100 + y - 20,
-                  width: 40,
-                  height: 40,
-                  borderRadius: 12,
-                  background: "rgba(108,99,255,0.1)",
-                  border: "1px solid rgba(108,99,255,0.2)",
+                  left: 100 + x - 24,
+                  top: 100 + y - 16,
+                  padding: "4px 12px",
+                  borderRadius: 8,
+                  background: COLORS.card,
+                  border: `1px solid ${COLORS.border}`,
+                  boxShadow: COLORS.cardShadow,
                   display: "flex",
                   justifyContent: "center",
                   alignItems: "center",
-                  fontSize: 20,
+                  fontFamily: FONT_SANS,
+                  fontSize: 26,
+                  color: COLORS.muted,
                   opacity: interpolate(orbitEnt, [0, 1], [0, 1]),
                   transform: `scale(${interpolate(orbitEnt, [0, 1], [0.5, 1])})`,
                 }}
               >
-                {icon}
+                {label}
               </div>
             );
           })}
@@ -86,12 +87,13 @@ export const SceneSkillsIntro: React.FC = () => {
               width: 100,
               height: 100,
               borderRadius: 28,
-              background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.accent})`,
+              background: COLORS.card,
+              border: `1px solid ${COLORS.border}`,
+              boxShadow: COLORS.cardShadow,
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
-              fontSize: 52,
-              boxShadow: `0 20px 60px rgba(108,99,255,${glow}), 0 0 80px rgba(7,193,96,${glow * 0.3})`,
+              fontSize: 56,
             }}
           >
             🐾
@@ -102,13 +104,11 @@ export const SceneSkillsIntro: React.FC = () => {
         <div
           style={{
             fontFamily: FONT,
-            fontSize: 64,
-            fontWeight: 800,
+            fontSize: 72,
+            fontWeight: 700,
+            color: COLORS.text,
             opacity: interpolate(textProg, [0, 1], [0, 1]),
             transform: `translateY(${interpolate(textProg, [0, 1], [30, 0])}px)`,
-            background: "linear-gradient(135deg, #ffffff 0%, #a78bfa 50%, #60a5fa 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
             marginTop: 16,
           }}
         >
@@ -119,10 +119,10 @@ export const SceneSkillsIntro: React.FC = () => {
         <div
           style={{
             opacity: subOpacity,
-            fontFamily: FONT,
-            fontSize: 28,
-            fontWeight: 300,
-            color: "rgba(255,255,255,0.6)",
+            fontFamily: FONT_SANS,
+            fontSize: 32,
+            fontWeight: 400,
+            color: COLORS.muted,
             letterSpacing: 6,
           }}
         >

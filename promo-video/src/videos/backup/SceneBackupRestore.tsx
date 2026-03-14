@@ -7,7 +7,7 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { FONT, MONO } from "../../constants";
+import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
 const steps = [
   {
@@ -15,37 +15,26 @@ const steps = [
     title: "选择备份文件",
     cmd: "make db-backup-list",
     detail: "查看 backups/ 下所有 .sql.gz 文件",
-    color: "#60a5fa",
   },
   {
     num: "2",
     title: "停止应用服务",
     cmd: "docker compose stop im-server agent-server",
     detail: "避免恢复期间数据写入冲突",
-    color: "#f59e0b",
   },
   {
     num: "3",
     title: "导入备份数据",
     cmd: "gunzip -c backup.sql.gz | psql",
     detail: "解压并导入到 PostgreSQL",
-    color: "#a78bfa",
   },
   {
     num: "4",
     title: "验证 + 重启",
     cmd: "验证两库表结构 → 重启服务",
     detail: "确认 clawchat + clawchat_agent 都正常",
-    color: "#34d399",
   },
 ];
-
-function hexToRgb(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `${r},${g},${b}`;
-}
 
 export const SceneBackupRestore: React.FC = () => {
   const frame = useCurrentFrame();
@@ -56,7 +45,7 @@ export const SceneBackupRestore: React.FC = () => {
 
   return (
     <AbsoluteFill>
-      <GradientBg colors={["#0c0a2e", "#1e1a4e", "#0c0a2e"]} />
+      <GradientBg />
       <Particles />
       <AbsoluteFill
         style={{
@@ -64,27 +53,24 @@ export const SceneBackupRestore: React.FC = () => {
           alignItems: "center",
           flexDirection: "column",
           gap: 40,
-          paddingBottom: 120,
+          paddingBottom: 140,
         }}
       >
-        {/* 标题 */}
+        {/* Title */}
         <div
           style={{
             fontFamily: FONT,
-            fontSize: 48,
-            fontWeight: 800,
+            fontSize: 64,
+            fontWeight: 700,
+            color: COLORS.text,
             opacity: interpolate(titleProg, [0, 1], [0, 1]),
             transform: `translateY(${titleY}px)`,
-            background:
-              "linear-gradient(135deg, #ffffff 20%, #f59e0b 60%, #34d399 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
           }}
         >
           恢复流程（四步完成）
         </div>
 
-        {/* 四步垂直列表 */}
+        {/* Four-step vertical list */}
         <div
           style={{
             display: "flex",
@@ -100,7 +86,6 @@ export const SceneBackupRestore: React.FC = () => {
               fps,
               config: { damping: 14, mass: 0.7 },
             });
-            const rgb = hexToRgb(s.color);
 
             return (
               <div
@@ -110,24 +95,25 @@ export const SceneBackupRestore: React.FC = () => {
                   alignItems: "center",
                   gap: 20,
                   padding: "18px 24px",
-                  background: `rgba(${rgb},0.03)`,
-                  borderRadius: 14,
-                  border: `1px solid rgba(${rgb},0.1)`,
+                  background: "#fff",
+                  borderRadius: 12,
+                  border: `1px solid ${COLORS.border}`,
                   opacity: interpolate(ent, [0, 1], [0, 1]),
                   transform: `translateX(${interpolate(ent, [0, 1], [-30, 0])}px)`,
+                  boxShadow: COLORS.cardShadow,
                 }}
               >
-                {/* 步骤编号 */}
+                {/* Step number */}
                 <div
                   style={{
                     fontFamily: FONT,
-                    fontSize: 24,
-                    fontWeight: 800,
-                    color: s.color,
+                    fontSize: 28,
+                    fontWeight: 700,
+                    color: COLORS.accent,
                     width: 44,
                     height: 44,
                     borderRadius: 12,
-                    background: `rgba(${rgb},0.1)`,
+                    background: "rgba(218,119,86,0.08)",
                     display: "flex",
                     justifyContent: "center",
                     alignItems: "center",
@@ -137,37 +123,37 @@ export const SceneBackupRestore: React.FC = () => {
                   {s.num}
                 </div>
 
-                {/* 内容 */}
+                {/* Content */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
                   <div
                     style={{
                       fontFamily: FONT,
-                      fontSize: 20,
+                      fontSize: 28,
                       fontWeight: 700,
-                      color: s.color,
+                      color: COLORS.text,
                     }}
                   >
                     {s.title}
                   </div>
                   <div
                     style={{
-                      fontFamily: FONT,
-                      fontSize: 14,
-                      color: "rgba(255,255,255,0.4)",
+                      fontFamily: FONT_SANS,
+                      fontSize: 28,
+                      color: COLORS.muted,
                     }}
                   >
                     {s.detail}
                   </div>
                 </div>
 
-                {/* 命令 */}
+                {/* Command */}
                 <div
                   style={{
                     fontFamily: MONO,
-                    fontSize: 12,
-                    color: `rgba(${rgb},0.6)`,
+                    fontSize: 26,
+                    color: COLORS.accent,
                     padding: "6px 12px",
-                    background: "rgba(0,0,0,0.3)",
+                    background: "rgba(218,119,86,0.06)",
                     borderRadius: 8,
                     flexShrink: 0,
                     maxWidth: 320,
@@ -180,7 +166,7 @@ export const SceneBackupRestore: React.FC = () => {
           })}
         </div>
 
-        {/* 底部提示 */}
+        {/* Bottom hint */}
         <div
           style={{
             opacity: interpolate(
@@ -189,8 +175,8 @@ export const SceneBackupRestore: React.FC = () => {
               [0, 1]
             ),
             fontFamily: MONO,
-            fontSize: 16,
-            color: "rgba(255,255,255,0.3)",
+            fontSize: 28,
+            color: COLORS.muted,
           }}
         >
           一键执行：make db-restore FILE=backups/xxx.sql.gz

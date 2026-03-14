@@ -7,7 +7,7 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { COLORS, FONT } from "../../constants";
+import { COLORS, FONT, FONT_SANS } from "../../constants";
 
 // Search results with skill tags
 const agents = [
@@ -15,19 +15,16 @@ const agents = [
     name: "法律顾问 Pro",
     avatar: "🏛️",
     skills: ["法规检索", "合同审查", "案例分析"],
-    color: "#a78bfa",
   },
   {
     name: "全栈开发助手",
     avatar: "👨‍💻",
     skills: ["代码审查", "单元测试", "架构设计", "数据库优化"],
-    color: "#60a5fa",
   },
   {
     name: "数据分析师",
     avatar: "📈",
     skills: ["数据可视化", "统计分析"],
-    color: "#34d399",
   },
 ];
 
@@ -40,7 +37,7 @@ export const SceneSkillsConsumer: React.FC = () => {
 
   return (
     <AbsoluteFill>
-      <GradientBg colors={["#0c0a2e", "#1a1040", "#0c0a2e"]} />
+      <GradientBg />
       <Particles />
       <AbsoluteFill
         style={{
@@ -48,20 +45,18 @@ export const SceneSkillsConsumer: React.FC = () => {
           alignItems: "center",
           flexDirection: "column",
           gap: 40,
-          paddingBottom: 120,
+          paddingBottom: 140,
         }}
       >
         {/* Title */}
         <div
           style={{
             fontFamily: FONT,
-            fontSize: 48,
-            fontWeight: 800,
+            fontSize: 64,
+            fontWeight: 700,
+            color: COLORS.text,
             opacity: interpolate(titleProg, [0, 1], [0, 1]),
             transform: `translateY(${titleY}px)`,
-            background: "linear-gradient(135deg, #ffffff 30%, #07C160 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
           }}
         >
           会什么，一看便知
@@ -76,11 +71,6 @@ export const SceneSkillsConsumer: React.FC = () => {
               fps,
               config: { damping: 14, mass: 0.7 },
             });
-            const glow = interpolate(
-              Math.sin(frame * 0.04 + i * 1.5),
-              [-1, 1],
-              [0.05, 0.15],
-            );
 
             return (
               <div
@@ -90,13 +80,13 @@ export const SceneSkillsConsumer: React.FC = () => {
                   flexDirection: "column",
                   gap: 16,
                   padding: "28px 24px",
-                  background: "rgba(255,255,255,0.03)",
-                  borderRadius: 24,
-                  border: `1px solid rgba(255,255,255,${glow + 0.05})`,
+                  background: COLORS.card,
+                  borderRadius: 12,
+                  border: `1px solid ${COLORS.border}`,
+                  boxShadow: COLORS.cardShadow,
                   width: 320,
                   opacity: interpolate(ent, [0, 1], [0, 1]),
                   transform: `scale(${interpolate(ent, [0, 1], [0.85, 1])})`,
-                  boxShadow: `0 8px 40px rgba(0,0,0,0.2)`,
                 }}
               >
                 {/* Agent header */}
@@ -105,8 +95,9 @@ export const SceneSkillsConsumer: React.FC = () => {
                     style={{
                       width: 52,
                       height: 52,
-                      borderRadius: 16,
-                      background: `linear-gradient(135deg, ${COLORS.primary}, ${a.color})`,
+                      borderRadius: 12,
+                      background: COLORS.bg,
+                      border: `1px solid ${COLORS.border}`,
                       display: "flex",
                       justifyContent: "center",
                       alignItems: "center",
@@ -119,18 +110,18 @@ export const SceneSkillsConsumer: React.FC = () => {
                     <div
                       style={{
                         fontFamily: FONT,
-                        fontSize: 20,
+                        fontSize: 26,
                         fontWeight: 700,
-                        color: COLORS.white,
+                        color: COLORS.text,
                       }}
                     >
                       {a.name}
                     </div>
                     <div
                       style={{
-                        fontFamily: FONT,
-                        fontSize: 13,
-                        color: "rgba(255,255,255,0.4)",
+                        fontFamily: FONT_SANS,
+                        fontSize: 26,
+                        color: COLORS.muted,
                       }}
                     >
                       {a.skills.length} 个技能
@@ -152,14 +143,14 @@ export const SceneSkillsConsumer: React.FC = () => {
                       <div
                         key={skill}
                         style={{
-                          fontFamily: FONT,
-                          fontSize: 13,
+                          fontFamily: FONT_SANS,
+                          fontSize: 26,
                           fontWeight: 500,
-                          color: a.color,
+                          color: COLORS.accent,
                           padding: "5px 12px",
                           borderRadius: 8,
-                          background: `rgba(${hexToRgb(a.color)},0.1)`,
-                          border: `1px solid rgba(${hexToRgb(a.color)},0.2)`,
+                          background: "rgba(218,119,86,0.08)",
+                          border: "1px solid rgba(218,119,86,0.15)",
                           opacity: interpolate(tagEnt, [0, 1], [0, 1]),
                           transform: `scale(${interpolate(tagEnt, [0, 1], [0.7, 1])})`,
                         }}
@@ -173,15 +164,14 @@ export const SceneSkillsConsumer: React.FC = () => {
                 {/* Add friend button */}
                 <div
                   style={{
-                    fontFamily: FONT,
-                    fontSize: 15,
+                    fontFamily: FONT_SANS,
+                    fontSize: 28,
                     fontWeight: 600,
-                    color: COLORS.white,
+                    color: COLORS.card,
                     padding: "10px 0",
-                    borderRadius: 12,
-                    background: `linear-gradient(135deg, ${COLORS.accent}, #05a050)`,
+                    borderRadius: 8,
+                    background: COLORS.accent,
                     textAlign: "center",
-                    boxShadow: "0 4px 16px rgba(7,193,96,0.25)",
                   }}
                 >
                   加好友
@@ -194,10 +184,3 @@ export const SceneSkillsConsumer: React.FC = () => {
     </AbsoluteFill>
   );
 };
-
-function hexToRgb(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `${r},${g},${b}`;
-}

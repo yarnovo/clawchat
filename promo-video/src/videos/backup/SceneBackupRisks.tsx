@@ -7,7 +7,7 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { FONT, MONO } from "../../constants";
+import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
 const risks = [
   {
@@ -18,7 +18,6 @@ const risks = [
       "clawchat_agent — Agent 配置、状态",
     ],
     consequence: "硬盘损坏 → 全部数据不可恢复",
-    color: "#ff6b6b",
   },
   {
     icon: "⚡",
@@ -28,7 +27,6 @@ const risks = [
       "Agent 回复队列 (agent-reply)",
     ],
     consequence: "容器重启 → 队列中消息丢失",
-    color: "#f59e0b",
   },
   {
     icon: "🚀",
@@ -38,16 +36,8 @@ const risks = [
       "Prisma migrate 无回滚点",
     ],
     consequence: "迁移失败 → 数据库状态不一致",
-    color: "#a78bfa",
   },
 ];
-
-function hexToRgb(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `${r},${g},${b}`;
-}
 
 export const SceneBackupRisks: React.FC = () => {
   const frame = useCurrentFrame();
@@ -58,7 +48,7 @@ export const SceneBackupRisks: React.FC = () => {
 
   return (
     <AbsoluteFill>
-      <GradientBg colors={["#1a0a0a", "#2e1a1a", "#1a0a0a"]} />
+      <GradientBg />
       <Particles />
       <AbsoluteFill
         style={{
@@ -66,19 +56,17 @@ export const SceneBackupRisks: React.FC = () => {
           alignItems: "center",
           flexDirection: "column",
           gap: 44,
-          paddingBottom: 120,
+          paddingBottom: 140,
         }}
       >
         <div
           style={{
             fontFamily: FONT,
-            fontSize: 48,
-            fontWeight: 800,
+            fontSize: 72,
+            fontWeight: 700,
+            color: COLORS.text,
             opacity: interpolate(titleProg, [0, 1], [0, 1]),
             transform: `translateY(${titleY}px)`,
-            background: "linear-gradient(135deg, #ffffff 30%, #ff6b6b 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
           }}
         >
           当前现状：三大风险
@@ -92,7 +80,6 @@ export const SceneBackupRisks: React.FC = () => {
               fps,
               config: { damping: 14, mass: 0.8 },
             });
-            const rgb = hexToRgb(r.color);
 
             return (
               <div
@@ -101,60 +88,60 @@ export const SceneBackupRisks: React.FC = () => {
                   display: "flex",
                   flexDirection: "column",
                   gap: 14,
-                  padding: "28px 24px",
-                  background: `rgba(${rgb},0.04)`,
-                  borderRadius: 20,
-                  border: `1px solid rgba(${rgb},0.12)`,
+                  padding: 32,
+                  background: "#fff",
+                  borderRadius: 12,
+                  border: `1px solid ${COLORS.border}`,
                   width: 340,
                   opacity: interpolate(ent, [0, 1], [0, 1]),
                   transform: `translateY(${interpolate(ent, [0, 1], [60, 0])}px)`,
-                  boxShadow: `0 8px 40px rgba(${rgb},0.08)`,
+                  boxShadow: COLORS.cardShadow,
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <div style={{ fontSize: 36 }}>{r.icon}</div>
+                  <div style={{ fontSize: 40 }}>{r.icon}</div>
                   <div
                     style={{
                       fontFamily: FONT,
-                      fontSize: 22,
+                      fontSize: 28,
                       fontWeight: 700,
-                      color: r.color,
+                      color: COLORS.text,
                     }}
                   >
                     {r.title}
                   </div>
                 </div>
 
-                {/* 详情列表 */}
+                {/* Detail list */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, paddingLeft: 8 }}>
                   {r.items.map((item) => (
                     <div
                       key={item}
                       style={{
-                        fontFamily: MONO,
-                        fontSize: 13,
-                        color: "rgba(255,255,255,0.5)",
+                        fontFamily: FONT_SANS,
+                        fontSize: 28,
+                        color: COLORS.muted,
                         display: "flex",
                         alignItems: "center",
                         gap: 8,
                       }}
                     >
-                      <span style={{ color: `rgba(${rgb},0.4)` }}>•</span>
+                      <span style={{ color: COLORS.subtle }}>•</span>
                       {item}
                     </div>
                   ))}
                 </div>
 
-                {/* 后果 */}
+                {/* Consequence */}
                 <div
                   style={{
-                    fontFamily: FONT,
-                    fontSize: 14,
-                    color: r.color,
+                    fontFamily: FONT_SANS,
+                    fontSize: 28,
+                    color: COLORS.accent,
                     padding: "8px 12px",
-                    background: `rgba(${rgb},0.06)`,
-                    borderRadius: 10,
-                    borderLeft: `3px solid ${r.color}`,
+                    background: "rgba(218,119,86,0.06)",
+                    borderRadius: 8,
+                    borderLeft: `3px solid ${COLORS.accent}`,
                     marginTop: 4,
                   }}
                 >

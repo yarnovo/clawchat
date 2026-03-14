@@ -7,7 +7,7 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { COLORS, FONT } from "../../constants";
+import { COLORS, FONT, FONT_SANS } from "../../constants";
 
 const painPoints = [
   {
@@ -39,7 +39,7 @@ export const ScenePainPoints: React.FC = () => {
 
   return (
     <AbsoluteFill>
-      <GradientBg colors={["#1a0a0a", "#2e1a1a", "#1a0a0a"]} />
+      <GradientBg />
       <Particles />
       <AbsoluteFill
         style={{
@@ -47,20 +47,18 @@ export const ScenePainPoints: React.FC = () => {
           alignItems: "center",
           flexDirection: "column",
           gap: 50,
-          paddingBottom: 120,
+          paddingBottom: 140,
         }}
       >
-        {/* Title with red accent */}
+        {/* Title */}
         <div
           style={{
             fontFamily: FONT,
-            fontSize: 52,
-            fontWeight: 800,
+            fontSize: 64,
+            fontWeight: 700,
+            color: COLORS.text,
             opacity: interpolate(titleProg, [0, 1], [0, 1]),
             transform: `translateY(${titleY}px)`,
-            background: "linear-gradient(135deg, #ffffff 30%, #ff6b6b 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
           }}
         >
           你遇到过这些问题吗？
@@ -69,10 +67,15 @@ export const ScenePainPoints: React.FC = () => {
         <div style={{ display: "flex", gap: 36 }}>
           {painPoints.map((p, i) => {
             const delay = 20 + i * 20;
-            const ent = spring({ frame: frame - delay, fps, config: { damping: 14, mass: 0.8 } });
-            const shake = i === 0 && frame > 30 && frame < 50
-              ? Math.sin(frame * 2) * 2
-              : 0;
+            const ent = spring({
+              frame: frame - delay,
+              fps,
+              config: { damping: 14, mass: 0.8 },
+            });
+            const shake =
+              i === 0 && frame > 30 && frame < 50
+                ? Math.sin(frame * 2) * 2
+                : 0;
 
             return (
               <div
@@ -82,32 +85,32 @@ export const ScenePainPoints: React.FC = () => {
                   flexDirection: "column",
                   alignItems: "center",
                   gap: 14,
-                  padding: "32px 28px",
-                  background: "rgba(255,60,60,0.04)",
-                  borderRadius: 24,
-                  border: "1px solid rgba(255,80,80,0.12)",
+                  padding: 32,
+                  background: COLORS.card,
+                  borderRadius: 12,
+                  border: `1px solid ${COLORS.border}`,
                   width: 320,
                   opacity: interpolate(ent, [0, 1], [0, 1]),
                   transform: `translateY(${interpolate(ent, [0, 1], [60, 0])}px) translateX(${shake}px)`,
-                  boxShadow: "0 8px 40px rgba(255,60,60,0.08)",
+                  boxShadow: COLORS.cardShadow,
                 }}
               >
-                <div style={{ fontSize: 52 }}>{p.icon}</div>
+                <div style={{ fontSize: 64 }}>{p.icon}</div>
                 <div
                   style={{
                     fontFamily: FONT,
-                    fontSize: 26,
+                    fontSize: 30,
                     fontWeight: 700,
-                    color: "#ff6b6b",
+                    color: COLORS.text,
                   }}
                 >
                   {p.title}
                 </div>
                 <div
                   style={{
-                    fontFamily: FONT,
-                    fontSize: 18,
-                    color: "rgba(255,255,255,0.85)",
+                    fontFamily: FONT_SANS,
+                    fontSize: 24,
+                    color: COLORS.text,
                     textAlign: "center",
                     lineHeight: 1.5,
                   }}
@@ -116,9 +119,9 @@ export const ScenePainPoints: React.FC = () => {
                 </div>
                 <div
                   style={{
-                    fontFamily: FONT,
-                    fontSize: 14,
-                    color: "rgba(255,255,255,0.35)",
+                    fontFamily: FONT_SANS,
+                    fontSize: 28,
+                    color: COLORS.muted,
                     textAlign: "center",
                   }}
                 >

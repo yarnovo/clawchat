@@ -7,22 +7,15 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { FONT, MONO } from "../../constants";
+import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
 const rows = [
-  { label: "备份什么", value: "PostgreSQL 全部数据库", detail: "pg_dumpall", color: "#60a5fa" },
-  { label: "备份频率", value: "每日凌晨 3 点 + 每次部署前", detail: "cron + CI/CD", color: "#a78bfa" },
-  { label: "保留策略", value: "最近 7 天，超期自动清理", detail: "find -mtime +7 -delete", color: "#f59e0b" },
-  { label: "存储位置", value: "ECS /opt/clawchat/backups/", detail: "gzip 压缩", color: "#34d399" },
-  { label: "Redis", value: "开启 RDB 持久化", detail: "--save 60 1", color: "#f472b6" },
+  { label: "备份什么", value: "PostgreSQL 全部数据库", detail: "pg_dumpall" },
+  { label: "备份频率", value: "每日凌晨 3 点 + 每次部署前", detail: "cron + CI/CD" },
+  { label: "保留策略", value: "最近 7 天，超期自动清理", detail: "find -mtime +7 -delete" },
+  { label: "存储位置", value: "ECS /opt/clawchat/backups/", detail: "gzip 压缩" },
+  { label: "Redis", value: "开启 RDB 持久化", detail: "--save 60 1" },
 ];
-
-function hexToRgb(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `${r},${g},${b}`;
-}
 
 export const SceneBackupOverview: React.FC = () => {
   const frame = useCurrentFrame();
@@ -33,7 +26,7 @@ export const SceneBackupOverview: React.FC = () => {
 
   return (
     <AbsoluteFill>
-      <GradientBg colors={["#0a0c2e", "#1a1e4e", "#0a0c2e"]} />
+      <GradientBg />
       <Particles />
       <AbsoluteFill
         style={{
@@ -41,36 +34,34 @@ export const SceneBackupOverview: React.FC = () => {
           alignItems: "center",
           flexDirection: "column",
           gap: 40,
-          paddingBottom: 120,
+          paddingBottom: 140,
         }}
       >
         <div
           style={{
             fontFamily: FONT,
-            fontSize: 48,
-            fontWeight: 800,
+            fontSize: 72,
+            fontWeight: 700,
+            color: COLORS.text,
             opacity: interpolate(titleProg, [0, 1], [0, 1]),
             transform: `translateY(${titleY}px)`,
-            background:
-              "linear-gradient(135deg, #ffffff 20%, #60a5fa 60%, #34d399 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
           }}
         >
           方案总览
         </div>
 
-        {/* 表格式布局 */}
+        {/* Table layout */}
         <div
           style={{
             display: "flex",
             flexDirection: "column",
-            gap: 12,
+            gap: 8,
             width: 900,
-            background: "rgba(255,255,255,0.02)",
-            borderRadius: 20,
+            background: "#fff",
+            borderRadius: 12,
             padding: "24px 28px",
-            border: "1px solid rgba(255,255,255,0.06)",
+            border: `1px solid ${COLORS.border}`,
+            boxShadow: COLORS.cardShadow,
           }}
         >
           {rows.map((row, i) => {
@@ -80,7 +71,6 @@ export const SceneBackupOverview: React.FC = () => {
               fps,
               config: { damping: 14, mass: 0.6 },
             });
-            const rgb = hexToRgb(row.color);
 
             return (
               <div
@@ -90,20 +80,19 @@ export const SceneBackupOverview: React.FC = () => {
                   alignItems: "center",
                   gap: 20,
                   padding: "14px 20px",
-                  background: `rgba(${rgb},0.03)`,
-                  borderRadius: 12,
-                  border: `1px solid rgba(${rgb},0.08)`,
+                  background: i % 2 === 0 ? "transparent" : "rgba(0,0,0,0.02)",
+                  borderRadius: 8,
                   opacity: interpolate(ent, [0, 1], [0, 1]),
                   transform: `translateX(${interpolate(ent, [0, 1], [-30, 0])}px)`,
                 }}
               >
-                {/* 标签 */}
+                {/* Label */}
                 <div
                   style={{
                     fontFamily: FONT,
-                    fontSize: 18,
+                    fontSize: 26,
                     fontWeight: 700,
-                    color: row.color,
+                    color: COLORS.text,
                     width: 120,
                     flexShrink: 0,
                   }}
@@ -111,37 +100,37 @@ export const SceneBackupOverview: React.FC = () => {
                   {row.label}
                 </div>
 
-                {/* 分隔线 */}
+                {/* Divider */}
                 <div
                   style={{
                     width: 2,
                     height: 28,
-                    background: `rgba(${rgb},0.15)`,
+                    background: COLORS.border,
                     borderRadius: 1,
                     flexShrink: 0,
                   }}
                 />
 
-                {/* 值 */}
+                {/* Value */}
                 <div
                   style={{
-                    fontFamily: FONT,
-                    fontSize: 18,
-                    color: "rgba(255,255,255,0.8)",
+                    fontFamily: FONT_SANS,
+                    fontSize: 24,
+                    color: COLORS.muted,
                     flex: 1,
                   }}
                 >
                   {row.value}
                 </div>
 
-                {/* 技术细节标签 */}
+                {/* Technical detail tag */}
                 <div
                   style={{
                     fontFamily: MONO,
-                    fontSize: 12,
-                    color: `rgba(${rgb},0.6)`,
+                    fontSize: 28,
+                    color: COLORS.accent,
                     padding: "4px 10px",
-                    background: `rgba(${rgb},0.06)`,
+                    background: "rgba(218,119,86,0.06)",
                     borderRadius: 6,
                     flexShrink: 0,
                   }}

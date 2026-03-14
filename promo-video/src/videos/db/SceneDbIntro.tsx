@@ -7,7 +7,7 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { FONT, MONO } from "../../constants";
+import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
 export const SceneDbIntro: React.FC = () => {
   const frame = useCurrentFrame();
@@ -18,13 +18,11 @@ export const SceneDbIntro: React.FC = () => {
   const subProg = spring({ frame: frame - 25, fps, config: { damping: 14 } });
   const tagsProg = spring({ frame: frame - 40, fps, config: { damping: 14 } });
 
-  const glow = interpolate(Math.sin(frame * 0.06), [-1, 1], [0.3, 0.7]);
-
   const tags = ["PostgreSQL", "Prisma ORM", "6 Core Tables"];
 
   return (
     <AbsoluteFill>
-      <GradientBg colors={["#0a0a2e", "#1a1a4e", "#0a0a2e"]} />
+      <GradientBg />
       <Particles />
       <AbsoluteFill
         style={{
@@ -32,22 +30,14 @@ export const SceneDbIntro: React.FC = () => {
           alignItems: "center",
           flexDirection: "column",
           gap: 28,
-          paddingBottom: 120,
+          paddingBottom: 140,
         }}
       >
         {/* Database icon */}
         <div
           style={{
             transform: `scale(${iconScale})`,
-            width: 120,
-            height: 120,
-            borderRadius: 32,
-            background: "linear-gradient(135deg, #6C63FF, #00D2FF)",
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            fontSize: 64,
-            boxShadow: `0 20px 80px rgba(108,99,255,${glow}), 0 0 120px rgba(0,210,255,${glow * 0.3})`,
+            fontSize: 90,
           }}
         >
           🗄️
@@ -57,14 +47,12 @@ export const SceneDbIntro: React.FC = () => {
         <div
           style={{
             fontFamily: FONT,
-            fontSize: 72,
-            fontWeight: 800,
+            fontSize: 84,
+            fontWeight: 700,
+            color: COLORS.text,
             letterSpacing: -2,
             opacity: interpolate(titleProg, [0, 1], [0, 1]),
             transform: `translateY(${interpolate(titleProg, [0, 1], [30, 0])}px)`,
-            background: "linear-gradient(135deg, #ffffff 0%, #00D2FF 50%, #6C63FF 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
           }}
         >
           数据库架构设计
@@ -74,9 +62,9 @@ export const SceneDbIntro: React.FC = () => {
         <div
           style={{
             fontFamily: FONT,
-            fontSize: 28,
+            fontSize: 36,
             fontWeight: 300,
-            color: "rgba(255,255,255,0.55)",
+            color: COLORS.muted,
             letterSpacing: 6,
             opacity: interpolate(subProg, [0, 1], [0, 1]),
             transform: `translateY(${interpolate(subProg, [0, 1], [20, 0])}px)`,
@@ -100,12 +88,13 @@ export const SceneDbIntro: React.FC = () => {
               key={tag}
               style={{
                 fontFamily: MONO,
-                fontSize: 16,
-                color: "#00D2FF",
+                fontSize: 28,
+                color: COLORS.accent,
                 padding: "8px 20px",
                 borderRadius: 10,
-                background: "rgba(0,210,255,0.06)",
-                border: `1px solid rgba(0,210,255,${interpolate(Math.sin(frame * 0.05), [-1, 1], [0.15, 0.35])})`,
+                background: COLORS.card,
+                border: `1px solid ${COLORS.border}`,
+                boxShadow: COLORS.cardShadow,
               }}
             >
               {tag}

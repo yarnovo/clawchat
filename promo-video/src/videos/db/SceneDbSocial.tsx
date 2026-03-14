@@ -7,55 +7,52 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { FONT, MONO } from "../../constants";
+import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
 const friendshipFields = [
-  { name: "id", type: "UUID", icon: "🔑" },
-  { name: "accountAId", type: "String", icon: "👤" },
-  { name: "accountBId", type: "String", icon: "👤" },
-  { name: "status", type: "FriendshipStatus", icon: "📋" },
+  { name: "id", type: "UUID" },
+  { name: "accountAId", type: "String" },
+  { name: "accountBId", type: "String" },
+  { name: "status", type: "FriendshipStatus" },
 ];
 
 const groupFields = [
-  { name: "id", type: "UUID", icon: "🔑" },
-  { name: "name", type: "String", icon: "💬" },
-  { name: "ownerId", type: "String", icon: "👑" },
+  { name: "id", type: "UUID" },
+  { name: "name", type: "String" },
+  { name: "ownerId", type: "String" },
 ];
 
 const memberFields = [
-  { name: "groupId", type: "String", icon: "🏠" },
-  { name: "accountId", type: "String", icon: "👤" },
-  { name: "role", type: "GroupRole", icon: "🛡️" },
+  { name: "groupId", type: "String" },
+  { name: "accountId", type: "String" },
+  { name: "role", type: "GroupRole" },
 ];
 
 interface TableCardProps {
   title: string;
-  emoji: string;
-  fields: { name: string; type: string; icon: string }[];
-  color: string;
+  fields: { name: string; type: string }[];
   delay: number;
   badge?: string;
 }
 
-const TableCard: React.FC<TableCardProps> = ({ title, emoji, fields, color, delay, badge }) => {
+const TableCard: React.FC<TableCardProps> = ({ title, fields, delay, badge }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const prog = spring({ frame: frame - delay, fps, config: { damping: 14, mass: 0.7 } });
-  const glow = interpolate(Math.sin(frame * 0.04 + delay * 0.1), [-1, 1], [0.06, 0.14]);
 
   return (
     <div
       style={{
         display: "flex",
         flexDirection: "column",
-        width: 380,
-        background: "rgba(255,255,255,0.03)",
-        borderRadius: 20,
-        border: `1px solid ${color}22`,
+        width: 360,
+        background: COLORS.card,
+        borderRadius: 12,
+        border: `1px solid ${COLORS.border}`,
         overflow: "hidden",
         opacity: interpolate(prog, [0, 1], [0, 1]),
-        transform: `translateY(${interpolate(prog, [0, 1], [50, 0])}px) scale(${interpolate(prog, [0, 1], [0.9, 1])})`,
-        boxShadow: `0 8px 40px ${color}${Math.round(glow * 255).toString(16).padStart(2, "0")}`,
+        transform: `translateY(${interpolate(prog, [0, 1], [40, 0])}px)`,
+        boxShadow: COLORS.cardShadow,
       }}
     >
       {/* Header */}
@@ -65,17 +62,15 @@ const TableCard: React.FC<TableCardProps> = ({ title, emoji, fields, color, dela
           alignItems: "center",
           gap: 10,
           padding: "14px 20px",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
-          background: `${color}08`,
+          borderBottom: `1px solid ${COLORS.border}`,
         }}
       >
-        <span style={{ fontSize: 24 }}>{emoji}</span>
         <div
           style={{
             fontFamily: FONT,
-            fontSize: 20,
+            fontSize: 28,
             fontWeight: 700,
-            color,
+            color: COLORS.text,
           }}
         >
           {title}
@@ -84,12 +79,12 @@ const TableCard: React.FC<TableCardProps> = ({ title, emoji, fields, color, dela
           <div
             style={{
               fontFamily: MONO,
-              fontSize: 11,
-              color,
+              fontSize: 24,
+              color: COLORS.accent,
               padding: "3px 10px",
               borderRadius: 6,
-              background: `${color}15`,
-              border: `1px solid ${color}30`,
+              background: "rgba(218,119,86,0.08)",
+              border: "1px solid rgba(218,119,86,0.2)",
               marginLeft: "auto",
             }}
           >
@@ -109,19 +104,18 @@ const TableCard: React.FC<TableCardProps> = ({ title, emoji, fields, color, dela
             style={{
               display: "flex",
               alignItems: "center",
-              padding: "8px 20px",
-              gap: 10,
+              padding: "9px 20px",
+              gap: 12,
               opacity: interpolate(rowProg, [0, 1], [0, 1]),
-              background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.015)",
+              background: i % 2 === 0 ? "transparent" : "rgba(0,0,0,0.015)",
             }}
           >
-            <span style={{ fontSize: 16, width: 24, textAlign: "center" }}>{f.icon}</span>
             <span
               style={{
                 fontFamily: MONO,
-                fontSize: 15,
+                fontSize: 28,
                 fontWeight: 600,
-                color: "rgba(255,255,255,0.85)",
+                color: COLORS.text,
                 width: 140,
               }}
             >
@@ -130,8 +124,8 @@ const TableCard: React.FC<TableCardProps> = ({ title, emoji, fields, color, dela
             <span
               style={{
                 fontFamily: MONO,
-                fontSize: 14,
-                color: `${color}cc`,
+                fontSize: 28,
+                color: COLORS.accent,
               }}
             >
               {f.type}
@@ -150,15 +144,15 @@ export const SceneDbSocial: React.FC = () => {
 
   return (
     <AbsoluteFill>
-      <GradientBg colors={["#0c0a2e", "#0e2a1e", "#0c0a2e"]} />
+      <GradientBg />
       <Particles />
       <AbsoluteFill
         style={{
           justifyContent: "center",
           alignItems: "center",
           flexDirection: "column",
-          gap: 36,
-          paddingBottom: 120,
+          gap: 32,
+          paddingBottom: 140,
         }}
       >
         {/* Title */}
@@ -171,15 +165,12 @@ export const SceneDbSocial: React.FC = () => {
             transform: `translateY(${interpolate(titleProg, [0, 1], [-30, 0])}px)`,
           }}
         >
-          <span style={{ fontSize: 44 }}>🤝</span>
           <div
             style={{
               fontFamily: FONT,
-              fontSize: 48,
-              fontWeight: 800,
-              background: "linear-gradient(135deg, #fff 30%, #34d399 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
+              fontSize: 60,
+              fontWeight: 700,
+              color: COLORS.text,
             }}
           >
             社交关系层
@@ -195,20 +186,20 @@ export const SceneDbSocial: React.FC = () => {
           }}
         >
           {[
-            { label: "pending", color: "#f59e0b" },
-            { label: "accepted", color: "#34d399" },
-            { label: "rejected", color: "#f87171" },
+            { label: "pending", color: COLORS.accent },
+            { label: "accepted", color: COLORS.accent },
+            { label: "rejected", color: COLORS.accent },
           ].map((s) => (
             <div
               key={s.label}
               style={{
                 fontFamily: MONO,
-                fontSize: 14,
+                fontSize: 26,
                 color: s.color,
                 padding: "5px 14px",
                 borderRadius: 8,
-                background: `${s.color}10`,
-                border: `1px solid ${s.color}30`,
+                background: "rgba(218,119,86,0.08)",
+                border: "1px solid rgba(218,119,86,0.2)",
               }}
             >
               {s.label}
@@ -216,20 +207,20 @@ export const SceneDbSocial: React.FC = () => {
           ))}
           <div style={{ width: 20 }} />
           {[
-            { label: "owner", color: "#f59e0b" },
-            { label: "admin", color: "#60a5fa" },
-            { label: "member", color: "#a78bfa" },
+            { label: "owner", color: COLORS.accent },
+            { label: "admin", color: COLORS.text },
+            { label: "member", color: COLORS.muted },
           ].map((r) => (
             <div
               key={r.label}
               style={{
                 fontFamily: MONO,
-                fontSize: 14,
+                fontSize: 26,
                 color: r.color,
                 padding: "5px 14px",
                 borderRadius: 8,
-                background: `${r.color}10`,
-                border: `1px solid ${r.color}30`,
+                background: COLORS.card,
+                border: `1px solid ${COLORS.border}`,
               }}
             >
               {r.label}
@@ -241,24 +232,18 @@ export const SceneDbSocial: React.FC = () => {
         <div style={{ display: "flex", gap: 24 }}>
           <TableCard
             title="Friendship"
-            emoji="💚"
             fields={friendshipFields}
-            color="#34d399"
             delay={10}
             badge="@@unique([A, B])"
           />
           <TableCard
             title="Group"
-            emoji="👥"
             fields={groupFields}
-            color="#60a5fa"
             delay={20}
           />
           <TableCard
             title="GroupMember"
-            emoji="🛡️"
             fields={memberFields}
-            color="#a78bfa"
             delay={30}
             badge="@@unique([group, account])"
           />

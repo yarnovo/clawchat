@@ -7,7 +7,7 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { FONT, MONO } from "../../constants";
+import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
 const steps = [
   { icon: "🕐", label: "cron 触发", detail: "0 3 * * *", desc: "每日凌晨 3 点" },
@@ -26,7 +26,7 @@ export const SceneBackupDaily: React.FC = () => {
 
   return (
     <AbsoluteFill>
-      <GradientBg colors={["#0a1020", "#102040", "#0a1020"]} />
+      <GradientBg />
       <Particles />
       <AbsoluteFill
         style={{
@@ -34,10 +34,10 @@ export const SceneBackupDaily: React.FC = () => {
           alignItems: "center",
           flexDirection: "column",
           gap: 40,
-          paddingBottom: 120,
+          paddingBottom: 140,
         }}
       >
-        {/* 标题 */}
+        {/* Title */}
         <div
           style={{
             display: "flex",
@@ -49,14 +49,14 @@ export const SceneBackupDaily: React.FC = () => {
         >
           <div
             style={{
-              fontFamily: FONT,
-              fontSize: 20,
+              fontFamily: FONT_SANS,
+              fontSize: 24,
               fontWeight: 600,
-              color: "#60a5fa",
+              color: COLORS.accent,
               padding: "6px 16px",
-              background: "rgba(96,165,250,0.1)",
+              background: "rgba(218,119,86,0.08)",
               borderRadius: 8,
-              border: "1px solid rgba(96,165,250,0.2)",
+              border: `1px solid rgba(218,119,86,0.15)`,
             }}
           >
             防线 1
@@ -64,18 +64,16 @@ export const SceneBackupDaily: React.FC = () => {
           <div
             style={{
               fontFamily: FONT,
-              fontSize: 48,
-              fontWeight: 800,
-              background: "linear-gradient(135deg, #ffffff 20%, #60a5fa 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
+              fontSize: 60,
+              fontWeight: 700,
+              color: COLORS.text,
             }}
           >
             每日自动备份
           </div>
         </div>
 
-        {/* 流程图 — 横向 steps */}
+        {/* Flow chart - horizontal steps */}
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {steps.map((s, i) => {
             const delay = 25 + i * 18;
@@ -87,7 +85,7 @@ export const SceneBackupDaily: React.FC = () => {
 
             return (
               <div key={s.label} style={{ display: "flex", alignItems: "center" }}>
-                {/* 步骤卡片 */}
+                {/* Step card */}
                 <div
                   style={{
                     display: "flex",
@@ -95,21 +93,22 @@ export const SceneBackupDaily: React.FC = () => {
                     alignItems: "center",
                     gap: 10,
                     padding: "24px 20px",
-                    background: "rgba(96,165,250,0.04)",
-                    borderRadius: 16,
-                    border: "1px solid rgba(96,165,250,0.1)",
+                    background: "#fff",
+                    borderRadius: 12,
+                    border: `1px solid ${COLORS.border}`,
                     width: 170,
                     opacity: interpolate(ent, [0, 1], [0, 1]),
                     transform: `translateY(${interpolate(ent, [0, 1], [40, 0])}px)`,
+                    boxShadow: COLORS.cardShadow,
                   }}
                 >
                   <div style={{ fontSize: 36 }}>{s.icon}</div>
                   <div
                     style={{
                       fontFamily: FONT,
-                      fontSize: 18,
+                      fontSize: 24,
                       fontWeight: 700,
-                      color: "#60a5fa",
+                      color: COLORS.text,
                     }}
                   >
                     {s.label}
@@ -117,10 +116,10 @@ export const SceneBackupDaily: React.FC = () => {
                   <div
                     style={{
                       fontFamily: MONO,
-                      fontSize: 12,
-                      color: "rgba(96,165,250,0.5)",
+                      fontSize: 26,
+                      color: COLORS.accent,
                       padding: "3px 8px",
-                      background: "rgba(96,165,250,0.06)",
+                      background: "rgba(218,119,86,0.06)",
                       borderRadius: 4,
                     }}
                   >
@@ -128,9 +127,9 @@ export const SceneBackupDaily: React.FC = () => {
                   </div>
                   <div
                     style={{
-                      fontFamily: FONT,
-                      fontSize: 13,
-                      color: "rgba(255,255,255,0.4)",
+                      fontFamily: FONT_SANS,
+                      fontSize: 26,
+                      color: COLORS.muted,
                       textAlign: "center",
                     }}
                   >
@@ -138,13 +137,13 @@ export const SceneBackupDaily: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 箭头连接线 */}
+                {/* Arrow connector */}
                 {i < steps.length - 1 && (
                   <div
                     style={{
-                      fontFamily: FONT,
-                      fontSize: 20,
-                      color: "rgba(96,165,250,0.3)",
+                      fontFamily: FONT_SANS,
+                      fontSize: 24,
+                      color: COLORS.subtle,
                       opacity: interpolate(ent, [0, 1], [0, 1]),
                       padding: "0 2px",
                     }}
@@ -157,7 +156,7 @@ export const SceneBackupDaily: React.FC = () => {
           })}
         </div>
 
-        {/* 输出文件格式 */}
+        {/* Output format */}
         <div
           style={{
             opacity: interpolate(
@@ -172,9 +171,9 @@ export const SceneBackupDaily: React.FC = () => {
         >
           <div
             style={{
-              fontFamily: FONT,
-              fontSize: 16,
-              color: "rgba(255,255,255,0.3)",
+              fontFamily: FONT_SANS,
+              fontSize: 28,
+              color: COLORS.muted,
             }}
           >
             输出格式
@@ -182,12 +181,13 @@ export const SceneBackupDaily: React.FC = () => {
           <div
             style={{
               fontFamily: MONO,
-              fontSize: 16,
-              color: "rgba(96,165,250,0.7)",
+              fontSize: 28,
+              color: COLORS.text,
               padding: "6px 16px",
-              background: "rgba(96,165,250,0.06)",
+              background: "#fff",
               borderRadius: 8,
-              border: "1px solid rgba(96,165,250,0.1)",
+              border: `1px solid ${COLORS.border}`,
+              boxShadow: COLORS.cardShadow,
             }}
           >
             2026-03-14_030000.sql.gz

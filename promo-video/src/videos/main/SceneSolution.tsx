@@ -7,7 +7,7 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { COLORS, FONT } from "../../constants";
+import { COLORS, FONT, FONT_SANS } from "../../constants";
 
 const solutions = [
   {
@@ -36,7 +36,7 @@ export const SceneSolution: React.FC = () => {
 
   return (
     <AbsoluteFill>
-      <GradientBg colors={["#0a1a0a", "#1a2e1a", "#0a1a0a"]} />
+      <GradientBg />
       <Particles />
       <AbsoluteFill
         style={{
@@ -44,34 +44,31 @@ export const SceneSolution: React.FC = () => {
           alignItems: "center",
           flexDirection: "column",
           gap: 50,
-          paddingBottom: 120,
+          paddingBottom: 140,
         }}
       >
         <div
           style={{
             fontFamily: FONT,
-            fontSize: 52,
-            fontWeight: 800,
+            fontSize: 64,
+            fontWeight: 700,
+            color: COLORS.text,
             opacity: interpolate(titleProg, [0, 1], [0, 1]),
             transform: `translateY(${titleY}px)`,
           }}
         >
-          <span
-            style={{
-              background: "linear-gradient(135deg, #ffffff 30%, #07C160 100%)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}
-          >
-            ClawChat，一键搞定
-          </span>
+          <span style={{ color: COLORS.accent }}>ClawChat</span>
+          ，一键搞定
         </div>
 
         <div style={{ display: "flex", gap: 36 }}>
           {solutions.map((s, i) => {
             const delay = 15 + i * 15;
-            const ent = spring({ frame: frame - delay, fps, config: { damping: 14, mass: 0.8 } });
-            const glow = interpolate(Math.sin(frame * 0.04 + i), [-1, 1], [0.08, 0.2]);
+            const ent = spring({
+              frame: frame - delay,
+              fps,
+              config: { damping: 14, mass: 0.8 },
+            });
 
             return (
               <div
@@ -81,32 +78,32 @@ export const SceneSolution: React.FC = () => {
                   flexDirection: "column",
                   alignItems: "center",
                   gap: 16,
-                  padding: "32px 28px",
-                  background: `rgba(7,193,96,0.04)`,
-                  borderRadius: 24,
-                  border: `1px solid rgba(7,193,96,${glow})`,
+                  padding: 32,
+                  background: COLORS.card,
+                  borderRadius: 12,
+                  border: `1px solid ${COLORS.border}`,
                   width: 320,
                   opacity: interpolate(ent, [0, 1], [0, 1]),
                   transform: `scale(${interpolate(ent, [0, 1], [0.85, 1])})`,
-                  boxShadow: `0 8px 40px rgba(7,193,96,${glow * 0.5})`,
+                  boxShadow: COLORS.cardShadow,
                 }}
               >
-                <div style={{ fontSize: 52 }}>{s.icon}</div>
+                <div style={{ fontSize: 64 }}>{s.icon}</div>
                 <div
                   style={{
                     fontFamily: FONT,
-                    fontSize: 24,
+                    fontSize: 28,
                     fontWeight: 700,
-                    color: COLORS.accent,
+                    color: COLORS.text,
                   }}
                 >
                   {s.title}
                 </div>
                 <div
                   style={{
-                    fontFamily: FONT,
-                    fontSize: 18,
-                    color: "rgba(255,255,255,0.7)",
+                    fontFamily: FONT_SANS,
+                    fontSize: 24,
+                    color: COLORS.muted,
                     textAlign: "center",
                     lineHeight: 1.5,
                   }}

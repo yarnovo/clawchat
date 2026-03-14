@@ -57,7 +57,7 @@ const Scene: React.FC<{ children: React.ReactNode; dur: number; isLast?: boolean
 };
 
 export const Backup: React.FC = () => (
-  <AbsoluteFill style={{ backgroundColor: "#0f0c29" }}>
+  <AbsoluteFill style={{ backgroundColor: "#FAF9F6" }}>
     <Audio src={staticFile("audio/backup/backup.mp3")} volume={0.9} />
     {scenes.map((s, i) => {
       const isLast = i === scenes.length - 1;

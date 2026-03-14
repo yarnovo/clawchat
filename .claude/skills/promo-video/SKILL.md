@@ -133,42 +133,64 @@ npm run dev              # Remotion Studio 预览
 npm run render:xyz       # 渲染 MP4
 ```
 
-## 视觉规范
+## 视觉规范：Claude 风格
 
-### 颜色体系
-| 用途 | 颜色 | 值 |
-|------|------|----|
-| 主色 | 紫色 | `#6C63FF` |
-| 强调 | 绿色 | `#07C160` |
-| 青色 | 信息 | `#00D2FF` |
-| 背景 | 深色 | `#0f0c29` |
+整体风格：**温暖、人文、克制、留白多、无浮华效果**。参考 Anthropic/Claude 的设计语言。
 
-### 场景配色
-每个场景通过 `<GradientBg colors={[...]}/>` 设置不同的背景色调：
-- 紫色调: `["#0c0a2e", "#1a1040", "#0c0a2e"]`
-- 绿色调: `["#0c0a2e", "#0e2a1e", "#0c0a2e"]`
-- 橙色调: `["#0c0a2e", "#2a1a0e", "#0c0a2e"]`
-- 蓝色调: `["#0a0a2e", "#1a1a4e", "#0a0a2e"]`
+### 颜色体系（定义在 constants.ts）
+| 用途 | 变量 | 值 | 说明 |
+|------|------|----|------|
+| 背景 | `COLORS.bg` | `#FAF9F6` | 奶油白 |
+| 正文 | `COLORS.text` | `#1A1A1A` | 深棕 |
+| 次要 | `COLORS.muted` | `#8B7E74` | 暖灰 |
+| 辅助 | `COLORS.subtle` | `#C4B9AE` | 更淡暖灰 |
+| 强调 | `COLORS.accent` | `#DA7756` | Claude 橙 |
+| 边框 | `COLORS.border` | `#E8E0D8` | 暖色边框 |
+| 卡片 | `COLORS.card` | `#FFFFFF` | 纯白 |
 
-### 卡片样式
-```tsx
-background: "rgba(255,255,255,0.03)",
-borderRadius: 20,
-border: "1px solid rgba(COLOR,0.15)",
-boxShadow: "0 8px 40px rgba(COLOR,0.08)",
-```
+### 严格颜色规则
+- **禁止使用彩色**：不要蓝、绿、紫、红等饱和色，只用上面的暖色调色板
+- 所有文字只用 `COLORS.text`（主要）或 `COLORS.muted`（次要）或 `COLORS.accent`（强调）
+- 背景统一 `COLORS.bg` 奶油白，不要深色背景
+- 卡片用 `COLORS.card` 白色 + 极淡阴影
 
-### 代码/字段展示
-- 字段名: `MONO` 字体, 主题色, fontWeight: 600
-- 类型: `MONO` 字体, 主题色 70% 透明度
-- 说明: `FONT` 字体, 白色 60% 透明度
+### 字体（定义在 constants.ts）
+| 变量 | 用途 | 字体 |
+|------|------|------|
+| `FONT` | 标题（衬线） | Noto Serif SC, Georgia, serif |
+| `FONT_SANS` | 正文/字幕（无衬线） | Noto Sans SC, SF Pro Display, sans-serif |
+| `MONO` | 代码/字段 | JetBrains Mono, SF Mono, monospace |
+
+### 字号规范
+- 场景大标题: 60-84px, `FONT`, fontWeight: 700
+- 卡片标题: 36-48px, `FONT` 或 `FONT_SANS`, fontWeight: 600
+- 卡片正文/描述: 28-32px, `FONT_SANS`, fontWeight: 400
+- 代码/字段名: 26-28px, `MONO`, fontWeight: 600
+- 辅助说明: 24-28px, `FONT_SANS`, color: `COLORS.muted`
+- **最小字号不低于 24px**，所有文字必须在视频中清晰可读
+
+### 内容呈现方式
+像 Markdown 渲染一样简洁，只用这些元素：
+- **标题**（h1/h2/h3 层级，衬线体，大号）
+- **列表**（有序/无序，无衬线体）
+- **代码块**（等宽字体 + 极淡背景）
+- **SVG 图**（简洁线条图、流程图、ER 图，取代花哨卡片）
+- **引用/高亮**（左边框 + 浅背景，用于强调关键信息）
+- **分割线**（极淡，用于内容分区）
+
+### 禁止的元素
+- 不要渐变背景、发光效果、脉冲动画
+- 不要毛玻璃、阴影层叠、彩色装饰
+- 不要 emoji 做标题装饰（可在列表项中少量使用）
+- 不要圆角卡片堆叠，用留白和排版代替
 
 ### 动画模式
-- 入场: `spring({ frame: frame - delay, fps, config: { damping: 14, mass: 0.7 } })`
-- 标题: 从上方滑入 `translateY(-30 → 0)`
-- 卡片: 缩放 + 位移 `scale(0.9→1) + translateY(50→0)`
-- 表格行: 从右滑入 `translateX(40→0)`，逐行延迟 5-6 帧
-- 发光脉冲: `Math.sin(frame * 0.04~0.06)` 控制 glow 强度
+保持克制，只用简单过渡：
+- 入场: `spring({ frame, fps, config: { damping: 14, mass: 0.7 } })`
+- 标题: 淡入 `opacity: 0->1`
+- 内容块: 从下方滑入 `translateY(20->0) + opacity: 0->1`
+- 列表项: 逐行淡入，延迟 5-6 帧
+- **禁止缩放、旋转、弹跳等过度动画**
 
 ## 避坑清单
 

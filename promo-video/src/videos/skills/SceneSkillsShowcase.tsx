@@ -6,17 +6,8 @@ import {
   useVideoConfig,
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
-import { COLORS, FONT } from "../../constants";
-
-// Simulated skill install flow
-const installSteps = [
-  { frame: 15, type: "search", text: "web-search" },
-  { frame: 55, type: "result", name: "web-search", desc: "网页搜索与摘要", downloads: "12.3k" },
-  { frame: 85, type: "installing", name: "web-search" },
-  { frame: 110, type: "installed", name: "web-search" },
-  { frame: 130, type: "result2", name: "code-review", desc: "代码审查与建议", downloads: "8.7k" },
-  { frame: 150, type: "installed2", name: "code-review" },
-];
+import { Particles } from "../../Particles";
+import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
 export const SceneSkillsShowcase: React.FC = () => {
   const frame = useCurrentFrame();
@@ -41,20 +32,20 @@ export const SceneSkillsShowcase: React.FC = () => {
 
   return (
     <AbsoluteFill>
-      <GradientBg colors={["#0a0a2e", "#151540", "#0a0a2e"]} />
+      <GradientBg />
+      <Particles />
       <AbsoluteFill
-        style={{ justifyContent: "center", alignItems: "center", paddingBottom: 120 }}
+        style={{ justifyContent: "center", alignItems: "center", paddingBottom: 140 }}
       >
         {/* Phone mockup */}
         <div
           style={{
             transform: `scale(${phoneScale})`,
             width: 580,
-            background: "rgba(20,20,45,0.95)",
+            background: COLORS.card,
             borderRadius: 32,
-            border: "1px solid rgba(108,99,255,0.15)",
-            boxShadow:
-              "0 40px 100px rgba(0,0,0,0.5), 0 0 80px rgba(108,99,255,0.1)",
+            border: `1px solid ${COLORS.border}`,
+            boxShadow: "0 20px 60px rgba(0,0,0,0.08)",
             overflow: "hidden",
           }}
         >
@@ -64,15 +55,14 @@ export const SceneSkillsShowcase: React.FC = () => {
               display: "flex",
               alignItems: "center",
               padding: "14px 24px",
-              background: "rgba(255,255,255,0.02)",
-              borderBottom: "1px solid rgba(255,255,255,0.05)",
+              borderBottom: `1px solid ${COLORS.border}`,
               gap: 12,
             }}
           >
-            <div style={{ fontFamily: FONT, fontSize: 14, color: "rgba(255,255,255,0.4)" }}>
+            <div style={{ fontFamily: FONT_SANS, fontSize: 24, color: COLORS.muted }}>
               ←
             </div>
-            <div style={{ fontFamily: FONT, fontSize: 18, fontWeight: 700, color: COLORS.white }}>
+            <div style={{ fontFamily: FONT, fontSize: 26, fontWeight: 700, color: COLORS.text }}>
               添加技能
             </div>
           </div>
@@ -84,22 +74,22 @@ export const SceneSkillsShowcase: React.FC = () => {
                 display: "flex",
                 alignItems: "center",
                 padding: "10px 16px",
-                background: "rgba(255,255,255,0.04)",
+                background: COLORS.bg,
                 borderRadius: 12,
-                border: "1px solid rgba(108,99,255,0.2)",
+                border: `1px solid ${COLORS.border}`,
                 gap: 8,
               }}
             >
-              <span style={{ fontSize: 16, opacity: 0.4 }}>🔍</span>
+              <span style={{ fontSize: 28, color: COLORS.muted }}>🔍</span>
               <span
                 style={{
-                  fontFamily: FONT,
-                  fontSize: 16,
-                  color: displaySearch ? COLORS.white : "rgba(255,255,255,0.3)",
+                  fontFamily: MONO,
+                  fontSize: 28,
+                  color: displaySearch ? COLORS.text : COLORS.subtle,
                 }}
               >
                 {displaySearch || "搜索技能..."}
-                {cursorOn && <span style={{ color: COLORS.primary }}>|</span>}
+                {cursorOn && <span style={{ color: COLORS.accent }}>|</span>}
               </span>
             </div>
           </div>
@@ -142,9 +132,9 @@ export const SceneSkillsShowcase: React.FC = () => {
             {frame >= 130 && (
               <div
                 style={{
-                  fontFamily: FONT,
-                  fontSize: 13,
-                  color: "rgba(255,255,255,0.2)",
+                  fontFamily: FONT_SANS,
+                  fontSize: 28,
+                  color: COLORS.subtle,
                   textAlign: "center",
                   padding: "8px 0",
                   opacity: interpolate(
@@ -184,27 +174,23 @@ const SkillResultCard: React.FC<{
         alignItems: "center",
         gap: 14,
         padding: "14px 16px",
-        background: installed
-          ? "rgba(7,193,96,0.06)"
-          : "rgba(255,255,255,0.03)",
-        borderRadius: 14,
-        border: installed
-          ? "1px solid rgba(7,193,96,0.2)"
-          : "1px solid rgba(255,255,255,0.06)",
+        background: installed ? "rgba(218,119,86,0.04)" : COLORS.bg,
+        borderRadius: 12,
+        border: `1px solid ${installed ? COLORS.accent : COLORS.border}`,
         opacity: interpolate(ent, [0, 1], [0, 1]),
         transform: `translateY(${interpolate(ent, [0, 1], [15, 0])}px)`,
       }}
     >
       <div style={{ fontSize: 32 }}>{icon}</div>
       <div style={{ flex: 1 }}>
-        <div style={{ fontFamily: FONT, fontSize: 17, fontWeight: 600, color: COLORS.white }}>
+        <div style={{ fontFamily: FONT_SANS, fontSize: 28, fontWeight: 600, color: COLORS.text }}>
           {desc}
         </div>
         <div
           style={{
-            fontFamily: "JetBrains Mono, SF Mono, monospace",
-            fontSize: 12,
-            color: "rgba(255,255,255,0.35)",
+            fontFamily: MONO,
+            fontSize: 24,
+            color: COLORS.muted,
           }}
         >
           {name} · {downloads} downloads
@@ -215,7 +201,7 @@ const SkillResultCard: React.FC<{
             style={{
               marginTop: 6,
               height: 3,
-              background: "rgba(255,255,255,0.06)",
+              background: COLORS.border,
               borderRadius: 2,
               overflow: "hidden",
             }}
@@ -224,7 +210,7 @@ const SkillResultCard: React.FC<{
               style={{
                 width: `${progress}%`,
                 height: "100%",
-                background: `linear-gradient(90deg, ${COLORS.primary}, ${COLORS.cyan})`,
+                background: COLORS.accent,
                 borderRadius: 2,
               }}
             />
@@ -236,24 +222,24 @@ const SkillResultCard: React.FC<{
         style={{
           padding: "6px 16px",
           borderRadius: 8,
-          fontFamily: FONT,
-          fontSize: 14,
+          fontFamily: FONT_SANS,
+          fontSize: 26,
           fontWeight: 600,
           ...(installed
             ? {
                 color: COLORS.accent,
-                background: "rgba(7,193,96,0.1)",
-                border: "1px solid rgba(7,193,96,0.2)",
+                background: "rgba(218,119,86,0.08)",
+                border: `1px solid rgba(218,119,86,0.2)`,
               }
             : installing
               ? {
-                  color: COLORS.cyan,
-                  background: "rgba(0,210,255,0.08)",
-                  border: "1px solid rgba(0,210,255,0.15)",
+                  color: COLORS.muted,
+                  background: COLORS.bg,
+                  border: `1px solid ${COLORS.border}`,
                 }
               : {
-                  color: COLORS.white,
-                  background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.cyan})`,
+                  color: COLORS.card,
+                  background: COLORS.accent,
                   border: "none",
                 }),
         }}

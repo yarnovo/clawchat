@@ -7,7 +7,7 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { FONT, MONO } from "../../constants";
+import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
 const commands = [
   {
@@ -15,30 +15,20 @@ const commands = [
     desc: "一键备份",
     result: "backups/2026-03-14_030000.sql.gz",
     icon: "📦",
-    color: "#34d399",
   },
   {
     cmd: "make db-restore FILE=xxx",
     desc: "一键恢复",
     result: "验证表结构 → 重启服务 → 完成",
     icon: "🔄",
-    color: "#60a5fa",
   },
   {
     cmd: "make db-backup-list",
     desc: "查看备份",
     result: "列出 backups/ 下所有 .sql.gz",
     icon: "📋",
-    color: "#a78bfa",
   },
 ];
-
-function hexToRgb(hex: string): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `${r},${g},${b}`;
-}
 
 export const SceneBackupCommands: React.FC = () => {
   const frame = useCurrentFrame();
@@ -49,7 +39,7 @@ export const SceneBackupCommands: React.FC = () => {
 
   return (
     <AbsoluteFill>
-      <GradientBg colors={["#050c0a", "#0a2e1a", "#050c0a"]} />
+      <GradientBg />
       <Particles />
       <AbsoluteFill
         style={{
@@ -57,27 +47,24 @@ export const SceneBackupCommands: React.FC = () => {
           alignItems: "center",
           flexDirection: "column",
           gap: 44,
-          paddingBottom: 120,
+          paddingBottom: 140,
         }}
       >
-        {/* 标题 */}
+        {/* Title */}
         <div
           style={{
             fontFamily: FONT,
-            fontSize: 52,
-            fontWeight: 800,
+            fontSize: 64,
+            fontWeight: 700,
+            color: COLORS.text,
             opacity: interpolate(titleProg, [0, 1], [0, 1]),
             transform: `translateY(${titleY}px)`,
-            background:
-              "linear-gradient(135deg, #ffffff 20%, #34d399 60%, #60a5fa 100%)",
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
           }}
         >
           就这三个命令
         </div>
 
-        {/* 终端风格命令卡片 */}
+        {/* Terminal-style command cards */}
         <div
           style={{
             display: "flex",
@@ -93,9 +80,8 @@ export const SceneBackupCommands: React.FC = () => {
               fps,
               config: { damping: 14, mass: 0.7 },
             });
-            const rgb = hexToRgb(c.color);
 
-            // 打字机效果：命令逐字显示
+            // Typewriter effect
             const typeDelay = delay + 10;
             const charsVisible = Math.min(
               Math.max(0, Math.floor((frame - typeDelay) / 1.5)),
@@ -113,12 +99,12 @@ export const SceneBackupCommands: React.FC = () => {
                   alignItems: "center",
                   gap: 20,
                   padding: "20px 28px",
-                  background: "rgba(0,0,0,0.4)",
-                  borderRadius: 16,
-                  border: `1px solid rgba(${rgb},0.15)`,
+                  background: "#fff",
+                  borderRadius: 12,
+                  border: `1px solid ${COLORS.border}`,
                   opacity: interpolate(ent, [0, 1], [0, 1]),
                   transform: `translateX(${interpolate(ent, [0, 1], [-40, 0])}px)`,
-                  boxShadow: `0 4px 24px rgba(0,0,0,0.3)`,
+                  boxShadow: COLORS.cardShadow,
                 }}
               >
                 <div style={{ fontSize: 36, flexShrink: 0 }}>{c.icon}</div>
@@ -134,9 +120,8 @@ export const SceneBackupCommands: React.FC = () => {
                     <span
                       style={{
                         fontFamily: MONO,
-                        fontSize: 14,
-                        color: c.color,
-                        opacity: 0.6,
+                        fontSize: 24,
+                        color: COLORS.subtle,
                       }}
                     >
                       $
@@ -144,23 +129,23 @@ export const SceneBackupCommands: React.FC = () => {
                     <span
                       style={{
                         fontFamily: MONO,
-                        fontSize: 20,
+                        fontSize: 26,
                         fontWeight: 600,
-                        color: c.color,
+                        color: COLORS.accent,
                       }}
                     >
                       {displayCmd}
                       {cursorOn && (
-                        <span style={{ color: "rgba(255,255,255,0.6)" }}>
+                        <span style={{ color: COLORS.subtle }}>
                           |
                         </span>
                       )}
                     </span>
                     <span
                       style={{
-                        fontFamily: FONT,
-                        fontSize: 16,
-                        color: "rgba(255,255,255,0.4)",
+                        fontFamily: FONT_SANS,
+                        fontSize: 28,
+                        color: COLORS.muted,
                         marginLeft: "auto",
                       }}
                     >
@@ -171,8 +156,8 @@ export const SceneBackupCommands: React.FC = () => {
                     <div
                       style={{
                         fontFamily: MONO,
-                        fontSize: 13,
-                        color: "rgba(255,255,255,0.3)",
+                        fontSize: 28,
+                        color: COLORS.muted,
                       }}
                     >
                       → {c.result}

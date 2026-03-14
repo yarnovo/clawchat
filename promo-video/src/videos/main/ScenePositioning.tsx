@@ -7,19 +7,31 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { COLORS, FONT } from "../../constants";
+import { COLORS, FONT, FONT_SANS } from "../../constants";
 
 export const ScenePositioning: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const leftEnt = spring({ frame: frame - 5, fps, config: { damping: 14 } });
-  const rightEnt = spring({ frame: frame - 15, fps, config: { damping: 14 } });
-  const taglineEnt = spring({ frame: frame - 35, fps, config: { damping: 12, mass: 0.8 } });
+  const leftEnt = spring({
+    frame: frame - 5,
+    fps,
+    config: { damping: 14 },
+  });
+  const rightEnt = spring({
+    frame: frame - 15,
+    fps,
+    config: { damping: 14 },
+  });
+  const taglineEnt = spring({
+    frame: frame - 35,
+    fps,
+    config: { damping: 12, mass: 0.8 },
+  });
 
   return (
     <AbsoluteFill>
-      <GradientBg colors={["#0f0c29", "#1a1845", "#0f0c29"]} />
+      <GradientBg />
       <Particles />
       <AbsoluteFill
         style={{
@@ -27,25 +39,24 @@ export const ScenePositioning: React.FC = () => {
           alignItems: "center",
           flexDirection: "column",
           gap: 50,
-          paddingBottom: 120, /* 为底部字幕留空间 */
+          paddingBottom: 140,
         }}
       >
-        {/* Tagline — 顶部 */}
+        {/* Tagline */}
         <div
           style={{
             fontFamily: FONT,
-            fontSize: 36,
+            fontSize: 64,
             fontWeight: 700,
-            color: COLORS.white,
+            color: COLORS.text,
             opacity: interpolate(taglineEnt, [0, 1], [0, 1]),
             transform: `scale(${interpolate(taglineEnt, [0, 1], [0.8, 1])})`,
-            textShadow: "0 0 30px rgba(108,99,255,0.4)",
           }}
         >
           第一个原生 AI Agent 聊天应用
         </div>
 
-        {/* 左右对比 — 横排 */}
+        {/* Left-right comparison */}
         <div style={{ display: "flex", alignItems: "center", gap: 80 }}>
           {/* Left: Generic IM */}
           <div
@@ -65,9 +76,9 @@ export const ScenePositioning: React.FC = () => {
             </div>
             <div
               style={{
-                fontFamily: FONT,
+                fontFamily: FONT_SANS,
                 fontSize: 24,
-                color: "rgba(255,255,255,0.5)",
+                color: COLORS.muted,
                 textAlign: "center",
               }}
             >
@@ -75,11 +86,11 @@ export const ScenePositioning: React.FC = () => {
             </div>
             <div
               style={{
-                fontFamily: FONT,
-                fontSize: 20,
-                color: "rgba(255,100,100,0.7)",
+                fontFamily: FONT_SANS,
+                fontSize: 28,
+                color: COLORS.muted,
                 padding: "8px 20px",
-                border: "1px solid rgba(255,100,100,0.2)",
+                border: `1px solid ${COLORS.border}`,
                 borderRadius: 12,
               }}
             >
@@ -92,8 +103,8 @@ export const ScenePositioning: React.FC = () => {
             style={{
               fontFamily: FONT,
               fontSize: 36,
-              fontWeight: 800,
-              color: "rgba(255,255,255,0.3)",
+              fontWeight: 700,
+              color: COLORS.subtle,
               opacity: interpolate(leftEnt, [0, 1], [0, 1]),
             }}
           >
@@ -111,26 +122,27 @@ export const ScenePositioning: React.FC = () => {
               transform: `translateX(${interpolate(rightEnt, [0, 1], [80, 0])}px)`,
             }}
           >
-            <div style={{ fontSize: 64 }}>🐾</div>
+            <div style={{ fontSize: 48 }}>🐾</div>
             <div
               style={{
                 fontFamily: FONT,
-                fontSize: 32,
-                fontWeight: 800,
-                color: COLORS.white,
+                fontSize: 30,
+                fontWeight: 700,
+                color: COLORS.accent,
               }}
             >
               ClawChat
             </div>
             <div
               style={{
-                fontFamily: FONT,
-                fontSize: 20,
-                color: COLORS.accent,
+                fontFamily: FONT_SANS,
+                fontSize: 28,
+                color: COLORS.text,
                 padding: "8px 20px",
-                border: "1px solid rgba(7,193,96,0.3)",
+                border: `1px solid ${COLORS.border}`,
                 borderRadius: 12,
-                background: "rgba(7,193,96,0.08)",
+                background: COLORS.card,
+                boxShadow: COLORS.cardShadow,
               }}
             >
               为 AI Agent 设计
