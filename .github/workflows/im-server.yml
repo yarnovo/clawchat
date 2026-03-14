@@ -2,9 +2,9 @@ name: IM Server CI
 
 on:
   push:
-    paths: [im-server/**]
+    paths: [im-server/**, .github/workflows/im-server.yml]
   pull_request:
-    paths: [im-server/**]
+    paths: [im-server/**, .github/workflows/im-server.yml]
 
 jobs:
   build:
