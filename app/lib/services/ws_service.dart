@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 /// Global WebSocket service — singleton, connects once after login.
@@ -65,5 +65,10 @@ class WsService {
     _channel?.sink.close();
     _channel = null;
     _url = null;
+  }
+
+  @visibleForTesting
+  void addTestEvent(Map<String, dynamic> event) {
+    _controller.add(event);
   }
 }
