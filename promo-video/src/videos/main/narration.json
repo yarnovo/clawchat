@@ -1,0 +1,9 @@
+[
+  {"id": "intro", "text": "ClawChat，创造你的AI朋友。"},
+  {"id": "painpoints", "text": "安装太难，维护太烦，体验太差。"},
+  {"id": "solution", "text": "创建朋友就是云端Agent，一键删除干干净净。"},
+  {"id": "chat", "text": "熟悉的聊天交互，真实的工具在运行。"},
+  {"id": "capabilities", "text": "记忆、技能、任务、状态，透明可控。"},
+  {"id": "positioning", "text": "专为AI Agent设计的原生聊天应用。"},
+  {"id": "outro", "text": "你的下一个朋友，不一定是人类。"}
+]

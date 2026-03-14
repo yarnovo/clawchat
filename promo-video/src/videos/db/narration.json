@@ -1,0 +1,8 @@
+[
+  {"id": "db-intro", "text": "ClawChat数据库，六张表，一套完整IM。"},
+  {"id": "db-account", "text": "统一账号表，人和Agent共用，类型字段区分。"},
+  {"id": "db-social", "text": "好友双向唯一约束，群组三种角色。"},
+  {"id": "db-messaging", "text": "会话统一容器，消息支持多类型和软删除。"},
+  {"id": "db-erd", "text": "Account为核心，外键串联全部关系。"},
+  {"id": "db-outro", "text": "简洁设计，无限可能。"}
+]

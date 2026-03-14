@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'my_agents_page.dart';
 
 class ProfilePage extends StatelessWidget {
   final VoidCallback? onLogout;
@@ -75,12 +76,18 @@ class ProfilePage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          const _ProfileSection(
+          _ProfileSection(
             items: [
-              _ProfileItem(icon: Icons.star_border, title: '收藏'),
-              _ProfileItem(icon: Icons.photo_library_outlined, title: '相册'),
-              _ProfileItem(icon: Icons.credit_card, title: '卡包'),
-              _ProfileItem(icon: Icons.emoji_emotions_outlined, title: '表情'),
+              _ProfileItem(
+                icon: Icons.smart_toy,
+                title: '我的 Agent',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const MyAgentsPage()),
+                  );
+                },
+              ),
             ],
           ),
           const SizedBox(height: 8),
@@ -172,16 +179,18 @@ class _ProfileSection extends StatelessWidget {
 class _ProfileItem extends StatelessWidget {
   final IconData icon;
   final String title;
+  final VoidCallback? onTap;
 
   const _ProfileItem({
     required this.icon,
     required this.title,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () {},
+      onTap: onTap ?? () {},
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         child: Row(

@@ -1,0 +1,52 @@
+[
+  {
+    "id": "backup-cover",
+    "startMs": 95,
+    "endMs": 3129
+  },
+  {
+    "id": "backup-risks",
+    "startMs": 3647,
+    "endMs": 13159
+  },
+  {
+    "id": "backup-analogy",
+    "startMs": 13681,
+    "endMs": 20522
+  },
+  {
+    "id": "backup-overview",
+    "startMs": 21045,
+    "endMs": 29363
+  },
+  {
+    "id": "backup-daily",
+    "startMs": 29886,
+    "endMs": 38602
+  },
+  {
+    "id": "backup-deploy",
+    "startMs": 39125,
+    "endMs": 46636
+  },
+  {
+    "id": "backup-redis",
+    "startMs": 47159,
+    "endMs": 55534
+  },
+  {
+    "id": "backup-commands",
+    "startMs": 56056,
+    "endMs": 62761
+  },
+  {
+    "id": "backup-restore",
+    "startMs": 63284,
+    "endMs": 70420
+  },
+  {
+    "id": "backup-outro",
+    "startMs": 70943,
+    "endMs": 73034
+  }
+]

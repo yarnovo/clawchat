@@ -6,6 +6,7 @@ import { registry, httpRequestDuration, httpRequestsTotal } from "./metrics.js";
 import { prisma } from "./db.js";
 import { getRuntimeClient } from "./runtime-client.js";
 import { createAgentSaga } from "./create-agent-saga.js";
+import { setAccountSearchable, getAgentFriendRequests, handleAgentFriendRequest } from "./im-client.js";
 import { authMiddleware } from "./auth.js";
 import type { AppEnv } from "./env.js";
 
@@ -279,6 +280,46 @@ app.post("/:id/chat", async (c) => {
     const msg = err instanceof Error ? err.message : "Unknown error";
     return c.json({ error: msg }, 500);
   }
+});
+
+// Set Agent visibility (searchable)
+app.patch("/:id/visibility", async (c) => {
+  const { agent, error } = await getOwnedAgent(c.req.param("id"), c.get("accountId"));
+  if (error === "Agent not found") return c.json({ error }, 404);
+  if (error === "Forbidden") return c.json({ error }, 403);
+
+  const { searchable } = await c.req.json();
+  if (typeof searchable !== "boolean") {
+    return c.json({ error: "searchable (boolean) is required" }, 400);
+  }
+
+  await setAccountSearchable(agent!.accountId, searchable);
+  return c.json({ ok: true, searchable });
+});
+
+// Get pending friend requests for Agent
+app.get("/:id/friend-requests", async (c) => {
+  const { agent, error } = await getOwnedAgent(c.req.param("id"), c.get("accountId"));
+  if (error === "Agent not found") return c.json({ error }, 404);
+  if (error === "Forbidden") return c.json({ error }, 403);
+
+  const requests = await getAgentFriendRequests(agent!.accountId);
+  return c.json(requests);
+});
+
+// Handle friend request for Agent (owner proxy)
+app.patch("/:id/friend-requests/:requestId", async (c) => {
+  const { agent, error } = await getOwnedAgent(c.req.param("id"), c.get("accountId"));
+  if (error === "Agent not found") return c.json({ error }, 404);
+  if (error === "Forbidden") return c.json({ error }, 403);
+
+  const { status } = await c.req.json();
+  if (!status || !["accepted", "rejected"].includes(status)) {
+    return c.json({ error: "status must be accepted or rejected" }, 400);
+  }
+
+  const result = await handleAgentFriendRequest(c.req.param("requestId"), status);
+  return c.json(result);
 });
 
 export default app;

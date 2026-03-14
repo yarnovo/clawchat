@@ -22,10 +22,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('服务'), findsOneWidget);
-      expect(find.text('收藏'), findsOneWidget);
-      expect(find.text('相册'), findsOneWidget);
-      expect(find.text('卡包'), findsOneWidget);
-      expect(find.text('表情'), findsOneWidget);
+      expect(find.text('我的 Agent'), findsOneWidget);
       expect(find.text('设置'), findsOneWidget);
     });
   });

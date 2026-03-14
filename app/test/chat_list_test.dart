@@ -22,7 +22,7 @@ void main() {
       // 切换到发现
       await tester.tap(find.text('发现'));
       await tester.pumpAndSettle();
-      expect(find.text('朋友圈'), findsOneWidget);
+      expect(find.text('搜索用户或 Agent'), findsOneWidget);
 
       // 切换到我
       await tester.tap(find.text('我'));

@@ -76,4 +76,72 @@ internal.post("/cleanup-test-data", async (c) => {
   return c.json({ deleted: accountIds.length });
 });
 
+// Update account searchable flag
+internal.patch("/accounts/:id", async (c) => {
+  const id = c.req.param("id");
+  const { searchable } = await c.req.json();
+
+  if (typeof searchable !== "boolean") {
+    return c.json({ error: "searchable (boolean) is required" }, 400);
+  }
+
+  const account = await prisma.account.findUnique({ where: { id } });
+  if (!account) {
+    return c.json({ error: "Account not found" }, 404);
+  }
+
+  const updated = await prisma.account.update({
+    where: { id },
+    data: { searchable },
+    select: { id: true, searchable: true },
+  });
+
+  return c.json(updated);
+});
+
+// Get pending friend requests for an account
+internal.get("/friend-requests/:accountId", async (c) => {
+  const accountId = c.req.param("accountId");
+
+  const requests = await prisma.friendship.findMany({
+    where: { accountBId: accountId, status: "pending" },
+    include: {
+      accountA: { select: { id: true, name: true, avatar: true, type: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return c.json(requests);
+});
+
+// Handle friend request on behalf of account (proxy review)
+internal.patch("/friend-requests/:id", async (c) => {
+  const id = c.req.param("id");
+  const { status } = await c.req.json();
+
+  if (!status || !["accepted", "rejected"].includes(status)) {
+    return c.json({ error: "status must be accepted or rejected" }, 400);
+  }
+
+  const friendship = await prisma.friendship.findUnique({ where: { id } });
+  if (!friendship) {
+    return c.json({ error: "Request not found" }, 404);
+  }
+
+  if (friendship.status !== "pending") {
+    return c.json({ error: "Request already handled" }, 409);
+  }
+
+  const updated = await prisma.friendship.update({
+    where: { id },
+    data: { status },
+    include: {
+      accountA: { select: { id: true, name: true, avatar: true, type: true } },
+      accountB: { select: { id: true, name: true, avatar: true, type: true } },
+    },
+  });
+
+  return c.json(updated);
+});
+
 export default internal;

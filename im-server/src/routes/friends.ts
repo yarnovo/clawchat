@@ -45,16 +45,22 @@ friends.post("/add-direct", async (c) => {
 // 以下路由需要鉴权
 friends.use(authMiddleware);
 
-// 发送好友申请（通过 email 查找）
+// 发送好友申请（通过 email 或 accountId 查找）
 friends.post("/request", async (c) => {
   const accountId = c.get("accountId");
-  const { email } = await c.req.json();
+  const body = await c.req.json();
+  const { email, accountId: targetAccountId } = body;
 
-  if (!email) {
-    return c.json({ error: "email is required" }, 400);
+  if (!email && !targetAccountId) {
+    return c.json({ error: "email or accountId is required" }, 400);
   }
 
-  const target = await prisma.account.findUnique({ where: { email } });
+  let target;
+  if (targetAccountId) {
+    target = await prisma.account.findUnique({ where: { id: targetAccountId } });
+  } else {
+    target = await prisma.account.findUnique({ where: { email } });
+  }
   if (!target) {
     return c.json({ error: "Account not found" }, 404);
   }
@@ -79,6 +85,15 @@ friends.post("/request", async (c) => {
     }
     if (existing.status === "pending") {
       return c.json({ error: "Request already pending" }, 409);
+    }
+    // rejected → 重新申请：更新为 pending，发起方变为当前用户
+    if (existing.status === "rejected") {
+      const updated = await prisma.friendship.update({
+        where: { id: existing.id },
+        data: { accountAId: accountId, accountBId: target.id, status: "pending" },
+        include: { accountA: { select: ACCOUNT_SELECT }, accountB: { select: ACCOUNT_SELECT } },
+      });
+      return c.json(updated, 201);
     }
   }
 

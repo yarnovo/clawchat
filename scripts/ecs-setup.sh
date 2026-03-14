@@ -68,12 +68,22 @@ fi
 
 # ---- Project directory ----
 echo "==> Creating project directory"
-mkdir -p /opt/clawchat/{cli,web,deploy}
+mkdir -p /opt/clawchat/{cli,web,deploy,scripts,backups}
 
 # ---- Verify ----
 echo "==> Verifying"
 docker --version
 docker compose version
 git --version
+
+# ---- Cron: daily DB backup at 3 AM ----
+echo "==> Setting up daily DB backup cron"
+CRON_JOB="0 3 * * * cd /opt/clawchat && BACKUP_DIR=/opt/clawchat/backups bash scripts/db-backup.sh >> /var/log/clawchat-backup.log 2>&1"
+if ! crontab -l 2>/dev/null | grep -qF 'db-backup.sh'; then
+  (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
+  echo "    Cron job installed"
+else
+  echo "    Cron job already exists"
+fi
 
 echo "==> Done. Next: push a tag to trigger CI/CD deployment."

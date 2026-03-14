@@ -101,6 +101,24 @@ http_testing.MockClient mockHttpClient({
     if (path.endsWith('/friends/requests')) {
       return _jsonResponse([], 200);
     }
+    if (path.contains('/accounts/search')) {
+      return _jsonResponse([], 200);
+    }
+    if (path.endsWith('/friends/request') && method == 'POST') {
+      return _jsonResponse({'id': 'fr-1', 'status': 'pending'}, 201);
+    }
+    if (path.contains('/v1/agents') && method == 'GET') {
+      return _jsonResponse([], 200);
+    }
+    if (path.contains('/visibility') && method == 'PATCH') {
+      return _jsonResponse({'ok': true, 'searchable': true}, 200);
+    }
+    if (path.contains('/friend-requests') && method == 'GET') {
+      return _jsonResponse([], 200);
+    }
+    if (path.contains('/friend-requests/') && method == 'PATCH') {
+      return _jsonResponse({'id': 'fr-1', 'status': 'accepted'}, 200);
+    }
     if (path.endsWith('/conversations') && method == 'GET') {
       return _jsonResponse(convs, 200);
     }

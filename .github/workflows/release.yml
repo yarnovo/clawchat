@@ -148,10 +148,11 @@ jobs:
       - name: Prepare directories
         run: ssh root@${{ secrets.ECS_HOST }} "mkdir -p /opt/clawchat/{cli,web,deploy}"
 
-      - name: Deploy compose and config
+      - name: Deploy compose, config, and scripts
         run: |
           scp docker-compose.deploy.yml root@${{ secrets.ECS_HOST }}:/opt/clawchat/docker-compose.yml
           rsync -az deploy/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/deploy/
+          rsync -az scripts/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/scripts/
 
       - name: Deploy web
         run: rsync -az --delete app/build/web/ root@${{ secrets.ECS_HOST }}:/opt/clawchat/web/
@@ -160,6 +161,10 @@ jobs:
         run: |
           scp cli/clawchat-linux-amd64 root@${{ secrets.ECS_HOST }}:/opt/clawchat/cli/clawchat
           ssh root@${{ secrets.ECS_HOST }} "chmod +x /opt/clawchat/cli/clawchat && ln -sf /opt/clawchat/cli/clawchat /usr/local/bin/clawchat"
+
+      - name: Pre-deploy database backup
+        run: |
+          ssh root@${{ secrets.ECS_HOST }} "cd /opt/clawchat && BACKUP_DIR=/opt/clawchat/backups bash scripts/db-backup.sh --tag pre-deploy" || echo "Backup skipped (database may not be running yet)"
 
       - name: Pull and start services
         run: |

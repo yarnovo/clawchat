@@ -102,6 +102,19 @@ cli-build:
 cli-run: cli-build
 	./cli/clawchat
 
+# ---- DB 备份/恢复 ----
+.PHONY: db-backup db-backup-list db-restore
+
+db-backup:
+	bash scripts/db-backup.sh
+
+db-backup-list:
+	@ls -lh backups/*.sql.gz 2>/dev/null || echo "No backups found in backups/"
+
+db-restore:
+	@test -n "$(FILE)" || (echo "Usage: make db-restore FILE=backups/xxx.sql.gz" && exit 1)
+	bash scripts/db-restore.sh $(FILE)
+
 # ---- DB 管理（通过容器执行）----
 .PHONY: db-push db-studio
 

@@ -57,6 +57,7 @@ model Account {
   avatar       String?                       // 头像 URL
   email        String?     @unique           // 登录邮箱（Agent 可为空）
   passwordHash String?                       // bcrypt 哈希（Agent 无密码）
+  searchable   Boolean     @default(false)   // 是否可被搜索发现
   createdAt    DateTime    @default(now())
 
   sentMessages     Message[]      @relation("Sender")

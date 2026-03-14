@@ -26,6 +26,7 @@ services:
   redis:
     image: redis:7
     container_name: clawchat-redis
+    command: redis-server --save 60 1 --save 300 100
     ports:
       - "6379:6379"
     volumes:

@@ -1,0 +1,32 @@
+[
+  {
+    "id": "db-intro",
+    "startMs": 95,
+    "endMs": 3527
+  },
+  {
+    "id": "db-account",
+    "startMs": 4045,
+    "endMs": 7886
+  },
+  {
+    "id": "db-social",
+    "startMs": 8409,
+    "endMs": 11295
+  },
+  {
+    "id": "db-messaging",
+    "startMs": 11818,
+    "endMs": 15488
+  },
+  {
+    "id": "db-erd",
+    "startMs": 16000,
+    "endMs": 18931
+  },
+  {
+    "id": "db-outro",
+    "startMs": 19454,
+    "endMs": 21249
+  }
+]

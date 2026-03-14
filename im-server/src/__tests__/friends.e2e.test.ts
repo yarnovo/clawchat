@@ -20,6 +20,8 @@ const userB = { name: "用户B", email: `b-${ts}@test.com`, password: "123456" }
 
 let tokenA: string;
 let tokenB: string;
+let accountAId: string;
+let accountBId: string;
 let friendshipId: string;
 
 beforeAll(async () => {
@@ -41,14 +43,18 @@ beforeAll(async () => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(userA),
   });
-  tokenA = (await resA.json()).token;
+  const bodyA = await resA.json();
+  tokenA = bodyA.token;
+  accountAId = bodyA.account.id;
 
   const resB = await request("/auth/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(userB),
   });
-  tokenB = (await resB.json()).token;
+  const bodyB = await resB.json();
+  tokenB = bodyB.token;
+  accountBId = bodyB.account.id;
 });
 
 afterAll(async () => {
@@ -188,5 +194,86 @@ describe("Friends", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body).toHaveLength(0);
+  });
+
+  it("通过 accountId 发送好友申请", async () => {
+    const res = await request(
+      "/friends/request",
+      json("POST", tokenA, { accountId: accountBId }),
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.status).toBe("pending");
+    friendshipId = body.id;
+  });
+
+  it("rejected 后可重新申请", async () => {
+    // B 拒绝
+    await request(
+      `/friends/request/${friendshipId}`,
+      json("PATCH", tokenB, { status: "rejected" }),
+    );
+
+    // A 重新申请
+    const res = await request(
+      "/friends/request",
+      json("POST", tokenA, { accountId: accountBId }),
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.status).toBe("pending");
+    expect(body.accountA.name).toBe(userA.name);
+    friendshipId = body.id;
+
+    // Cleanup
+    await prisma.friendship.delete({ where: { id: friendshipId } });
+  });
+
+  it("内部接口: 查询/审核好友请求", async () => {
+    // A 向 B 发送申请
+    const reqRes = await request(
+      "/friends/request",
+      json("POST", tokenA, { accountId: accountBId }),
+    );
+    const reqBody = await reqRes.json();
+    friendshipId = reqBody.id;
+
+    // 内部接口查询 B 的待处理请求
+    const listRes = await request(`/internal/friend-requests/${accountBId}`);
+    expect(listRes.status).toBe(200);
+    const list = await listRes.json();
+    expect(list).toHaveLength(1);
+    expect(list[0].accountA.name).toBe(userA.name);
+
+    // 内部接口代理审核
+    const handleRes = await request(`/internal/friend-requests/${friendshipId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "accepted" }),
+    });
+    expect(handleRes.status).toBe(200);
+    const handled = await handleRes.json();
+    expect(handled.status).toBe("accepted");
+
+    // Cleanup
+    await prisma.friendship.delete({ where: { id: friendshipId } });
+  });
+
+  it("内部接口: 更新 searchable", async () => {
+    const res = await request(`/internal/accounts/${accountAId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ searchable: true }),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.searchable).toBe(true);
+
+    // 恢复
+    await request(`/internal/accounts/${accountAId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ searchable: false }),
+    });
   });
 });

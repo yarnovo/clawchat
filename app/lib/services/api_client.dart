@@ -65,11 +65,14 @@ class ApiClient {
     return ApiListResponse(res.statusCode, List<Map<String, dynamic>>.from(jsonDecode(res.body)));
   }
 
-  Future<ApiResponse> sendFriendRequest({required String email}) async {
+  Future<ApiResponse> sendFriendRequest({String? email, String? accountId}) async {
     final res = await _http.post(
       Uri.parse('$baseUrl/v1/im/friends/request'),
       headers: await _headers(),
-      body: jsonEncode({'email': email}),
+      body: jsonEncode({
+        if (email != null) 'email': email, // ignore: use_null_aware_elements
+        if (accountId != null) 'accountId': accountId, // ignore: use_null_aware_elements
+      }),
     );
     return ApiResponse(res.statusCode, jsonDecode(res.body));
   }
@@ -102,6 +105,16 @@ class ApiClient {
     return ApiResponse(res.statusCode, jsonDecode(res.body));
   }
 
+  // ---- Search ----
+
+  Future<ApiListResponse> searchAccounts({required String query, int limit = 20}) async {
+    final res = await _http.get(
+      Uri.parse('$baseUrl/v1/im/accounts/search?q=${Uri.encodeComponent(query)}&limit=$limit'),
+      headers: await _headers(),
+    );
+    return ApiListResponse(res.statusCode, List<Map<String, dynamic>>.from(jsonDecode(res.body)));
+  }
+
   // ---- Agents ----
 
   Future<ApiResponse> createAgent({
@@ -123,6 +136,44 @@ class ApiClient {
         if (apiBaseUrl != null) 'baseUrl': apiBaseUrl, // ignore: use_null_aware_elements
         if (runtime != null) 'runtime': runtime, // ignore: use_null_aware_elements
       }),
+    );
+    return ApiResponse(res.statusCode, jsonDecode(res.body));
+  }
+
+  Future<ApiListResponse> getMyAgents() async {
+    final res = await _http.get(
+      Uri.parse('$baseUrl/v1/agents'),
+      headers: await _headers(),
+    );
+    return ApiListResponse(res.statusCode, List<Map<String, dynamic>>.from(jsonDecode(res.body)));
+  }
+
+  Future<ApiResponse> setAgentVisibility({required String agentId, required bool searchable}) async {
+    final res = await _http.patch(
+      Uri.parse('$baseUrl/v1/agents/$agentId/visibility'),
+      headers: await _headers(),
+      body: jsonEncode({'searchable': searchable}),
+    );
+    return ApiResponse(res.statusCode, jsonDecode(res.body));
+  }
+
+  Future<ApiListResponse> getAgentFriendRequests({required String agentId}) async {
+    final res = await _http.get(
+      Uri.parse('$baseUrl/v1/agents/$agentId/friend-requests'),
+      headers: await _headers(),
+    );
+    return ApiListResponse(res.statusCode, List<Map<String, dynamic>>.from(jsonDecode(res.body)));
+  }
+
+  Future<ApiResponse> handleAgentFriendRequest({
+    required String agentId,
+    required String requestId,
+    required String status,
+  }) async {
+    final res = await _http.patch(
+      Uri.parse('$baseUrl/v1/agents/$agentId/friend-requests/$requestId'),
+      headers: await _headers(),
+      body: jsonEncode({'status': status}),
     );
     return ApiResponse(res.statusCode, jsonDecode(res.body));
   }

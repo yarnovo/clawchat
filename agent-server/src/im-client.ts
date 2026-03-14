@@ -54,6 +54,56 @@ export async function addDirectFriend(
   }
 }
 
+// Set account searchable flag
+export async function setAccountSearchable(
+  accountId: string,
+  searchable: boolean,
+): Promise<void> {
+  const res = await fetch(`${IM_SERVER_URL}/v1/im/internal/accounts/${accountId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ searchable }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json();
+    throw new Error(body.error || `im-server returned ${res.status}`);
+  }
+}
+
+// Get pending friend requests for an agent account
+export async function getAgentFriendRequests(
+  accountId: string,
+): Promise<unknown[]> {
+  const res = await fetch(`${IM_SERVER_URL}/v1/im/internal/friend-requests/${accountId}`);
+
+  if (!res.ok) {
+    const body = await res.json();
+    throw new Error(body.error || `im-server returned ${res.status}`);
+  }
+
+  return res.json();
+}
+
+// Handle a friend request on behalf of an agent
+export async function handleAgentFriendRequest(
+  requestId: string,
+  status: "accepted" | "rejected",
+): Promise<unknown> {
+  const res = await fetch(`${IM_SERVER_URL}/v1/im/internal/friend-requests/${requestId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json();
+    throw new Error(body.error || `im-server returned ${res.status}`);
+  }
+
+  return res.json();
+}
+
 // Delete an Agent account from im-server
 export async function deleteAgentAccount(
   accountId: string,

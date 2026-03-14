@@ -1,0 +1,32 @@
+[
+  {
+    "id": "skills-intro",
+    "startMs": 95,
+    "endMs": 1947
+  },
+  {
+    "id": "skills-problem",
+    "startMs": 2454,
+    "endMs": 7147
+  },
+  {
+    "id": "skills-solution",
+    "startMs": 7659,
+    "endMs": 12931
+  },
+  {
+    "id": "skills-showcase",
+    "startMs": 13454,
+    "endMs": 19363
+  },
+  {
+    "id": "skills-consumer",
+    "startMs": 19875,
+    "endMs": 23556
+  },
+  {
+    "id": "skills-outro",
+    "startMs": 24068,
+    "endMs": 26170
+  }
+]

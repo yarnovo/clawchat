@@ -16,15 +16,17 @@ interface WordBoundary {
  */
 export const Subtitle: React.FC<{
   words: WordBoundary[];
-  delayFrames: number;
-}> = ({ words, delayFrames }) => {
+  delayFrames?: number;
+  offsetMs?: number;
+}> = ({ words, delayFrames = 0, offsetMs = 0 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   if (words.length === 0) return null;
 
-  // 音频开始后经过的毫秒
-  const elapsedMs = ((frame - delayFrames) / fps) * 1000;
+  // offsetMs: scene start in global audio (for single-track mode)
+  // delayFrames: legacy per-scene audio delay
+  const elapsedMs = offsetMs + ((frame - delayFrames) / fps) * 1000;
 
   // 找到当前正在说的词
   let lastSpokenIdx = -1;

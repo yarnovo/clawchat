@@ -7,7 +7,14 @@
     "dev": "remotion studio",
     "build": "remotion bundle",
     "render": "remotion render Demo out/demo.mp4",
-    "tts": "npx tsx scripts/generate-tts.ts"
+    "render:backup": "remotion render BackupDemo out/backup-demo.mp4",
+    "tts": "npx tsx scripts/generate-tts.ts all --force",
+    "tts:main": "npx tsx scripts/generate-tts.ts main --force",
+    "tts:db": "npx tsx scripts/generate-tts.ts db --force",
+    "tts:backup": "npx tsx scripts/generate-tts.ts backup --force",
+    "tts:skills": "npx tsx scripts/generate-tts.ts skills --force",
+    "render:db": "remotion render DbDemo out/db-demo.mp4",
+    "render:skills": "remotion render SkillsDemo out/skills-demo.mp4"
   },
   "keywords": [],
   "author": "",

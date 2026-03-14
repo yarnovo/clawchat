@@ -1,3 +1,4 @@
 screenshots/
 .env
 .playwright-mcp/
+backups/
