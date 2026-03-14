@@ -1,42 +1,112 @@
 [
   {
-    "part": "ClawChat",
+    "part": "来看",
     "start": 95,
-    "end": 606
+    "end": 447
   },
   {
-    "part": "数据库，",
-    "start": 618,
-    "end": 1186
+    "part": "一下",
+    "start": 459,
+    "end": 834
+  },
+  {
+    "part": "ClawChat",
+    "start": 925,
+    "end": 1481
+  },
+  {
+    "part": "的",
+    "start": 1481,
+    "end": 1561
+  },
+  {
+    "part": "数据库。",
+    "start": 1572,
+    "end": 2163
+  },
+  {
+    "part": "整个",
+    "start": 2670,
+    "end": 3034
+  },
+  {
+    "part": "IM",
+    "start": 3045,
+    "end": 3465
+  },
+  {
+    "part": "系统",
+    "start": 3477,
+    "end": 3954
+  },
+  {
+    "part": "只",
+    "start": 4045,
+    "end": 4193
+  },
+  {
+    "part": "用",
+    "start": 4193,
+    "end": 4329
+  },
+  {
+    "part": "了",
+    "start": 4329,
+    "end": 4409
   },
   {
     "part": "六",
-    "start": 1402,
-    "end": 1549
+    "start": 4431,
+    "end": 4590
   },
   {
     "part": "张",
-    "start": 1550,
-    "end": 1754
+    "start": 4590,
+    "end": 4795
   },
   {
     "part": "表，",
-    "start": 1754,
-    "end": 2015
+    "start": 4795,
+    "end": 5045
   },
   {
-    "part": "一套",
-    "start": 2231,
-    "end": 2515
+    "part": "跑",
+    "start": 5272,
+    "end": 5454
   },
   {
-    "part": "完整",
-    "start": 2527,
-    "end": 2970
+    "part": "在",
+    "start": 5454,
+    "end": 5636
   },
   {
-    "part": "IM。",
-    "start": 3061,
-    "end": 3527
+    "part": "PostgreSQL",
+    "start": 5659,
+    "end": 6761
+  },
+  {
+    "part": "上，",
+    "start": 6761,
+    "end": 7034
+  },
+  {
+    "part": "用",
+    "start": 7238,
+    "end": 7420
+  },
+  {
+    "part": "Prisma",
+    "start": 7443,
+    "end": 7920
+  },
+  {
+    "part": "做",
+    "start": 7931,
+    "end": 8170
+  },
+  {
+    "part": "ORM。",
+    "start": 8170,
+    "end": 8818
   }
 ]

@@ -1,8 +1,8 @@
 [
-  {"id": "db-intro", "text": "ClawChat数据库，六张表，一套完整IM。"},
-  {"id": "db-account", "text": "统一账号表，人和Agent共用，类型字段区分。"},
-  {"id": "db-social", "text": "好友双向唯一约束，群组三种角色。"},
-  {"id": "db-messaging", "text": "会话统一容器，消息支持多类型和软删除。"},
-  {"id": "db-erd", "text": "Account为核心，外键串联全部关系。"},
-  {"id": "db-outro", "text": "简洁设计，无限可能。"}
+  {"id": "db-intro", "text": "来看一下ClawChat的数据库。整个IM系统只用了六张表，跑在PostgreSQL上，用Prisma做ORM。"},
+  {"id": "db-account", "text": "首先是Account表。这张表最特别的地方是，人类用户和AI Agent共用同一张表，通过type字段区分。这样所有的好友关系、会话、消息，都不需要区分对方是人还是Agent，逻辑大大简化。"},
+  {"id": "db-social", "text": "社交关系层一共三张表。好友表用双向唯一约束，保证两个人之间不会重复加好友。另外两张是群组表和群成员表，成员分三种角色：群主、管理员、普通成员。"},
+  {"id": "db-messaging", "text": "消息系统两张表。Conversation是会话容器，私聊和群聊都归到这里，通过type字段区分。Message存消息本身，支持文字、图片、语音，用deletedAt做软删除来实现撤回。"},
+  {"id": "db-erd", "text": "从实体关系图来看，Account是整个系统的核心。好友关系、群成员、消息发送者，所有外键都指向Account。以账号为中心的设计，让查询和维护都很直观。"},
+  {"id": "db-outro", "text": "回顾一下：六张表，Account为核心，人和Agent统一身份，好友双向唯一，消息支持软删除。这就是整个数据库的全貌。"}
 ]

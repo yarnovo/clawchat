@@ -55,7 +55,7 @@ export const SceneDbIntro: React.FC = () => {
             transform: `translateY(${interpolate(titleProg, [0, 1], [30, 0])}px)`,
           }}
         >
-          数据库架构设计
+          数据库设计走读
         </div>
 
         {/* Subtitle */}
@@ -70,7 +70,7 @@ export const SceneDbIntro: React.FC = () => {
             transform: `translateY(${interpolate(subProg, [0, 1], [20, 0])}px)`,
           }}
         >
-          统一 · 简洁 · 可扩展
+          ClawChat 内部分享
         </div>
 
         {/* Tech tags */}

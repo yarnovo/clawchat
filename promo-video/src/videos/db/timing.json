@@ -2,31 +2,31 @@
   {
     "id": "db-intro",
     "startMs": 95,
-    "endMs": 3527
+    "endMs": 8818
   },
   {
     "id": "db-account",
-    "startMs": 4045,
-    "endMs": 7886
+    "startMs": 9329,
+    "endMs": 25522
   },
   {
     "id": "db-social",
-    "startMs": 8409,
-    "endMs": 11295
+    "startMs": 26045,
+    "endMs": 40477
   },
   {
     "id": "db-messaging",
-    "startMs": 11818,
-    "endMs": 15488
+    "startMs": 41000,
+    "endMs": 56261
   },
   {
     "id": "db-erd",
-    "startMs": 16000,
-    "endMs": 18931
+    "startMs": 56772,
+    "endMs": 69988
   },
   {
     "id": "db-outro",
-    "startMs": 19454,
-    "endMs": 21249
+    "startMs": 70511,
+    "endMs": 80602
   }
 ]
