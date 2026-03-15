@@ -1,0 +1,37 @@
+[
+  {
+    "id": "sd-intro",
+    "startMs": 95,
+    "endMs": 17852
+  },
+  {
+    "id": "sd-openclaw",
+    "startMs": 18375,
+    "endMs": 50409
+  },
+  {
+    "id": "sd-nanoclaw",
+    "startMs": 50931,
+    "endMs": 79045
+  },
+  {
+    "id": "sd-ironclaw",
+    "startMs": 79556,
+    "endMs": 110818
+  },
+  {
+    "id": "sd-design",
+    "startMs": 111329,
+    "endMs": 134852
+  },
+  {
+    "id": "sd-impl",
+    "startMs": 135363,
+    "endMs": 161397
+  },
+  {
+    "id": "sd-outro",
+    "startMs": 161920,
+    "endMs": 181522
+  }
+]

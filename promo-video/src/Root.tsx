@@ -66,6 +66,8 @@ import { AgentCoreWalk, TOTAL_FRAMES as ACW_FRAMES } from "./videos/agent-core-w
 import { TestArch, TOTAL_FRAMES as TA_FRAMES } from "./videos/test-arch/TestArch";
 import { EvalFramework, TOTAL_FRAMES as EF_FRAMES } from "./videos/eval-framework/EvalFramework";
 import { AgentEvals, TOTAL_FRAMES as AE_FRAMES } from "./videos/agent-evals/AgentEvals";
+import { SchedulerDesign, TOTAL_FRAMES as SCHED_FRAMES } from "./videos/scheduler-design/SchedulerDesign";
+import { ChannelDesign, TOTAL_FRAMES as CHDESIGN_FRAMES } from "./videos/channel-design/ChannelDesign";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -585,6 +587,22 @@ export const RemotionRoot: React.FC = () => {
             id="SkillLoading"
             component={SkillLoading}
             durationInFrames={SKLOAD_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="SchedulerDesign"
+            component={SchedulerDesign}
+            durationInFrames={SCHED_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="ChannelDesign"
+            component={ChannelDesign}
+            durationInFrames={CHDESIGN_FRAMES}
             fps={30}
             width={1920}
             height={1080}
