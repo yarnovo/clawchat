@@ -51,6 +51,7 @@ import { StateMemory, TOTAL_FRAMES as SM_FRAMES } from "./videos/state-memory/St
 import { BizOpportunities, TOTAL_FRAMES as BIZOP_FRAMES } from "./videos/biz-opportunities/BizOpportunities";
 import { NanoClawGuide, TOTAL_FRAMES as NCG_FRAMES } from "./videos/nanoclaw-guide/NanoClawGuide";
 import { AgentAgency, TOTAL_FRAMES as AAGENCY_FRAMES } from "./videos/agent-agency/AgentAgency";
+import { ToolsCompare, TOTAL_FRAMES as TC_FRAMES } from "./videos/tools-compare/ToolsCompare";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -398,6 +399,14 @@ export const RemotionRoot: React.FC = () => {
             id="StateMemory"
             component={StateMemory}
             durationInFrames={SM_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="ToolsCompare"
+            component={ToolsCompare}
+            durationInFrames={TC_FRAMES}
             fps={30}
             width={1920}
             height={1080}

@@ -1,0 +1,32 @@
+[
+  {
+    "id": "tc-intro",
+    "startMs": 95,
+    "endMs": 11454
+  },
+  {
+    "id": "tc-openclaw",
+    "startMs": 11965,
+    "endMs": 29704
+  },
+  {
+    "id": "tc-nanoclaw",
+    "startMs": 30215,
+    "endMs": 50363
+  },
+  {
+    "id": "tc-ironclaw",
+    "startMs": 50886,
+    "endMs": 67431
+  },
+  {
+    "id": "tc-unique",
+    "startMs": 67943,
+    "endMs": 84386
+  },
+  {
+    "id": "tc-outro",
+    "startMs": 84909,
+    "endMs": 100375
+  }
+]
