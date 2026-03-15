@@ -1,0 +1,52 @@
+[
+  {
+    "id": "at-intro",
+    "startMs": 95,
+    "endMs": 8488
+  },
+  {
+    "id": "at-agent",
+    "startMs": 9011,
+    "endMs": 22852
+  },
+  {
+    "id": "at-models",
+    "startMs": 23375,
+    "endMs": 40852
+  },
+  {
+    "id": "at-world",
+    "startMs": 41375,
+    "endMs": 55454
+  },
+  {
+    "id": "at-robot",
+    "startMs": 55977,
+    "endMs": 69886
+  },
+  {
+    "id": "at-coding",
+    "startMs": 70409,
+    "endMs": 86124
+  },
+  {
+    "id": "at-science",
+    "startMs": 86647,
+    "endMs": 97954
+  },
+  {
+    "id": "at-infra",
+    "startMs": 98477,
+    "endMs": 110420
+  },
+  {
+    "id": "at-safety",
+    "startMs": 110943,
+    "endMs": 122704
+  },
+  {
+    "id": "at-outro",
+    "startMs": 123227,
+    "endMs": 131090
+  }
+]

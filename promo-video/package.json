@@ -40,7 +40,9 @@
     "tts:nanoclaw-guide": "npx tsx scripts/generate-tts.ts nanoclaw-guide --force",
     "render:nanoclaw-guide": "remotion render NanoClawGuide out/nanoclaw-guide.mp4",
     "tts:agent-agency": "npx tsx scripts/generate-tts.ts agent-agency --force",
-    "render:agent-agency": "remotion render AgentAgency out/agent-agency.mp4"
+    "render:agent-agency": "remotion render AgentAgency out/agent-agency.mp4",
+    "tts:ai-trends-2026": "npx tsx scripts/generate-tts.ts ai-trends-2026 --force",
+    "render:ai-trends-2026": "remotion render AiTrends2026 out/ai-trends-2026.mp4"
   },
   "keywords": [],
   "author": "",

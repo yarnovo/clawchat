@@ -54,6 +54,8 @@ import { AgentAgency, TOTAL_FRAMES as AAGENCY_FRAMES } from "./videos/agent-agen
 import { ToolsCompare, TOTAL_FRAMES as TC_FRAMES } from "./videos/tools-compare/ToolsCompare";
 import { AgentMarket, TOTAL_FRAMES as AMKT_FRAMES } from "./videos/agent-market/AgentMarket";
 import { CoreTools, TOTAL_FRAMES as CT_FRAMES } from "./videos/core-tools/CoreTools";
+import { K8sGuide, TOTAL_FRAMES as K8S_FRAMES } from "./videos/k8s-guide/K8sGuide";
+import { AiTrends2026, TOTAL_FRAMES as AITRENDS_FRAMES } from "./videos/ai-trends-2026/AiTrends2026";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -521,7 +523,25 @@ export const RemotionRoot: React.FC = () => {
             width={1920}
             height={1080}
           />
+          <Composition
+            id="K8sGuide"
+            component={K8sGuide}
+            durationInFrames={K8S_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
         </Folder>
+      </Folder>
+      <Folder name="Industry">
+        <Composition
+          id="AiTrends2026"
+          component={AiTrends2026}
+          durationInFrames={AITRENDS_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
       </Folder>
     </>
   );
