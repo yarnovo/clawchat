@@ -1,0 +1,11 @@
+{
+  "name": "@agentkit/channels",
+  "version": "0.0.1",
+  "description": "Channel adapters — connect agents to Web/App/messaging",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": { "build": "tsc" },
+  "dependencies": { "@agentkit/core": "workspace:*" },
+  "devDependencies": { "@types/node": "^22.10.0", "typescript": "^5.7.0" }
+}

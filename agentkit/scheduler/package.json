@@ -1,0 +1,14 @@
+{
+  "name": "@agentkit/scheduler",
+  "version": "0.0.1",
+  "description": "Scheduled tasks — read HEARTBEAT.md, run on cron",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": { "build": "tsc" },
+  "dependencies": {
+    "@agentkit/core": "workspace:*",
+    "cron-parser": "^5.0.0"
+  },
+  "devDependencies": { "@types/node": "^22.10.0", "typescript": "^5.7.0" }
+}

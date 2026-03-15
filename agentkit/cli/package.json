@@ -11,8 +11,10 @@
     "dev": "tsc --watch"
   },
   "dependencies": {
+    "@agentkit/channels": "workspace:*",
     "@agentkit/core": "workspace:*",
     "@agentkit/eval": "workspace:*",
+    "@agentkit/scheduler": "workspace:*",
     "@agentkit/tools": "workspace:*",
     "commander": "^14.0.3"
   },
