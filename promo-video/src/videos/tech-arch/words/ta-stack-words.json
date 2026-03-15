@@ -1,0 +1,167 @@
+[
+  {
+    "part": "技术",
+    "start": 77863,
+    "end": 78181
+  },
+  {
+    "part": "选型。",
+    "start": 78193,
+    "end": 78738
+  },
+  {
+    "part": "前端",
+    "start": 79261,
+    "end": 79772
+  },
+  {
+    "part": "Flutter",
+    "start": 79863,
+    "end": 80306
+  },
+  {
+    "part": "跨平台。",
+    "start": 80329,
+    "end": 80977
+  },
+  {
+    "part": "网",
+    "start": 81500,
+    "end": 81693
+  },
+  {
+    "part": "关用",
+    "start": 81693,
+    "end": 82124
+  },
+  {
+    "part": "Hono",
+    "start": 82215,
+    "end": 82636
+  },
+  {
+    "part": "加",
+    "start": 82647,
+    "end": 82852
+  },
+  {
+    "part": "TypeScript。",
+    "start": 82863,
+    "end": 83534
+  },
+  {
+    "part": "Agent",
+    "start": 84056,
+    "end": 84465
+  },
+  {
+    "part": "引擎",
+    "start": 84477,
+    "end": 85022
+  },
+  {
+    "part": "是",
+    "start": 85102,
+    "end": 85306
+  },
+  {
+    "part": "agentkit",
+    "start": 85318,
+    "end": 85954
+  },
+  {
+    "part": "的",
+    "start": 85954,
+    "end": 86068
+  },
+  {
+    "part": "agent-core。",
+    "start": 86090,
+    "end": 86715
+  },
+  {
+    "part": "容器",
+    "start": 87238,
+    "end": 87568
+  },
+  {
+    "part": "编排",
+    "start": 87579,
+    "end": 88079
+  },
+  {
+    "part": "K",
+    "start": 88170,
+    "end": 88374
+  },
+  {
+    "part": "8",
+    "start": 88375,
+    "end": 88579
+  },
+  {
+    "part": "s。",
+    "start": 88579,
+    "end": 88977
+  },
+  {
+    "part": "镜像",
+    "start": 89488,
+    "end": 89840
+  },
+  {
+    "part": "仓库",
+    "start": 89852,
+    "end": 90352
+  },
+  {
+    "part": "Harbor。",
+    "start": 90443,
+    "end": 90897
+  },
+  {
+    "part": "数据库",
+    "start": 91420,
+    "end": 92045
+  },
+  {
+    "part": "PostgreSQL。",
+    "start": 92136,
+    "end": 93329
+  },
+  {
+    "part": "消息队",
+    "start": 93840,
+    "end": 94397
+  },
+  {
+    "part": "列",
+    "start": 94397,
+    "end": 94659
+  },
+  {
+    "part": "Redis。",
+    "start": 94750,
+    "end": 95306
+  },
+  {
+    "part": "全栈",
+    "start": 95818,
+    "end": 96295
+  },
+  {
+    "part": "TypeScript",
+    "start": 96318,
+    "end": 96943
+  },
+  {
+    "part": "加",
+    "start": 96954,
+    "end": 97147
+  },
+  {
+    "part": "Docker。",
+    "start": 97159,
+    "end": 97579
+  }
+]

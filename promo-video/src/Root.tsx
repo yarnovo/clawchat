@@ -55,6 +55,8 @@ import { ToolsCompare, TOTAL_FRAMES as TC_FRAMES } from "./videos/tools-compare/
 import { AgentMarket, TOTAL_FRAMES as AMKT_FRAMES } from "./videos/agent-market/AgentMarket";
 import { CoreTools, TOTAL_FRAMES as CT_FRAMES } from "./videos/core-tools/CoreTools";
 import { K8sGuide, TOTAL_FRAMES as K8S_FRAMES } from "./videos/k8s-guide/K8sGuide";
+import { K8sDeploy, TOTAL_FRAMES as K8SDEPLOY_FRAMES } from "./videos/k8s-deploy/K8sDeploy";
+import { TechArch, TOTAL_FRAMES as TECHARCH_FRAMES } from "./videos/tech-arch/TechArch";
 import { AiTrends2026, TOTAL_FRAMES as AITRENDS_FRAMES } from "./videos/ai-trends-2026/AiTrends2026";
 
 export const RemotionRoot: React.FC = () => {
@@ -527,6 +529,22 @@ export const RemotionRoot: React.FC = () => {
             id="K8sGuide"
             component={K8sGuide}
             durationInFrames={K8S_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="K8sDeploy"
+            component={K8sDeploy}
+            durationInFrames={K8SDEPLOY_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="TechArch"
+            component={TechArch}
+            durationInFrames={TECHARCH_FRAMES}
             fps={30}
             width={1920}
             height={1080}
