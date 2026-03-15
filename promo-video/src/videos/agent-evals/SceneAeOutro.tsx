@@ -11,7 +11,7 @@ import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
 const keywords = [
   { text: "自带 evals", desc: "20-50 条用例", color: COLORS.muted },
-  { text: "三层评估", desc: "工具 / 轨迹 / 场景", color: "#C4956A" },
+  { text: "DeepEval", desc: "一个框架 · 三层六指标", color: "#C4956A" },
   { text: "质量门槛", desc: "量化证据，非主观", color: COLORS.accent },
 ];
 

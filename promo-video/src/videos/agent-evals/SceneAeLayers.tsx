@@ -12,25 +12,25 @@ import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 const layers = [
   {
     label: "L3",
-    name: "场景层",
-    tool: "LangWatch Scenario",
-    desc: "多轮对话 + Judge Agent",
+    name: "端到端",
+    tool: "TaskCompletion + GEval",
+    desc: "完整任务完成度评估",
     color: COLORS.accent,
-    width: 420,
+    width: 480,
   },
   {
     label: "L2",
     name: "轨迹层",
-    tool: "agentevals",
-    desc: "完整调用链匹配",
+    tool: "ToolUse + Orchestration",
+    desc: "完整调用链 + 编排顺序",
     color: "#C4956A",
-    width: 600,
+    width: 640,
   },
   {
     label: "L1",
-    name: "单元层",
-    tool: "ToolCallScorer",
-    desc: "单次工具调用验证",
+    name: "工具调用",
+    tool: "ToolCorrectness + Argument",
+    desc: "单次工具名 + 参数验证",
     color: COLORS.muted,
     width: 780,
   },
@@ -65,7 +65,7 @@ export const SceneAeLayers: React.FC = () => {
             transform: `translateY(${interpolate(titleProg, [0, 1], [-20, 0])}px)`,
           }}
         >
-          三层评估金字塔
+          DeepEval 三层六指标
         </div>
 
         {layers.map((layer, i) => {

@@ -23,7 +23,7 @@ const jsonlLines = [
   ' "expected_tools": ["search_flights", "book_ticket"],',
   ' "must_include": ["航班", "确认"],',
   ' "must_not_include": ["酒店"],',
-  ' "trajectory": ["search_flights", "book_ticket"]}',
+  ' "level": "L2"}',
 ];
 
 export const SceneAeFormat: React.FC = () => {

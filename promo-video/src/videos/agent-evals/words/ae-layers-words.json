@@ -1,207 +1,172 @@
 [
   {
     "part": "分",
-    "start": 67693,
-    "end": 67909
+    "start": 67875,
+    "end": 68090
   },
   {
     "part": "三",
-    "start": 67920,
-    "end": 68136
+    "start": 68102,
+    "end": 68295
   },
   {
     "part": "层",
-    "start": 68136,
-    "end": 68306
+    "start": 68295,
+    "end": 68465
   },
   {
-    "part": "评估。",
-    "start": 68318,
-    "end": 68795
+    "part": "评估，",
+    "start": 68477,
+    "end": 68920
+  },
+  {
+    "part": "全部",
+    "start": 69102,
+    "end": 69465
+  },
+  {
+    "part": "用",
+    "start": 69477,
+    "end": 69704
+  },
+  {
+    "part": "DeepEval。",
+    "start": 69727,
+    "end": 70340
   },
   {
     "part": "L",
-    "start": 69318,
-    "end": 69590
+    "start": 70863,
+    "end": 71136
   },
   {
     "part": "1",
-    "start": 69590,
-    "end": 69749
-  },
-  {
-    "part": "单元层：",
-    "start": 69761,
-    "end": 70431
-  },
-  {
-    "part": "vitest-evals",
-    "start": 70681,
-    "end": 71534
-  },
-  {
-    "part": "的",
-    "start": 71534,
-    "end": 71681
-  },
-  {
-    "part": "ToolCallScorer，",
-    "start": 71704,
-    "end": 72613
-  },
-  {
-    "part": "评",
-    "start": 72840,
-    "end": 73056
-  },
-  {
-    "part": "单次",
-    "start": 73068,
-    "end": 73352
+    "start": 71136,
+    "end": 71295
   },
   {
     "part": "工具",
-    "start": 73363,
-    "end": 73715
+    "start": 71306,
+    "end": 71602
   },
   {
-    "part": "调用",
-    "start": 73727,
-    "end": 74068
+    "part": "调用：",
+    "start": 71613,
+    "end": 72045
   },
   {
-    "part": "对不对。",
-    "start": 74090,
-    "end": 74545
+    "part": "ToolCorrectnessMetric",
+    "start": 72318,
+    "end": 73727
+  },
+  {
+    "part": "加",
+    "start": 73738,
+    "end": 73965
+  },
+  {
+    "part": "ArgumentCorrectnessMetric。",
+    "start": 73977,
+    "end": 75681
   },
   {
     "part": "L",
-    "start": 75068,
-    "end": 75306
+    "start": 76204,
+    "end": 76431
   },
   {
     "part": "2",
-    "start": 75306,
-    "end": 75454
+    "start": 76431,
+    "end": 76579
   },
   {
-    "part": "轨迹",
-    "start": 75465,
-    "end": 75795
+    "part": "轨迹：",
+    "start": 76590,
+    "end": 77045
   },
   {
-    "part": "层：",
-    "start": 75795,
-    "end": 76124
+    "part": "ToolUseMetric",
+    "start": 77284,
+    "end": 78272
   },
   {
-    "part": "agentevals，",
-    "start": 76329,
-    "end": 77113
+    "part": "加",
+    "start": 78363,
+    "end": 78579
   },
   {
-    "part": "评完",
-    "start": 77363,
-    "end": 77681
-  },
-  {
-    "part": "整调",
-    "start": 77681,
-    "end": 77988
-  },
-  {
-    "part": "用链",
-    "start": 78000,
-    "end": 78443
-  },
-  {
-    "part": "是否",
-    "start": 78522,
-    "end": 78886
-  },
-  {
-    "part": "符合",
-    "start": 78897,
-    "end": 79215
-  },
-  {
-    "part": "预期。",
-    "start": 79227,
-    "end": 79681
+    "part": "OrchestrationMetric。",
+    "start": 78590,
+    "end": 79784
   },
   {
     "part": "L",
-    "start": 80204,
-    "end": 80454
+    "start": 80306,
+    "end": 80556
   },
   {
     "part": "3",
-    "start": 80454,
-    "end": 80659
+    "start": 80556,
+    "end": 80772
   },
   {
-    "part": "场景",
-    "start": 80670,
-    "end": 81034
+    "part": "端",
+    "start": 80772,
+    "end": 80931
   },
   {
-    "part": "层：",
-    "start": 81034,
-    "end": 81374
+    "part": "到端：",
+    "start": 80931,
+    "end": 81363
   },
   {
-    "part": "LangWatch ",
+    "part": "TaskCompletionMetric",
     "start": 81613,
-    "end": 82045
+    "end": 82909
   },
   {
-    "part": "Scenario，",
-    "start": 82056,
-    "end": 82738
+    "part": "加",
+    "start": 82909,
+    "end": 83193
   },
   {
-    "part": "模拟",
-    "start": 82965,
-    "end": 83204
+    "part": "GEval。",
+    "start": 83284,
+    "end": 83840
   },
   {
-    "part": "用户",
-    "start": 83215,
-    "end": 83602
+    "part": "一个",
+    "start": 84363,
+    "end": 84590
   },
   {
-    "part": "多",
-    "start": 83625,
-    "end": 83772
+    "part": "框架，",
+    "start": 84602,
+    "end": 85056
   },
   {
-    "part": "轮",
-    "start": 83772,
-    "end": 83920
+    "part": "六个",
+    "start": 85284,
+    "end": 85522
   },
   {
-    "part": "对话，",
-    "start": 83931,
-    "end": 84352
+    "part": "指标，",
+    "start": 85534,
+    "end": 85977
   },
   {
-    "part": "Judge ",
-    "start": 84590,
-    "end": 84874
+    "part": "三",
+    "start": 86193,
+    "end": 86409
   },
   {
-    "part": "Agent",
-    "start": 84886,
-    "end": 85329
+    "part": "层",
+    "start": 86409,
+    "end": 86590
   },
   {
-    "part": "自动",
-    "start": 85352,
-    "end": 85670
-  },
-  {
-    "part": "评分。",
-    "start": 85681,
-    "end": 86102
+    "part": "全覆盖。",
+    "start": 86613,
+    "end": 87204
   }
 ]

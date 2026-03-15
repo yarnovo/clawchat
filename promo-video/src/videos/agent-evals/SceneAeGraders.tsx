@@ -38,6 +38,7 @@ export const SceneAeGraders: React.FC = () => {
   const { fps } = useVideoConfig();
 
   const titleProg = spring({ frame, fps, config: { damping: 14 } });
+  const badgeProg = spring({ frame: frame - 60, fps, config: { damping: 14 } });
 
   return (
     <AbsoluteFill>
@@ -128,6 +129,19 @@ export const SceneAeGraders: React.FC = () => {
             </div>
           );
         })}
+
+        <div
+          style={{
+            fontFamily: MONO,
+            fontSize: 28,
+            fontWeight: 600,
+            color: COLORS.accent,
+            opacity: interpolate(badgeProg, [0, 1], [0, 1]),
+            transform: `translateY(${interpolate(badgeProg, [0, 1], [16, 0])}px)`,
+          }}
+        >
+          DeepEval 一个框架全部支持
+        </div>
       </AbsoluteFill>
     </AbsoluteFill>
   );

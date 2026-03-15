@@ -1,9 +1,9 @@
 [
   {"id": "ae-intro", "text": "Agent做好了怎么验证质量？业界共识：每个Agent必须自带评估用例，二十到五十个从真实场景提取。不是可选项，是上架的硬性门槛。"},
   {"id": "ae-consensus", "text": "三个大厂的做法。Anthropic说先写eval再开发，叫eval-driven development。OpenAI的Codex每个skill都带测试集。Google ADK有Golden Dataset概念。评估不只看最终回答，还要看中间步骤：调了什么工具、什么顺序、参数对不对。"},
-  {"id": "ae-graders", "text": "三种评估者组合使用。代码grader做确定性判断，工具名匹配、正则检查，快且便宜。LLM-as-Judge评开放式回答，准确度达到百分之八十五。人工评估校准LLM裁判，是金标准但成本高。"},
-  {"id": "ae-format", "text": "每个Agent工作区加一个evals目录，里面是cases.json。每条用例包含：输入、期望调用的工具、输出必须包含的关键词、不能包含的内容、轨迹验证。格式用JSONL，跟OpenAI对齐。"},
-  {"id": "ae-layers", "text": "分三层评估。L1单元层：vitest-evals的ToolCallScorer，评单次工具调用对不对。L2轨迹层：agentevals，评完整调用链是否符合预期。L3场景层：LangWatch Scenario，模拟用户多轮对话，Judge Agent自动评分。"},
+  {"id": "ae-graders", "text": "三种评估者组合使用。代码grader做确定性判断，快且便宜。LLM-as-Judge评开放式回答，准确度达到百分之八十五。人工评估校准LLM裁判，是金标准但成本高。DeepEval一个框架全部支持。"},
+  {"id": "ae-format", "text": "每个Agent工作区加一个evals目录，里面是cases.jsonl。每条用例包含：输入、期望调用的工具、输出必须包含的关键词、不能包含的内容、层级标记。格式用JSONL，跟OpenAI对齐。"},
+  {"id": "ae-layers", "text": "分三层评估，全部用DeepEval。L1工具调用：ToolCorrectnessMetric加ArgumentCorrectnessMetric。L2轨迹：ToolUseMetric加OrchestrationMetric。L3端到端：TaskCompletionMetric加GEval。一个框架，六个指标，三层全覆盖。"},
   {"id": "ae-gate", "text": "评估即门槛。开发时跑eval验证效果。上架时平台自动跑全部eval，不过不能发布。fork后修改了Agent，eval没过不能重新上架。审核去重加质量门槛，双保险。"},
-  {"id": "ae-outro", "text": "总结。每个Agent自带evals，二十到五十条用例。三种grader组合评估。分三层从工具调用到完整场景。eval是质量的量化证据，不是主观判断。先写eval再开发，eval-driven development。"}
+  {"id": "ae-outro", "text": "总结。每个Agent自带evals，二十到五十条用例。DeepEval一个框架覆盖三层六个指标。eval是质量的量化证据，不是主观判断。先写eval再开发，eval-driven development。"}
 ]
