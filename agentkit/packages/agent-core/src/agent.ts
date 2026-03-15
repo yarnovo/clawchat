@@ -1,7 +1,7 @@
 import type { LLMProvider, ChatMessage, ToolDefinition } from './llm.js';
 import type { Tool, ToolResult } from './types.js';
-import type { Memory } from './memory.js';
-import { InMemory } from './memory.js';
+import type { ChatSession } from './session.js';
+import { InMemorySession } from './session.js';
 import { loadPersonaPrompt } from './persona.js';
 
 export interface AgentOptions {
@@ -13,8 +13,8 @@ export interface AgentOptions {
   systemPrompt?: string;
   /** 工作目录（从中加载 AGENT.md / TOOLS.md / MEMORY.md / HEARTBEAT.md） */
   workDir?: string;
-  /** 记忆（默认 InMemory） */
-  memory?: Memory;
+  /** 会话存储（默认 InMemorySession） */
+  session?: ChatSession;
   /** 最大工具调用轮数（防止无限循环，默认 20） */
   maxRounds?: number;
   /** 每轮回调 */
@@ -28,7 +28,7 @@ export class Agent {
   private tools: Map<string, Tool>;
   private toolDefs: ToolDefinition[];
   private systemPrompt: string;
-  private memory: Memory;
+  private session: ChatSession;
   private maxRounds: number;
   private onToolCall?: AgentOptions['onToolCall'];
   private onToolResult?: AgentOptions['onToolResult'];
@@ -36,7 +36,7 @@ export class Agent {
 
   constructor(options: AgentOptions) {
     this.llm = options.llm;
-    this.memory = options.memory || new InMemory();
+    this.session = options.session || new InMemorySession();
     this.maxRounds = options.maxRounds || 20;
     this.onToolCall = options.onToolCall;
     this.onToolResult = options.onToolResult;
@@ -72,21 +72,18 @@ export class Agent {
    * 核心 — while 循环
    */
   async run(userMessage: string): Promise<string> {
-    // 加入用户消息
-    this.memory.addMessage({ role: 'user', content: userMessage });
+    this.session.addMessage({ role: 'user', content: userMessage });
 
     let round = 0;
 
     while (round < this.maxRounds) {
       round++;
 
-      // 构建完整消息列表
       const messages: ChatMessage[] = [
         { role: 'system', content: this.systemPrompt },
-        ...this.memory.getMessages(),
+        ...this.session.getMessages(),
       ];
 
-      // 调 LLM
       const response = await this.llm.chat(
         messages,
         this.toolDefs.length > 0 ? this.toolDefs : undefined,
@@ -95,19 +92,18 @@ export class Agent {
       // LLM 直接回复文本
       if (response.tool_calls.length === 0) {
         const text = response.content || '';
-        this.memory.addMessage({ role: 'assistant', content: text });
+        this.session.addMessage({ role: 'assistant', content: text });
         this.onText?.(text);
         return text;
       }
 
-      // LLM 要调工具 — 先把 assistant 消息（含 tool_calls）存入历史
-      this.memory.addMessage({
+      // LLM 要调工具
+      this.session.addMessage({
         role: 'assistant',
         content: response.content || '',
         tool_calls: response.tool_calls,
       });
 
-      // 执行每个工具调用
       for (const call of response.tool_calls) {
         const tool = this.tools.get(call.name);
         let result: ToolResult;
@@ -129,15 +125,12 @@ export class Agent {
 
         this.onToolResult?.(call.name, result);
 
-        // 把工具结果加入历史
-        this.memory.addMessage({
+        this.session.addMessage({
           role: 'tool',
           content: result.content,
           tool_call_id: call.id,
         });
       }
-
-      // 回到 while 循环顶部，让 LLM 继续
     }
 
     return '[Agent reached max rounds]';
