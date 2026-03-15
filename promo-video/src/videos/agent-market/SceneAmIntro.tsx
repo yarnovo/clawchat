@@ -17,7 +17,10 @@ export const SceneAmIntro: React.FC = () => {
   const subProg = spring({ frame: frame - 14, fps, config: { damping: 14 } });
   const tagsProg = spring({ frame: frame - 30, fps, config: { damping: 14 } });
 
-  const tags = ["浏览", "fork", "教育", "上架"];
+  const phases = [
+    { label: "服务", desc: "第一阶段" },
+    { label: "平台", desc: "第二阶段" },
+  ];
 
   return (
     <AbsoluteFill>
@@ -42,7 +45,7 @@ export const SceneAmIntro: React.FC = () => {
             transform: `scale(${titleProg})`,
           }}
         >
-          Agent 市场
+          Agent 市场路线图
         </div>
 
         <div
@@ -55,33 +58,38 @@ export const SceneAmIntro: React.FC = () => {
             transform: `translateY(${interpolate(subProg, [0, 1], [20, 0])}px)`,
           }}
         >
-          Docker Hub + GitHub + App Store
+          先卖铲子，再开金矿
         </div>
 
         <div
           style={{
             display: "flex",
-            gap: 16,
+            gap: 24,
             marginTop: 12,
             opacity: interpolate(tagsProg, [0, 1], [0, 1]),
             transform: `translateY(${interpolate(tagsProg, [0, 1], [20, 0])}px)`,
           }}
         >
-          {tags.map((t) => (
+          {phases.map((p, i) => (
             <div
-              key={t}
+              key={p.label}
               style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: 6,
                 fontFamily: FONT_SANS,
-                fontSize: 26,
-                color: COLORS.accent,
-                padding: "10px 28px",
-                borderRadius: 10,
+                padding: "14px 36px",
+                borderRadius: 12,
                 background: COLORS.card,
-                border: `1px solid ${COLORS.border}`,
+                border: `1px solid ${i === 0 ? COLORS.accent : COLORS.border}`,
                 boxShadow: COLORS.cardShadow,
               }}
             >
-              {t}
+              <div style={{ fontSize: 18, color: COLORS.muted }}>{p.desc}</div>
+              <div style={{ fontSize: 30, fontWeight: 700, color: i === 0 ? COLORS.accent : COLORS.text }}>
+                {p.label}
+              </div>
             </div>
           ))}
         </div>

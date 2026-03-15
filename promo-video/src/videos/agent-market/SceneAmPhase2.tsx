@@ -7,20 +7,20 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
+import { COLORS, FONT, FONT_SANS } from "../../constants";
 
 const steps = [
-  { label: "缺能力", desc: "用户说：帮我分析 PDF", icon: "❓" },
-  { label: "搜索技能市场", desc: "Agent 自动检索", icon: "🔍" },
-  { label: "自动安装", desc: "三秒完成部署", icon: "📦" },
-  { label: "使用", desc: "用户完全无感", icon: "✅" },
+  { label: "种子 Agent", desc: "自己跑通的真实 Agent" },
+  { label: "邀请开发者", desc: "第一批开发者入驻" },
+  { label: "用户进来即可用", desc: "不是空架子" },
 ];
 
-export const SceneAmEvolve: React.FC = () => {
+export const SceneAmPhase2: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const titleProg = spring({ frame, fps, config: { damping: 14 } });
+  const footerProg = spring({ frame: frame - 55, fps, config: { damping: 14 } });
 
   return (
     <AbsoluteFill>
@@ -31,7 +31,7 @@ export const SceneAmEvolve: React.FC = () => {
           justifyContent: "center",
           alignItems: "center",
           flexDirection: "column",
-          gap: 36,
+          gap: 40,
           paddingBottom: 140,
         }}
       >
@@ -45,71 +45,60 @@ export const SceneAmEvolve: React.FC = () => {
             transform: `translateY(${interpolate(titleProg, [0, 1], [-30, 0])}px)`,
           }}
         >
-          Agent 自我进化
+          第二阶段 · 开放平台
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 0,
-            justifyContent: "center",
-            maxWidth: 1300,
-          }}
-        >
-          {steps.map((step, i) => {
-            const delay = 10 + i * 10;
+        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+          {steps.map((s, i) => {
+            const delay = 10 + i * 12;
             const prog = spring({ frame: frame - delay, fps, config: { damping: 14, mass: 0.6 } });
-            const isLast = i === steps.length - 1;
             return (
-              <div key={step.label} style={{ display: "flex", alignItems: "center" }}>
+              <div key={s.label} style={{ display: "flex", alignItems: "center", gap: 20 }}>
                 <div
                   style={{
-                    padding: "20px 24px",
-                    borderRadius: 14,
-                    background: COLORS.card,
-                    border: isLast ? `2px solid ${COLORS.accent}` : `1px solid ${COLORS.border}`,
-                    boxShadow: COLORS.cardShadow,
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
-                    gap: 8,
-                    minWidth: 180,
+                    gap: 10,
+                    padding: "28px 32px",
+                    borderRadius: 16,
+                    background: COLORS.card,
+                    border: `1px solid ${COLORS.border}`,
+                    boxShadow: COLORS.cardShadow,
+                    width: 260,
                     opacity: interpolate(prog, [0, 1], [0, 1]),
-                    transform: `translateY(${interpolate(prog, [0, 1], [20, 0])}px)`,
+                    transform: `translateY(${interpolate(prog, [0, 1], [30, 0])}px)`,
                   }}
                 >
-                  <div style={{ fontSize: 36 }}>{step.icon}</div>
-                  <div
-                    style={{
-                      fontFamily: FONT_SANS,
-                      fontSize: 26,
-                      fontWeight: 700,
-                      color: isLast ? COLORS.accent : COLORS.text,
-                      textAlign: "center",
-                    }}
-                  >
-                    {step.label}
-                  </div>
-                  <div
-                    style={{
-                      fontFamily: FONT_SANS,
-                      fontSize: 20,
-                      color: COLORS.muted,
-                      textAlign: "center",
-                      lineHeight: 1.4,
-                    }}
-                  >
-                    {step.desc}
-                  </div>
-                </div>
-                {!isLast && (
                   <div
                     style={{
                       fontFamily: FONT_SANS,
                       fontSize: 28,
+                      fontWeight: 700,
+                      color: COLORS.text,
+                      textAlign: "center",
+                    }}
+                  >
+                    {s.label}
+                  </div>
+                  <div
+                    style={{
+                      fontFamily: FONT_SANS,
+                      fontSize: 22,
+                      color: COLORS.muted,
+                      textAlign: "center",
+                    }}
+                  >
+                    {s.desc}
+                  </div>
+                </div>
+                {i < steps.length - 1 && (
+                  <div
+                    style={{
+                      fontFamily: FONT_SANS,
+                      fontSize: 36,
                       color: COLORS.accent,
-                      margin: "0 10px",
+                      fontWeight: 700,
                       opacity: interpolate(prog, [0, 1], [0, 1]),
                     }}
                   >
@@ -123,23 +112,15 @@ export const SceneAmEvolve: React.FC = () => {
 
         <div
           style={{
-            fontFamily: MONO,
+            fontFamily: FONT_SANS,
             fontSize: 28,
             fontWeight: 600,
             color: COLORS.accent,
-            padding: "10px 32px",
-            borderRadius: 10,
-            background: COLORS.card,
-            border: `1px solid ${COLORS.border}`,
-            boxShadow: COLORS.cardShadow,
-            opacity: interpolate(
-              spring({ frame: frame - 55, fps, config: { damping: 14 } }),
-              [0, 1],
-              [0, 1],
-            ),
+            opacity: interpolate(footerProg, [0, 1], [0, 1]),
+            transform: `translateY(${interpolate(footerProg, [0, 1], [10, 0])}px)`,
           }}
         >
-          用户完全无感，Agent 越用越强
+          不是空架子
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

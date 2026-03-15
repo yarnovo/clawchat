@@ -7,21 +7,21 @@ import {
 } from "remotion";
 import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
-import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
+import { COLORS, FONT, FONT_SANS } from "../../constants";
 
-const steps = [
-  { label: "免费 fork", desc: "容器复制一份，你的专属版本" },
-  { label: "教育 Agent", desc: "灌入行业知识" },
-  { label: "commit 保存", desc: "每次成长都保留" },
-  { label: "上架市场", desc: "给别人用" },
+const controls = [
+  { label: "使用数据", desc: "用户行为全掌握" },
+  { label: "推荐算法", desc: "流量分发权" },
+  { label: "计费通道", desc: "收入必经之路" },
+  { label: "运行环境", desc: "Docker 基础设施" },
 ];
 
-export const SceneAmFork: React.FC = () => {
+export const SceneAmMoat: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const titleProg = spring({ frame, fps, config: { damping: 14 } });
-  const badgeProg = spring({ frame: frame - 55, fps, config: { damping: 12, mass: 0.8 } });
+  const analogyProg = spring({ frame: frame - 55, fps, config: { damping: 14 } });
 
   return (
     <AbsoluteFill>
@@ -46,43 +46,50 @@ export const SceneAmFork: React.FC = () => {
             transform: `translateY(${interpolate(titleProg, [0, 1], [-30, 0])}px)`,
           }}
         >
-          Fork 你的专属 Agent
+          运行时垄断
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 14, width: 900 }}>
-          {steps.map((s, i) => {
+        <div
+          style={{
+            display: "flex",
+            gap: 16,
+            justifyContent: "center",
+          }}
+        >
+          {controls.map((c, i) => {
             const delay = 10 + i * 8;
             const prog = spring({ frame: frame - delay, fps, config: { damping: 14, mass: 0.6 } });
             return (
               <div
-                key={s.label}
+                key={c.label}
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 20,
-                  padding: "16px 28px",
-                  borderRadius: 12,
+                  width: 220,
+                  padding: "28px 20px",
+                  borderRadius: 16,
                   background: COLORS.card,
                   border: `1px solid ${COLORS.border}`,
                   boxShadow: COLORS.cardShadow,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: 10,
                   opacity: interpolate(prog, [0, 1], [0, 1]),
-                  transform: `translateX(${interpolate(prog, [0, 1], [40, 0])}px)`,
+                  transform: `translateY(${interpolate(prog, [0, 1], [30, 0])}px)`,
                 }}
               >
                 <div
                   style={{
-                    fontFamily: MONO,
-                    fontSize: 24,
-                    fontWeight: 700,
-                    color: COLORS.card,
+                    width: 48,
+                    height: 48,
+                    borderRadius: 24,
                     background: COLORS.accent,
-                    width: 40,
-                    height: 40,
-                    borderRadius: 20,
                     display: "flex",
                     justifyContent: "center",
                     alignItems: "center",
-                    flexShrink: 0,
+                    fontFamily: FONT_SANS,
+                    fontSize: 20,
+                    fontWeight: 700,
+                    color: COLORS.white,
                   }}
                 >
                   {i + 1}
@@ -90,17 +97,23 @@ export const SceneAmFork: React.FC = () => {
                 <div
                   style={{
                     fontFamily: FONT_SANS,
-                    fontSize: 28,
-                    fontWeight: 600,
+                    fontSize: 26,
+                    fontWeight: 700,
                     color: COLORS.text,
-                    width: 260,
-                    flexShrink: 0,
+                    textAlign: "center",
                   }}
                 >
-                  {s.label}
+                  {c.label}
                 </div>
-                <div style={{ fontFamily: FONT_SANS, fontSize: 26, color: COLORS.muted }}>
-                  {s.desc}
+                <div
+                  style={{
+                    fontFamily: FONT_SANS,
+                    fontSize: 20,
+                    color: COLORS.muted,
+                    textAlign: "center",
+                  }}
+                >
+                  {c.desc}
                 </div>
               </div>
             );
@@ -113,11 +126,11 @@ export const SceneAmFork: React.FC = () => {
             fontSize: 28,
             fontWeight: 600,
             color: COLORS.accent,
-            opacity: interpolate(badgeProg, [0, 1], [0, 1]),
-            transform: `scale(${interpolate(badgeProg, [0, 1], [0.8, 1])})`,
+            opacity: interpolate(analogyProg, [0, 1], [0, 1]),
+            transform: `translateY(${interpolate(analogyProg, [0, 1], [10, 0])}px)`,
           }}
         >
-          fork 免费，因为 fork 是增长引擎
+          App 离不开 App Store
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

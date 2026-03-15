@@ -1,21 +1,21 @@
 import { AbsoluteFill, Audio, interpolate, Sequence, staticFile, useCurrentFrame } from "remotion";
 import { SceneAmIntro } from "./SceneAmIntro";
-import { SceneAmBrowse } from "./SceneAmBrowse";
-import { SceneAmChat } from "./SceneAmChat";
-import { SceneAmEvolve } from "./SceneAmEvolve";
+import { SceneAmPhase1 } from "./SceneAmPhase1";
+import { SceneAmPhase2 } from "./SceneAmPhase2";
+import { SceneAmAgent } from "./SceneAmAgent";
 import { SceneAmFork } from "./SceneAmFork";
-import { SceneAmPublish } from "./SceneAmPublish";
-import { SceneAmFlywheel } from "./SceneAmFlywheel";
+import { SceneAmMoney } from "./SceneAmMoney";
+import { SceneAmMoat } from "./SceneAmMoat";
 import { SceneAmOutro } from "./SceneAmOutro";
 import { Subtitle } from "../../Subtitle";
 
 import amIntroWords from "./words/am-intro-words.json";
-import amBrowseWords from "./words/am-browse-words.json";
-import amChatWords from "./words/am-chat-words.json";
-import amEvolveWords from "./words/am-evolve-words.json";
+import amPhase1Words from "./words/am-phase1-words.json";
+import amPhase2Words from "./words/am-phase2-words.json";
+import amAgentWords from "./words/am-agent-words.json";
 import amForkWords from "./words/am-fork-words.json";
-import amPublishWords from "./words/am-publish-words.json";
-import amFlywheelWords from "./words/am-flywheel-words.json";
+import amMoneyWords from "./words/am-money-words.json";
+import amMoatWords from "./words/am-moat-words.json";
 import amOutroWords from "./words/am-outro-words.json";
 import timingData from "./timing.json";
 
@@ -25,12 +25,12 @@ const INTRO_PAD = 10;
 const OUTRO_PAD = 30;
 
 const SCENE_COMPS = [
-  SceneAmIntro, SceneAmBrowse, SceneAmChat, SceneAmEvolve,
-  SceneAmFork, SceneAmPublish, SceneAmFlywheel, SceneAmOutro,
+  SceneAmIntro, SceneAmPhase1, SceneAmPhase2, SceneAmAgent,
+  SceneAmFork, SceneAmMoney, SceneAmMoat, SceneAmOutro,
 ];
 const SCENE_WORDS = [
-  amIntroWords, amBrowseWords, amChatWords, amEvolveWords,
-  amForkWords, amPublishWords, amFlywheelWords, amOutroWords,
+  amIntroWords, amPhase1Words, amPhase2Words, amAgentWords,
+  amForkWords, amMoneyWords, amMoatWords, amOutroWords,
 ];
 
 const scenes = timingData.map((t, i) => {
