@@ -1,0 +1,9 @@
+[
+  {"id": "sm-intro", "text": "Agent怎么记住东西？三个Runtime的状态管理策略差异巨大，从纯内存到数据库驱动到容器级隔离，直接影响可靠性和扩展性。"},
+  {"id": "sm-openclaw", "text": "OpenClaw用内存管理会话。每个对话有唯一Session对象，支持四种模式：直接聊天、群组隔离、队列模式和回复模式。超期或超大小时自动剪枝。快，但重启就丢。可以通过扩展接入LanceDB等外部存储。"},
+  {"id": "sm-ironclaw", "text": "IronClaw用数据库驱动一切。所有操作日志、工具执行、会话记录全部写入PostgreSQL或libSQL。Workspace系统支持混合搜索，全文检索加向量搜索通过RRF融合排序。重启不丢数据，可以审计回溯。"},
+  {"id": "sm-nanoclaw", "text": "NanoClaw用容器级状态。每个群组一个独立容器，状态在容器内管理。简单清晰，天然隔离，但不适合跨容器共享。容器销毁，状态就没了，除非挂载了数据卷。"},
+  {"id": "sm-identity", "text": "身份文件是共同点。三个Runtime都支持AGENTS.md和SOUL.md注入系统提示词，定义Agent的人格和行为。IronClaw额外支持IDENTITY.md和HEARTBEAT.md，后者是定时触发的后台任务，比如定期整理记忆。"},
+  {"id": "sm-scale", "text": "扩展性差异。OpenClaw单进程内存，扩展靠加内存或分片。IronClaw数据库可共享，天然支持多Worker水平扩展。NanoClaw按容器扩展，资源隔离好但通信成本高。"},
+  {"id": "sm-outro", "text": "选择状态策略就是选择可靠性级别。OpenClaw适合临时对话，IronClaw适合需要持久记忆和审计的场景，NanoClaw适合需要强隔离的团队协作。"}
+]

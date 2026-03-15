@@ -44,6 +44,13 @@ import { InvestorPitch, TOTAL_FRAMES as INVESTOR_FRAMES } from "./videos/investo
 import { VideoGuide, TOTAL_FRAMES as VG_FRAMES } from "./videos/video-guide/VideoGuide";
 import { OpenclawMemory, TOTAL_FRAMES as OCMEM_FRAMES } from "./videos/openclaw-memory/OpenclawMemory";
 import { DevSetup, TOTAL_FRAMES as DXSETUP_FRAMES } from "./videos/dev-setup/DevSetup";
+import { RuntimeBattle, TOTAL_FRAMES as RB_FRAMES } from "./videos/runtime-battle/RuntimeBattle";
+import { SecurityFaceoff, TOTAL_FRAMES as SF_FRAMES } from "./videos/security-faceoff/SecurityFaceoff";
+import { ToolEcosystem, TOTAL_FRAMES as TE_FRAMES } from "./videos/tool-ecosystem/ToolEcosystem";
+import { StateMemory, TOTAL_FRAMES as SM_FRAMES } from "./videos/state-memory/StateMemory";
+import { BizOpportunities, TOTAL_FRAMES as BIZOP_FRAMES } from "./videos/biz-opportunities/BizOpportunities";
+import { NanoClawGuide, TOTAL_FRAMES as NCG_FRAMES } from "./videos/nanoclaw-guide/NanoClawGuide";
+import { AgentAgency, TOTAL_FRAMES as AAGENCY_FRAMES } from "./videos/agent-agency/AgentAgency";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -57,7 +64,7 @@ export const RemotionRoot: React.FC = () => {
         width={1920}
         height={1080}
       />
-      <Folder name="宣传">
+      <Folder name="Promo">
         <Composition
           id="Main"
           component={Main}
@@ -122,7 +129,7 @@ export const RemotionRoot: React.FC = () => {
           width={1920}
           height={1080}
         />
-        <Folder name="痛点攻坚">
+        <Folder name="Pain-Points">
           <Composition
             id="PainPoints"
             component={PainPoints}
@@ -132,7 +139,7 @@ export const RemotionRoot: React.FC = () => {
             height={1080}
           />
         </Folder>
-        <Folder name="投资人">
+        <Folder name="Investor">
           <Composition
             id="InvestorPitch"
             component={InvestorPitch}
@@ -143,7 +150,7 @@ export const RemotionRoot: React.FC = () => {
           />
         </Folder>
       </Folder>
-      <Folder name="教程">
+      <Folder name="Tutorial">
         <Composition
           id="SkillTutorial"
           component={SkillTutorial}
@@ -176,8 +183,16 @@ export const RemotionRoot: React.FC = () => {
           width={1920}
           height={1080}
         />
+        <Composition
+          id="NanoClawGuide"
+          component={NanoClawGuide}
+          durationInFrames={NCG_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
       </Folder>
-      <Folder name="科普">
+      <Folder name="Educational">
         <Composition
           id="Db"
           component={Db}
@@ -354,8 +369,42 @@ export const RemotionRoot: React.FC = () => {
           width={1920}
           height={1080}
         />
+        <Folder name="Runtime-Compare">
+          <Composition
+            id="RuntimeBattle"
+            component={RuntimeBattle}
+            durationInFrames={RB_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="SecurityFaceoff"
+            component={SecurityFaceoff}
+            durationInFrames={SF_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="ToolEcosystem"
+            component={ToolEcosystem}
+            durationInFrames={TE_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="StateMemory"
+            component={StateMemory}
+            durationInFrames={SM_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+        </Folder>
       </Folder>
-      <Folder name="开发">
+      <Folder name="Developer">
         <Composition
           id="SkillDevwalk"
           component={SkillDevwalk}
@@ -405,7 +454,7 @@ export const RemotionRoot: React.FC = () => {
           height={1080}
         />
       </Folder>
-      <Folder name="技术分享">
+      <Folder name="Tech-Sharing">
         <Composition
           id="ShareSaga"
           component={ShareSaga}
@@ -418,6 +467,24 @@ export const RemotionRoot: React.FC = () => {
           id="ShareVolume"
           component={ShareVolume}
           durationInFrames={SVOL_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+      </Folder>
+      <Folder name="Biz">
+        <Composition
+          id="BizOpportunities"
+          component={BizOpportunities}
+          durationInFrames={BIZOP_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="AgentAgency"
+          component={AgentAgency}
+          durationInFrames={AAGENCY_FRAMES}
           fps={30}
           width={1920}
           height={1080}

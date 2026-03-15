@@ -1,0 +1,10 @@
+[
+  {"id": "nc-intro", "text": "NanoClaw是什么？一句话：把Claude Code变成一个永远在线的私人助手。它连接WhatsApp、Telegram、Slack、Discord，你随时随地用消息跟它对话，它在自己的容器里安全地执行任务。"},
+  {"id": "nc-vs-claude", "text": "跟Claude Code有什么区别？Claude Code是一个终端工具，你打开它、对话、关掉它就没了。NanoClaw是一个常驻服务，七天二十四小时在线。Claude Code只在你的电脑上跑，NanoClaw把每个对话隔离到独立容器里。Claude Code没有消息渠道，NanoClaw让你用手机发消息就能指挥Agent。"},
+  {"id": "nc-setup", "text": "三步启动。第一步，fork仓库然后clone到本地。第二步，在目录里输入claude，进入Claude Code。第三步，输入斜杠setup，Claude Code自动帮你装依赖、配认证、启动服务。不需要手动配置任何东西。"},
+  {"id": "nc-channels", "text": "渠道是Skill方式添加的。输入斜杠add-whatsapp，Claude Code直接改源码把WhatsApp集成进来。同样的方式加Telegram、Discord、Slack、Gmail。可以同时连多个渠道，消息统一汇聚到同一个助手。"},
+  {"id": "nc-groups", "text": "每个群组完全隔离。各自有独立的文件系统、独立的CLAUDE.md记忆文件、独立的容器沙箱。工作群看不到家庭群的数据，家庭群看不到工作群的文件。主频道是你的私聊，拥有管理员权限，可以管理所有群组和任务。"},
+  {"id": "nc-tasks", "text": "支持定时任务。告诉它每天早上九点从Hacker News抓新闻发给你简报，或者每周五检查代码仓库更新README。用自然语言设定，不需要写cron表达式。任务在容器里执行，结果通过消息推送给你。"},
+  {"id": "nc-customize", "text": "定制方式是改代码，不是改配置。想改触发词？告诉Claude Code把Andy改成Bob。想加功能？描述你要什么，Claude Code直接改源码。代码总共三万五千个token，小到你能完全理解每一行。这是NanoClaw的核心哲学：不做大而全，做小而专。"},
+  {"id": "nc-outro", "text": "总结。NanoClaw等于Claude Code加上消息渠道、加上容器隔离、加上定时任务、加上持久记忆。fork一份，跑个setup，你就有了一个七天二十四小时在线的私人AI助手。"}
+]

@@ -1,0 +1,42 @@
+[
+  {
+    "id": "aa-intro",
+    "startMs": 95,
+    "endMs": 13068
+  },
+  {
+    "id": "aa-compare",
+    "startMs": 13590,
+    "endMs": 32556
+  },
+  {
+    "id": "aa-moat",
+    "startMs": 33079,
+    "endMs": 48590
+  },
+  {
+    "id": "aa-workflow",
+    "startMs": 49113,
+    "endMs": 67125
+  },
+  {
+    "id": "aa-pricing",
+    "startMs": 67636,
+    "endMs": 89284
+  },
+  {
+    "id": "aa-verticals",
+    "startMs": 89806,
+    "endMs": 113659
+  },
+  {
+    "id": "aa-scale",
+    "startMs": 114170,
+    "endMs": 136659
+  },
+  {
+    "id": "aa-outro",
+    "startMs": 137181,
+    "endMs": 153874
+  }
+]
