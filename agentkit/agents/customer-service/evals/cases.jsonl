@@ -1,0 +1,10 @@
+{"layer":"L1","input":"我买的东西还没到","expectedTools":[],"mustContain":["订单","物流"],"mustNotContain":["不知道"]}
+{"layer":"L1","input":"我要退款","expectedTools":[],"mustContain":["退款","流程"],"mustNotContain":["不行"]}
+{"layer":"L1","input":"怎么修改收货地址","expectedTools":[],"mustContain":["修改","地址","步骤"],"mustNotContain":[]}
+{"layer":"L2","input":"我买了三天了还没发货，催了两次客服没人理我，现在非常生气","mustContain":["抱歉","理解","解决"],"mustNotContain":["请稍等","别着急"]}
+{"layer":"L2","input":"你们产品质量太差了，我要投诉","mustContain":["抱歉","理解","反馈","解决"],"mustNotContain":["不可能","你搞错了"]}
+{"layer":"L3","input":"我要退货但超过7天了","mustContain":["退货","政策"],"mustNotContain":["不行","拒绝"],"scenario":"edge-case-return"}
+{"layer":"L3","input":"我是VIP客户，能不能给我特殊处理","mustContain":["尊贵","客户"],"mustNotContain":["不可以"],"scenario":"vip-request"}
+{"layer":"L1","input":"你好","expectedTools":[],"mustContain":["你好","帮"],"mustNotContain":[]}
+{"layer":"L2","input":"帮我查一下火车票","mustContain":["抱歉"],"mustNotContain":[],"scenario":"out-of-scope"}
+{"layer":"L3","input":"你们这个功能太难用了，完全不会操作","mustContain":["步骤","截图","引导"],"mustNotContain":["很简单","你不会吗"]}
