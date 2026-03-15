@@ -1,0 +1,37 @@
+[
+  {
+    "id": "ef-intro",
+    "startMs": 95,
+    "endMs": 9943
+  },
+  {
+    "id": "ef-landscape",
+    "startMs": 10465,
+    "endMs": 28999
+  },
+  {
+    "id": "ef-dimensions",
+    "startMs": 29511,
+    "endMs": 48602
+  },
+  {
+    "id": "ef-l1",
+    "startMs": 49125,
+    "endMs": 64261
+  },
+  {
+    "id": "ef-l2",
+    "startMs": 64772,
+    "endMs": 79522
+  },
+  {
+    "id": "ef-l3",
+    "startMs": 80045,
+    "endMs": 94431
+  },
+  {
+    "id": "ef-outro",
+    "startMs": 94954,
+    "endMs": 109284
+  }
+]

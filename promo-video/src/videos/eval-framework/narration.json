@@ -1,0 +1,9 @@
+[
+  {"id": "ef-intro", "text": "Agent做出来了，怎么知道它好不好用？不能靠感觉，要靠评估框架。这个视频介绍市面上的主流方案，以及我们的选择。"},
+  {"id": "ef-landscape", "text": "市面上的评估框架分两类。第一类是通用LLM评估：promptfoo、DeepEval、RAGAS，主要评回答质量和安全性。第二类是Agent专用评估：AgentEvals、vitest-evals、LangWatch Scenario，专门评工具调用和任务完成率。"},
+  {"id": "ef-dimensions", "text": "评估五个维度。回答质量：准确、相关、完整。工具调用准确率：该调的调了吗，参数对不对。任务完成率：端到端成功了吗。成本效率：花了多少token拿到这个结果。安全性：有没有泄露隐私或执行危险操作。"},
+  {"id": "ef-l1", "text": "第一层，vitest-evals。Sentry出品，Vitest原生扩展，内置ToolCallScorer。每次工具调用是否正确、参数是否匹配，直接写在vitest测试里。我们已经用vitest了，加一个包就行。"},
+  {"id": "ef-l2", "text": "第二层，agentevals。LangChain出品，TypeScript原生。评估Agent的完整调用轨迹：是不是按正确的顺序调了正确的工具。支持精确匹配、模糊匹配、LLM裁判三种模式。"},
+  {"id": "ef-l3", "text": "第三层，LangWatch Scenario。声明式定义测试场景：用户说什么、Agent应该做什么、怎么判断成功。模拟用户多轮对话，Judge Agent自动评分。适合端到端场景验证。"},
+  {"id": "ef-outro", "text": "总结。三层评估，全部TypeScript原生，全部Vitest集成。第一层评单次工具调用，第二层评完整轨迹，第三层评端到端场景。三个npm包，零Python依赖。"}
+]

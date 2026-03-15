@@ -53,6 +53,7 @@ import { NanoClawGuide, TOTAL_FRAMES as NCG_FRAMES } from "./videos/nanoclaw-gui
 import { AgentAgency, TOTAL_FRAMES as AAGENCY_FRAMES } from "./videos/agent-agency/AgentAgency";
 import { ToolsCompare, TOTAL_FRAMES as TC_FRAMES } from "./videos/tools-compare/ToolsCompare";
 import { AgentMarket, TOTAL_FRAMES as AMKT_FRAMES } from "./videos/agent-market/AgentMarket";
+import { SeedAgents, TOTAL_FRAMES as SA_FRAMES } from "./videos/seed-agents/SeedAgents";
 import { CoreTools, TOTAL_FRAMES as CT_FRAMES } from "./videos/core-tools/CoreTools";
 import { K8sGuide, TOTAL_FRAMES as K8S_FRAMES } from "./videos/k8s-guide/K8sGuide";
 import { K8sDeploy, TOTAL_FRAMES as K8SDEPLOY_FRAMES } from "./videos/k8s-deploy/K8sDeploy";
@@ -63,6 +64,7 @@ import { LoadStrategy, TOTAL_FRAMES as LS_FRAMES } from "./videos/load-strategy/
 import { SkillLoading, TOTAL_FRAMES as SKLOAD_FRAMES } from "./videos/skill-loading/SkillLoading";
 import { AgentCoreWalk, TOTAL_FRAMES as ACW_FRAMES } from "./videos/agent-core-walk/AgentCoreWalk";
 import { TestArch, TOTAL_FRAMES as TA_FRAMES } from "./videos/test-arch/TestArch";
+import { EvalFramework, TOTAL_FRAMES as EF_FRAMES } from "./videos/eval-framework/EvalFramework";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -494,6 +496,14 @@ export const RemotionRoot: React.FC = () => {
             width={1920}
             height={1080}
           />
+          <Composition
+            id="SeedAgents"
+            component={SeedAgents}
+            durationInFrames={SA_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
         </Folder>
         <Folder name="Biz-Model">
           <Composition
@@ -592,6 +602,14 @@ export const RemotionRoot: React.FC = () => {
             id="TestArch"
             component={TestArch}
             durationInFrames={TA_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="EvalFramework"
+            component={EvalFramework}
+            durationInFrames={EF_FRAMES}
             fps={30}
             width={1920}
             height={1080}
