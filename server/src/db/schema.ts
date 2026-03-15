@@ -87,3 +87,14 @@ export const skillInstallations = pgTable('skill_installations', {
   version: text('version').notNull().default('latest'),
   installedAt: timestamp('installed_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const marketReviews = pgTable('market_reviews', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  listingId: uuid('listing_id')
+    .notNull()
+    .references(() => marketListings.id),
+  userId: uuid('user_id').notNull(),
+  rating: integer('rating').notNull(),
+  comment: text('comment').default(''),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});

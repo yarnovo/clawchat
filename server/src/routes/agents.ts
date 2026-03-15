@@ -3,6 +3,7 @@ import { eq, and, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/index.js';
 import { agents } from '../db/schema.js';
+import { startAgent, stopAgent } from '../services/agent-lifecycle.js';
 import type { AuthEnv } from '../middleware/auth.js';
 
 const app = new Hono<AuthEnv>();
@@ -87,7 +88,7 @@ app.delete('/:id', async (c) => {
   return c.json({ deleted: true, agent: updated });
 });
 
-/** Start agent container (stub) */
+/** Start agent container */
 app.post('/:id/start', async (c) => {
   const userId = c.get('userId');
   const agentId = c.req.param('id');
@@ -105,17 +106,23 @@ app.post('/:id/start', async (c) => {
     return c.json({ error: 'Agent is already running' }, 400);
   }
 
-  // TODO: Actually start the container via container-server
-  const [updated] = await db
-    .update(agents)
-    .set({ status: 'starting', updatedAt: new Date() })
-    .where(eq(agents.id, agentId))
-    .returning();
+  try {
+    const { channelUrl } = await startAgent(agentId);
 
-  return c.json({ agent: updated });
+    // Re-fetch the updated agent
+    const [updated] = await db
+      .select()
+      .from(agents)
+      .where(eq(agents.id, agentId));
+
+    return c.json({ agent: updated, channelUrl });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return c.json({ error: `Failed to start agent: ${message}` }, 500);
+  }
 });
 
-/** Stop agent container (stub) */
+/** Stop agent container */
 app.post('/:id/stop', async (c) => {
   const userId = c.get('userId');
   const agentId = c.req.param('id');
@@ -133,14 +140,20 @@ app.post('/:id/stop', async (c) => {
     return c.json({ error: 'Agent is not running' }, 400);
   }
 
-  // TODO: Actually stop the container via container-server
-  const [updated] = await db
-    .update(agents)
-    .set({ status: 'stopped', updatedAt: new Date() })
-    .where(eq(agents.id, agentId))
-    .returning();
+  try {
+    await stopAgent(agentId);
 
-  return c.json({ agent: updated });
+    // Re-fetch the updated agent
+    const [updated] = await db
+      .select()
+      .from(agents)
+      .where(eq(agents.id, agentId));
+
+    return c.json({ agent: updated });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return c.json({ error: `Failed to stop agent: ${message}` }, 500);
+  }
 });
 
 export { app as agentsRoutes };
