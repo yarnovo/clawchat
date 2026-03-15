@@ -1,0 +1,19 @@
+model_list:
+  # 把所有 Claude 模型名映射到百炼 qwen-plus
+  - model_name: claude-sonnet-4-6
+    litellm_params:
+      model: openai/qwen-plus
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api_key: sk-7c6c85be82ac437b839872e349e0776c
+
+  - model_name: claude-sonnet-4-5-20250929
+    litellm_params:
+      model: openai/qwen-plus
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api_key: sk-7c6c85be82ac437b839872e349e0776c
+
+  - model_name: claude-3-5-sonnet-20241022
+    litellm_params:
+      model: openai/qwen-plus
+      api_base: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api_key: sk-7c6c85be82ac437b839872e349e0776c
