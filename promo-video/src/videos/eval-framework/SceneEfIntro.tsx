@@ -9,15 +9,13 @@ import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
 import { COLORS, FONT, FONT_SANS } from "../../constants";
 
-const tags = ["vitest-evals", "agentevals", "Scenario"];
-
 export const SceneEfIntro: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const titleProg = spring({ frame, fps, config: { damping: 12, mass: 0.8 } });
   const subProg = spring({ frame: frame - 15, fps, config: { damping: 14 } });
-  const tagsProg = spring({ frame: frame - 30, fps, config: { damping: 14 } });
+  const badgeProg = spring({ frame: frame - 30, fps, config: { damping: 14 } });
 
   return (
     <AbsoluteFill>
@@ -56,41 +54,22 @@ export const SceneEfIntro: React.FC = () => {
             transform: `translateY(${interpolate(subProg, [0, 1], [20, 0])}px)`,
           }}
         >
-          不靠感觉，靠数据
+          不靠感觉，靠 DeepEval
         </div>
 
         <div
           style={{
-            display: "flex",
-            gap: 14,
-            marginTop: 12,
-            opacity: interpolate(tagsProg, [0, 1], [0, 1]),
-            transform: `translateY(${interpolate(tagsProg, [0, 1], [20, 0])}px)`,
+            fontFamily: FONT_SANS,
+            fontSize: 28,
+            color: COLORS.white,
+            background: COLORS.accent,
+            padding: "10px 28px",
+            borderRadius: 10,
+            opacity: interpolate(badgeProg, [0, 1], [0, 1]),
+            transform: `scale(${interpolate(badgeProg, [0, 1], [0.8, 1])})`,
           }}
         >
-          {tags.map((t, i) => {
-            const delay = 35 + i * 8;
-            const prog = spring({ frame: frame - delay, fps, config: { damping: 14, mass: 0.6 } });
-            return (
-              <div
-                key={t}
-                style={{
-                  fontFamily: FONT_SANS,
-                  fontSize: 26,
-                  color: COLORS.accent,
-                  padding: "10px 22px",
-                  borderRadius: 8,
-                  background: COLORS.card,
-                  border: `1px solid ${COLORS.border}`,
-                  boxShadow: COLORS.cardShadow,
-                  opacity: interpolate(prog, [0, 1], [0, 1]),
-                  transform: `translateY(${interpolate(prog, [0, 1], [16, 0])}px)`,
-                }}
-              >
-                {t}
-              </div>
-            );
-          })}
+          一个框架，覆盖三层
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

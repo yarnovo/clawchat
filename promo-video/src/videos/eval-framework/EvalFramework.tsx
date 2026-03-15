@@ -1,19 +1,19 @@
 import { AbsoluteFill, Audio, interpolate, Sequence, staticFile, useCurrentFrame } from "remotion";
 import { SceneEfIntro } from "./SceneEfIntro";
 import { SceneEfLandscape } from "./SceneEfLandscape";
-import { SceneEfDimensions } from "./SceneEfDimensions";
-import { SceneEfL1 } from "./SceneEfL1";
-import { SceneEfL2 } from "./SceneEfL2";
-import { SceneEfL3 } from "./SceneEfL3";
+import { SceneEfDeepeval } from "./SceneEfDeepeval";
+import { SceneEfLayers } from "./SceneEfLayers";
+import { SceneEfIntegration } from "./SceneEfIntegration";
+import { SceneEfWhy } from "./SceneEfWhy";
 import { SceneEfOutro } from "./SceneEfOutro";
 import { Subtitle } from "../../Subtitle";
 
 import efIntroWords from "./words/ef-intro-words.json";
 import efLandscapeWords from "./words/ef-landscape-words.json";
-import efDimensionsWords from "./words/ef-dimensions-words.json";
-import efL1Words from "./words/ef-l1-words.json";
-import efL2Words from "./words/ef-l2-words.json";
-import efL3Words from "./words/ef-l3-words.json";
+import efDeepevalWords from "./words/ef-deepeval-words.json";
+import efLayersWords from "./words/ef-layers-words.json";
+import efIntegrationWords from "./words/ef-integration-words.json";
+import efWhyWords from "./words/ef-why-words.json";
 import efOutroWords from "./words/ef-outro-words.json";
 import timingData from "./timing.json";
 
@@ -23,12 +23,12 @@ const INTRO_PAD = 10;
 const OUTRO_PAD = 30;
 
 const SCENE_COMPS = [
-  SceneEfIntro, SceneEfLandscape, SceneEfDimensions, SceneEfL1,
-  SceneEfL2, SceneEfL3, SceneEfOutro,
+  SceneEfIntro, SceneEfLandscape, SceneEfDeepeval, SceneEfLayers,
+  SceneEfIntegration, SceneEfWhy, SceneEfOutro,
 ];
 const SCENE_WORDS = [
-  efIntroWords, efLandscapeWords, efDimensionsWords, efL1Words,
-  efL2Words, efL3Words, efOutroWords,
+  efIntroWords, efLandscapeWords, efDeepevalWords, efLayersWords,
+  efIntegrationWords, efWhyWords, efOutroWords,
 ];
 
 const scenes = timingData.map((t, i) => {

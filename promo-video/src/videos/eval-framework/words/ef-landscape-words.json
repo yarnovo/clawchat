@@ -1,202 +1,182 @@
 [
   {
     "part": "市面",
-    "start": 10465,
-    "end": 10897
+    "start": 11386,
+    "end": 11840
   },
   {
     "part": "上",
-    "start": 10897,
-    "end": 11068
+    "start": 11840,
+    "end": 11999
   },
   {
     "part": "的",
-    "start": 11068,
-    "end": 11147
+    "start": 12000,
+    "end": 12090
   },
   {
-    "part": "评估",
-    "start": 11170,
-    "end": 11511
+    "part": "方案。",
+    "start": 12102,
+    "end": 12522
   },
   {
-    "part": "框架",
-    "start": 11522,
-    "end": 11909
-  },
-  {
-    "part": "分",
-    "start": 11909,
-    "end": 12079
-  },
-  {
-    "part": "两",
-    "start": 12090,
-    "end": 12329
-  },
-  {
-    "part": "类。",
-    "start": 12329,
-    "end": 12568
-  },
-  {
-    "part": "第一类",
-    "start": 13079,
-    "end": 13522
-  },
-  {
-    "part": "是",
-    "start": 13545,
+    "part": "Promptfoo",
+    "start": 13045,
     "end": 13681
   },
   {
-    "part": "通用",
-    "start": 13693,
-    "end": 14136
+    "part": "刚",
+    "start": 13772,
+    "end": 13977
   },
   {
-    "part": "LLM",
-    "start": 14227,
-    "end": 14829
+    "part": "被",
+    "start": 13977,
+    "end": 14147
   },
   {
-    "part": "评估：",
-    "start": 14840,
-    "end": 15318
+    "part": "OpenAI",
+    "start": 14170,
+    "end": 14784
   },
   {
-    "part": "promptfoo、",
-    "start": 15579,
-    "end": 16227
+    "part": "收购，",
+    "start": 14795,
+    "end": 15249
   },
   {
-    "part": "DeepEval、",
-    "start": 16397,
-    "end": 17056
+    "part": "方向",
+    "start": 15488,
+    "end": 15852
   },
   {
-    "part": "RAGAS，",
-    "start": 17238,
-    "end": 17795
+    "part": "偏",
+    "start": 15875,
+    "end": 16034
   },
   {
-    "part": "主要",
-    "start": 18056,
-    "end": 18318
+    "part": "安全",
+    "start": 16045,
+    "end": 16363
   },
   {
-    "part": "评",
-    "start": 18318,
-    "end": 18511
+    "part": "红队。",
+    "start": 16375,
+    "end": 16806
   },
   {
-    "part": "回答",
-    "start": 18534,
-    "end": 18806
+    "part": "vitest-evals",
+    "start": 17329,
+    "end": 18363
   },
   {
-    "part": "质量",
-    "start": 18818,
-    "end": 19193
+    "part": "只",
+    "start": 18454,
+    "end": 18636
   },
   {
-    "part": "和",
-    "start": 19215,
-    "end": 19340
+    "part": "覆盖",
+    "start": 18647,
+    "end": 18965
   },
   {
-    "part": "安全性。",
-    "start": 19352,
-    "end": 19965
+    "part": "工具",
+    "start": 18988,
+    "end": 19284
   },
   {
-    "part": "第二",
-    "start": 20488,
-    "end": 20772
+    "part": "调用。",
+    "start": 19295,
+    "end": 19738
   },
   {
-    "part": "类",
-    "start": 20772,
-    "end": 21022
+    "part": "agentevals",
+    "start": 20261,
+    "end": 21079
   },
   {
-    "part": "是",
-    "start": 21102,
-    "end": 21409
+    "part": "只",
+    "start": 21170,
+    "end": 21329
   },
   {
-    "part": "Agent",
-    "start": 21488,
-    "end": 21875
+    "part": "覆盖",
+    "start": 21340,
+    "end": 21659
   },
   {
-    "part": "专用",
-    "start": 21897,
-    "end": 22204
-  },
-  {
-    "part": "评估：",
-    "start": 22215,
-    "end": 22681
-  },
-  {
-    "part": "AgentEvals、",
-    "start": 22931,
-    "end": 23874
-  },
-  {
-    "part": "vitest-evals、",
-    "start": 24079,
-    "end": 25011
+    "part": "轨迹。",
+    "start": 21670,
+    "end": 22147
   },
   {
     "part": "LangWatch ",
-    "start": 25215,
-    "end": 25636
+    "start": 22670,
+    "end": 23193
   },
   {
-    "part": "Scenario，",
-    "start": 25647,
-    "end": 26295
+    "part": "Scenario",
+    "start": 23204,
+    "end": 23931
   },
   {
-    "part": "专门",
-    "start": 26522,
-    "end": 26863
+    "part": "只",
+    "start": 23931,
+    "end": 24136
   },
   {
-    "part": "评工",
-    "start": 26875,
-    "end": 27238
+    "part": "覆盖端",
+    "start": 24147,
+    "end": 24613
   },
   {
-    "part": "具",
-    "start": 27238,
-    "end": 27375
+    "part": "到端。",
+    "start": 24613,
+    "end": 25034
   },
   {
-    "part": "调用",
-    "start": 27386,
-    "end": 27840
+    "part": "没有",
+    "start": 25545,
+    "end": 25829
   },
   {
-    "part": "和",
+    "part": "一个",
+    "start": 25840,
+    "end": 26068
+  },
+  {
+    "part": "能",
+    "start": 26090,
+    "end": 26204
+  },
+  {
+    "part": "单独",
+    "start": 26215,
+    "end": 26579
+  },
+  {
+    "part": "覆盖",
+    "start": 26590,
+    "end": 26874
+  },
+  {
+    "part": "三",
+    "start": 26886,
+    "end": 27125
+  },
+  {
+    "part": "层。",
+    "start": 27125,
+    "end": 27420
+  },
+  {
+    "part": "除了",
     "start": 27931,
-    "end": 28102
+    "end": 28272
   },
   {
-    "part": "任务",
-    "start": 28113,
-    "end": 28386
-  },
-  {
-    "part": "完成",
-    "start": 28397,
-    "end": 28784
-  },
-  {
-    "part": "率。",
-    "start": 28784,
-    "end": 28999
+    "part": "DeepEval。",
+    "start": 28295,
+    "end": 28977
   }
 ]

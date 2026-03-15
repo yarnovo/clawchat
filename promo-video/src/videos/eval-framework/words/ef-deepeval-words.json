@@ -1,0 +1,187 @@
+[
+  {
+    "part": "DeepEval，",
+    "start": 29500,
+    "end": 30159
+  },
+  {
+    "part": "一万两千八百",
+    "start": 30397,
+    "end": 31386
+  },
+  {
+    "part": "颗",
+    "start": 31386,
+    "end": 31568
+  },
+  {
+    "part": "星，",
+    "start": 31568,
+    "end": 31840
+  },
+  {
+    "part": "三百万月",
+    "start": 32079,
+    "end": 32659
+  },
+  {
+    "part": "下载，",
+    "start": 32670,
+    "end": 33090
+  },
+  {
+    "part": "Python",
+    "start": 33318,
+    "end": 33715
+  },
+  {
+    "part": "生态。",
+    "start": 33727,
+    "end": 34181
+  },
+  {
+    "part": "六",
+    "start": 34704,
+    "end": 34909
+  },
+  {
+    "part": "个",
+    "start": 34909,
+    "end": 35034
+  },
+  {
+    "part": "Agent",
+    "start": 35056,
+    "end": 35420
+  },
+  {
+    "part": "专精",
+    "start": 35443,
+    "end": 35761
+  },
+  {
+    "part": "指标：",
+    "start": 35772,
+    "end": 36204
+  },
+  {
+    "part": "ToolCorrectness",
+    "start": 36465,
+    "end": 37363
+  },
+  {
+    "part": "评工具",
+    "start": 37375,
+    "end": 37840
+  },
+  {
+    "part": "选择，",
+    "start": 37852,
+    "end": 38374
+  },
+  {
+    "part": "ArgumentCorrectness",
+    "start": 38602,
+    "end": 39806
+  },
+  {
+    "part": "评参数，",
+    "start": 39818,
+    "end": 40488
+  },
+  {
+    "part": "ToolUse",
+    "start": 40727,
+    "end": 41204
+  },
+  {
+    "part": "评",
+    "start": 41204,
+    "end": 41499
+  },
+  {
+    "part": "多",
+    "start": 41522,
+    "end": 41681
+  },
+  {
+    "part": "轮调",
+    "start": 41681,
+    "end": 41999
+  },
+  {
+    "part": "用，",
+    "start": 42000,
+    "end": 42227
+  },
+  {
+    "part": "TaskCompletion",
+    "start": 42443,
+    "end": 43397
+  },
+  {
+    "part": "评",
+    "start": 43397,
+    "end": 43613
+  },
+  {
+    "part": "任务",
+    "start": 43625,
+    "end": 43829
+  },
+  {
+    "part": "完成，",
+    "start": 43840,
+    "end": 44340
+  },
+  {
+    "part": "PlanQuality",
+    "start": 44579,
+    "end": 45340
+  },
+  {
+    "part": "评",
+    "start": 45352,
+    "end": 45579
+  },
+  {
+    "part": "规划",
+    "start": 45590,
+    "end": 45909
+  },
+  {
+    "part": "能力，",
+    "start": 45920,
+    "end": 46318
+  },
+  {
+    "part": "Orchestration",
+    "start": 46556,
+    "end": 47374
+  },
+  {
+    "part": "评编",
+    "start": 47386,
+    "end": 47738
+  },
+  {
+    "part": "排效率。",
+    "start": 47738,
+    "end": 48352
+  },
+  {
+    "part": "一个",
+    "start": 48875,
+    "end": 49090
+  },
+  {
+    "part": "框架，",
+    "start": 49102,
+    "end": 49590
+  },
+  {
+    "part": "全覆盖。",
+    "start": 49795,
+    "end": 50443
+  }
+]

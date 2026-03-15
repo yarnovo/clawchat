@@ -2,36 +2,36 @@
   {
     "id": "ef-intro",
     "startMs": 95,
-    "endMs": 9943
+    "endMs": 10863
   },
   {
     "id": "ef-landscape",
-    "startMs": 10465,
-    "endMs": 28999
+    "startMs": 11386,
+    "endMs": 28977
   },
   {
-    "id": "ef-dimensions",
-    "startMs": 29511,
-    "endMs": 48602
+    "id": "ef-deepeval",
+    "startMs": 29500,
+    "endMs": 50443
   },
   {
-    "id": "ef-l1",
-    "startMs": 49125,
-    "endMs": 64261
+    "id": "ef-layers",
+    "startMs": 50965,
+    "endMs": 69840
   },
   {
-    "id": "ef-l2",
-    "startMs": 64772,
-    "endMs": 79522
+    "id": "ef-integration",
+    "startMs": 70363,
+    "endMs": 85943
   },
   {
-    "id": "ef-l3",
-    "startMs": 80045,
-    "endMs": 94431
+    "id": "ef-why",
+    "startMs": 86454,
+    "endMs": 103056
   },
   {
     "id": "ef-outro",
-    "startMs": 94954,
-    "endMs": 109284
+    "startMs": 103579,
+    "endMs": 117420
   }
 ]

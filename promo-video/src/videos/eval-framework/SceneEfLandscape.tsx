@@ -9,23 +9,23 @@ import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
 import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
-const generalTools = [
-  { name: "promptfoo", stars: "4.5k" },
-  { name: "DeepEval", stars: "4.2k" },
-  { name: "RAGAS", stars: "7.8k" },
+const frameworks = [
+  { name: "Promptfoo", l1: false, l2: false, l3: false, note: "被 OpenAI 收购，偏安全红队" },
+  { name: "vitest-evals", l1: true, l2: false, l3: false, note: "只覆盖工具调用" },
+  { name: "agentevals", l1: false, l2: true, l3: false, note: "只覆盖轨迹" },
+  { name: "LangWatch", l1: false, l2: false, l3: true, note: "只覆盖端到端" },
+  { name: "DeepEval", l1: true, l2: true, l3: true, note: "全覆盖", highlight: true },
 ];
 
-const agentTools = [
-  { name: "AgentEvals", stars: "0.6k" },
-  { name: "vitest-evals", stars: "1.2k" },
-  { name: "LangWatch Scenario", stars: "0.3k" },
-];
+const CHECK = "\u2713";
+const CROSS = "\u2717";
 
 export const SceneEfLandscape: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const titleProg = spring({ frame, fps, config: { damping: 14 } });
+  const tableProg = spring({ frame: frame - 12, fps, config: { damping: 14, mass: 0.7 } });
 
   return (
     <AbsoluteFill>
@@ -50,94 +50,90 @@ export const SceneEfLandscape: React.FC = () => {
             transform: `translateY(${interpolate(titleProg, [0, 1], [-20, 0])}px)`,
           }}
         >
-          评估框架全景
+          框架覆盖对比
         </div>
 
-        <div style={{ display: "flex", gap: 60, alignItems: "flex-start" }}>
-          {/* General LLM Evaluation */}
-          {[
-            { title: "通用 LLM 评估", subtitle: "回答质量 + 安全性", tools: generalTools, borderColor: COLORS.muted },
-            { title: "Agent 专用评估", subtitle: "工具调用 + 任务完成", tools: agentTools, borderColor: COLORS.accent },
-          ].map((col, ci) => {
-            const colDelay = 10 + ci * 16;
-            const colProg = spring({ frame: frame - colDelay, fps, config: { damping: 14, mass: 0.7 } });
+        <div
+          style={{
+            background: COLORS.card,
+            borderRadius: 18,
+            boxShadow: COLORS.cardShadow,
+            overflow: "hidden",
+            border: `1px solid ${COLORS.border}`,
+            opacity: interpolate(tableProg, [0, 1], [0, 1]),
+            transform: `translateY(${interpolate(tableProg, [0, 1], [30, 0])}px)`,
+          }}
+        >
+          {/* Header */}
+          <div
+            style={{
+              display: "flex",
+              borderBottom: `2px solid ${COLORS.border}`,
+              background: `${COLORS.bg}`,
+            }}
+          >
+            {["框架", "L1 工具", "L2 轨迹", "L3 端到端"].map((h, hi) => (
+              <div
+                key={h}
+                style={{
+                  fontFamily: FONT_SANS,
+                  fontSize: 26,
+                  fontWeight: 700,
+                  color: COLORS.text,
+                  padding: "18px 32px",
+                  width: hi === 0 ? 280 : 160,
+                  textAlign: hi === 0 ? "left" : "center",
+                }}
+              >
+                {h}
+              </div>
+            ))}
+          </div>
+
+          {/* Rows */}
+          {frameworks.map((fw, i) => {
+            const rowDelay = 18 + i * 10;
+            const rowProg = spring({ frame: frame - rowDelay, fps, config: { damping: 14, mass: 0.5 } });
+            const isHighlight = fw.highlight;
             return (
               <div
-                key={col.title}
+                key={fw.name}
                 style={{
-                  background: COLORS.card,
-                  border: `2px solid ${col.borderColor}`,
-                  borderRadius: 18,
-                  boxShadow: COLORS.cardShadow,
-                  padding: "32px 44px",
                   display: "flex",
-                  flexDirection: "column",
-                  gap: 16,
-                  minWidth: 380,
-                  opacity: interpolate(colProg, [0, 1], [0, 1]),
-                  transform: `translateY(${interpolate(colProg, [0, 1], [30, 0])}px)`,
+                  borderBottom: i < frameworks.length - 1 ? `1px solid ${COLORS.border}` : "none",
+                  background: isHighlight ? `${COLORS.accent}10` : "transparent",
+                  opacity: interpolate(rowProg, [0, 1], [0, 1]),
+                  transform: `translateX(${interpolate(rowProg, [0, 1], [-12, 0])}px)`,
                 }}
               >
                 <div
                   style={{
-                    fontFamily: FONT_SANS,
-                    fontSize: 32,
-                    fontWeight: 700,
-                    color: ci === 1 ? COLORS.accent : COLORS.text,
+                    fontFamily: MONO,
+                    fontSize: 26,
+                    fontWeight: isHighlight ? 700 : 500,
+                    color: isHighlight ? COLORS.accent : COLORS.text,
+                    padding: "16px 32px",
+                    width: 280,
                   }}
                 >
-                  {col.title}
+                  {fw.name}
                 </div>
-                <div
-                  style={{
-                    fontFamily: FONT_SANS,
-                    fontSize: 24,
-                    color: COLORS.muted,
-                    marginBottom: 8,
-                  }}
-                >
-                  {col.subtitle}
-                </div>
-                {col.tools.map((tool, ti) => {
-                  const toolDelay = colDelay + 10 + ti * 8;
-                  const toolProg = spring({ frame: frame - toolDelay, fps, config: { damping: 14, mass: 0.5 } });
-                  return (
-                    <div
-                      key={tool.name}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        padding: "12px 20px",
-                        borderRadius: 10,
-                        background: `${col.borderColor}08`,
-                        border: `1px solid ${COLORS.border}`,
-                        opacity: interpolate(toolProg, [0, 1], [0, 1]),
-                        transform: `translateX(${interpolate(toolProg, [0, 1], [-16, 0])}px)`,
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontFamily: MONO,
-                          fontSize: 26,
-                          fontWeight: 600,
-                          color: COLORS.text,
-                        }}
-                      >
-                        {tool.name}
-                      </div>
-                      <div
-                        style={{
-                          fontFamily: MONO,
-                          fontSize: 24,
-                          color: COLORS.muted,
-                        }}
-                      >
-                        {tool.stars}
-                      </div>
-                    </div>
-                  );
-                })}
+                {[fw.l1, fw.l2, fw.l3].map((v, vi) => (
+                  <div
+                    key={vi}
+                    style={{
+                      fontFamily: MONO,
+                      fontSize: 28,
+                      fontWeight: 700,
+                      color: v ? "#5A9E6F" : COLORS.subtle,
+                      padding: "16px 32px",
+                      width: 160,
+                      textAlign: "center",
+                    }}
+                  >
+                    {v ? CHECK : CROSS}
+                  </div>
+                ))}
               </div>
             );
           })}
