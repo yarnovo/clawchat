@@ -1,8 +1,0 @@
-[project]
-name = "agentkit"
-version = "0.0.1"
-description = "Agent toolkit — monorepo root"
-requires-python = ">=3.13"
-
-[tool.uv.workspace]
-members = ["packages/agent-evals", "packages/agent-demo"]
