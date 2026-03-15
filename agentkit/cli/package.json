@@ -4,7 +4,7 @@
   "description": "AgentKit CLI",
   "type": "module",
   "bin": { "agentkit": "dist/main.js" },
-  "scripts": { "build": "tsc", "dev": "tsc --watch" },
+  "scripts": { "build": "tsc", "test": "vitest run", "dev": "tsc --watch" },
   "dependencies": {
     "@agentkit/agentic": "workspace:*",
     "@agentkit/core": "workspace:*",
