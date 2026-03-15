@@ -42,6 +42,8 @@ import { ShareSaga, TOTAL_FRAMES as SSAGA_FRAMES } from "./videos/share-saga/Sha
 import { ShareVolume, TOTAL_FRAMES as SVOL_FRAMES } from "./videos/share-volume/ShareVolume";
 import { InvestorPitch, TOTAL_FRAMES as INVESTOR_FRAMES } from "./videos/investor-pitch/InvestorPitch";
 import { VideoGuide, TOTAL_FRAMES as VG_FRAMES } from "./videos/video-guide/VideoGuide";
+import { OpenclawMemory, TOTAL_FRAMES as OCMEM_FRAMES } from "./videos/openclaw-memory/OpenclawMemory";
+import { DevSetup, TOTAL_FRAMES as DXSETUP_FRAMES } from "./videos/dev-setup/DevSetup";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -344,6 +346,14 @@ export const RemotionRoot: React.FC = () => {
           width={1920}
           height={1080}
         />
+        <Composition
+          id="OpenclawMemory"
+          component={OpenclawMemory}
+          durationInFrames={OCMEM_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
       </Folder>
       <Folder name="开发">
         <Composition
@@ -382,6 +392,14 @@ export const RemotionRoot: React.FC = () => {
           id="OpenclawVolume"
           component={OpenclawVolume}
           durationInFrames={OV_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="DevSetup"
+          component={DevSetup}
+          durationInFrames={DXSETUP_FRAMES}
           fps={30}
           width={1920}
           height={1080}

@@ -1,0 +1,9 @@
+[
+  {"id": "dx-intro", "text": "这个视频介绍ClawChat的本地开发体验。一条命令启动十六个容器，改代码自动热重载，前后端完全Docker化。五分钟搭好环境，直接写代码。"},
+  {"id": "dx-onecommand", "text": "make dev，一条命令。Docker Compose拉起所有服务：PostgreSQL、Redis、九个后端服务、nginx代理、前端、还有监控全家桶。十几秒，从零到全栈可用。打开localhost 8080就能看到应用。"},
+  {"id": "dx-services", "text": "十六个容器分四层。基础设施层是PostgreSQL和Redis。业务层有im-server、agent-server、container-server、openclaw-server等六个后端。平台层是mcp-server和skill-registry-server。入口层是nginx反代，统一到8080端口，前端和API同域，不用操心跨域。"},
+  {"id": "dx-hotreload", "text": "后端改代码不用重启。所有Node服务用tsx watch模式，源码挂载到容器里，改了文件自动重编译。前端改了Flutter代码，make reload重新构建Web产物、重启nginx，刷新浏览器就看到效果。"},
+  {"id": "dx-tools", "text": "日常开发有一套Makefile快捷指令。make logs-im看单服务日志，make restart-agent重启单个服务，make db-studio打开数据库GUI，make diagnose一键诊断整个环境。每个操作都是一条命令，不用记Docker参数。"},
+  {"id": "dx-testing", "text": "测试分三层。L1用Widget测试做回归，mock HTTP，跑得快。L2用vitest跑API端到端测试，直连真实数据库。L3用Playwright做全链路集成，注册登录加好友发消息全走一遍。make e2e-test一条命令跑完。"},
+  {"id": "dx-outro", "text": "回顾一下。make dev启动，make reload热更前端，make dev-stop停止，三条命令覆盖日常。所有服务容器化，环境一致，不怕在我这能跑的问题。新人clone仓库，装个Docker，make dev，就能开始贡献。"}
+]

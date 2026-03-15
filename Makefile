@@ -5,11 +5,14 @@ VERSION := $(shell cat VERSION)
 
 dev:
 	docker compose up -d --build
+	cd promo-video && npx remotion studio --port 3100 &
 	@echo "All services starting. Logs: make logs"
 	@echo "Web UI: http://localhost:8080"
+	@echo "Remotion Studio: http://localhost:3100"
 
 dev-stop:
 	docker compose down
+	-pkill -f "remotion studio" 2>/dev/null
 	@echo "All dev services stopped"
 
 reload: app-build-web skill-build-web

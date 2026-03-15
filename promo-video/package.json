@@ -24,7 +24,9 @@
     "tts:skill-devwalk": "npx tsx scripts/generate-tts.ts skill-devwalk --force",
     "render:agent-db": "remotion render AgentDb out/agent-db.mp4",
     "render:skill-tutorial": "remotion render SkillTutorial out/skill-tutorial.mp4",
-    "render:skill-devwalk": "remotion render SkillDevwalk out/skill-devwalk.mp4"
+    "render:skill-devwalk": "remotion render SkillDevwalk out/skill-devwalk.mp4",
+    "tts:dev-setup": "npx tsx scripts/generate-tts.ts dev-setup --force",
+    "render:dev-setup": "remotion render DevSetup out/dev-setup.mp4"
   },
   "keywords": [],
   "author": "",

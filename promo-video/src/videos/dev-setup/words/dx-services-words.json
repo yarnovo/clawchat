@@ -1,0 +1,217 @@
+[
+  {
+    "part": "十六",
+    "start": 30181,
+    "end": 30613
+  },
+  {
+    "part": "个",
+    "start": 30613,
+    "end": 30693
+  },
+  {
+    "part": "容器",
+    "start": 30704,
+    "end": 31022
+  },
+  {
+    "part": "分",
+    "start": 31022,
+    "end": 31170
+  },
+  {
+    "part": "四",
+    "start": 31181,
+    "end": 31374
+  },
+  {
+    "part": "层。",
+    "start": 31375,
+    "end": 31693
+  },
+  {
+    "part": "基础",
+    "start": 32204,
+    "end": 32545
+  },
+  {
+    "part": "设施层",
+    "start": 32556,
+    "end": 33034
+  },
+  {
+    "part": "是",
+    "start": 33045,
+    "end": 33329
+  },
+  {
+    "part": "PostgreSQL",
+    "start": 33420,
+    "end": 34659
+  },
+  {
+    "part": "和",
+    "start": 34670,
+    "end": 34840
+  },
+  {
+    "part": "Redis。",
+    "start": 34852,
+    "end": 35374
+  },
+  {
+    "part": "业务层",
+    "start": 35897,
+    "end": 36352
+  },
+  {
+    "part": "有",
+    "start": 36363,
+    "end": 36625
+  },
+  {
+    "part": "im-server、",
+    "start": 36715,
+    "end": 37340
+  },
+  {
+    "part": "agent-server、",
+    "start": 37568,
+    "end": 38363
+  },
+  {
+    "part": "container-server、",
+    "start": 38590,
+    "end": 39477
+  },
+  {
+    "part": "openclaw-server",
+    "start": 39715,
+    "end": 40613
+  },
+  {
+    "part": "等",
+    "start": 40625,
+    "end": 40806
+  },
+  {
+    "part": "六",
+    "start": 40829,
+    "end": 40999
+  },
+  {
+    "part": "个",
+    "start": 41000,
+    "end": 41056
+  },
+  {
+    "part": "后端。",
+    "start": 41068,
+    "end": 41488
+  },
+  {
+    "part": "平台",
+    "start": 42011,
+    "end": 42375
+  },
+  {
+    "part": "层",
+    "start": 42375,
+    "end": 42693
+  },
+  {
+    "part": "是",
+    "start": 42784,
+    "end": 43022
+  },
+  {
+    "part": "mcp-server",
+    "start": 43034,
+    "end": 43965
+  },
+  {
+    "part": "和",
+    "start": 44056,
+    "end": 44238
+  },
+  {
+    "part": "skill-registry-server。",
+    "start": 44250,
+    "end": 45511
+  },
+  {
+    "part": "入口层",
+    "start": 46034,
+    "end": 46704
+  },
+  {
+    "part": "是",
+    "start": 46784,
+    "end": 46965
+  },
+  {
+    "part": "nginx",
+    "start": 46977,
+    "end": 47329
+  },
+  {
+    "part": "反代，",
+    "start": 47329,
+    "end": 47738
+  },
+  {
+    "part": "统一",
+    "start": 48034,
+    "end": 48352
+  },
+  {
+    "part": "到",
+    "start": 48363,
+    "end": 48556
+  },
+  {
+    "part": "8080",
+    "start": 48579,
+    "end": 49340
+  },
+  {
+    "part": "端口，",
+    "start": 49352,
+    "end": 49784
+  },
+  {
+    "part": "前端",
+    "start": 50056,
+    "end": 50454
+  },
+  {
+    "part": "和",
+    "start": 50465,
+    "end": 50636
+  },
+  {
+    "part": "API",
+    "start": 50647,
+    "end": 51079
+  },
+  {
+    "part": "同域，",
+    "start": 51079,
+    "end": 51522
+  },
+  {
+    "part": "不用",
+    "start": 51704,
+    "end": 51977
+  },
+  {
+    "part": "操心",
+    "start": 51988,
+    "end": 52329
+  },
+  {
+    "part": "跨域。",
+    "start": 52340,
+    "end": 52772
+  }
+]
