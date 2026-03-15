@@ -1,0 +1,37 @@
+[
+  {
+    "id": "intro",
+    "startMs": 95,
+    "endMs": 4856
+  },
+  {
+    "id": "case-rent",
+    "startMs": 5375,
+    "endMs": 12068
+  },
+  {
+    "id": "case-labor",
+    "startMs": 12579,
+    "endMs": 19272
+  },
+  {
+    "id": "case-penalty",
+    "startMs": 19795,
+    "endMs": 26693
+  },
+  {
+    "id": "case-format",
+    "startMs": 27215,
+    "endMs": 33761
+  },
+  {
+    "id": "report",
+    "startMs": 34284,
+    "endMs": 41340
+  },
+  {
+    "id": "outro",
+    "startMs": 41863,
+    "endMs": 47409
+  }
+]

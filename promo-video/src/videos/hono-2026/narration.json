@@ -1,0 +1,9 @@
+[
+  {"id": "intro", "text": "二零二六年，有一个Web框架悄然登顶，它叫Hono。"},
+  {"id": "era", "text": "Express已经十三岁了，中间件臃肿，不支持边缘计算。开发者迫切需要更现代的选择。"},
+  {"id": "what", "text": "Hono，日语中火焰的意思。完全基于Web标准API，核心体积仅14KB。"},
+  {"id": "compare", "text": "对比主流框架，Hono在性能、体积和跨运行时兼容性上全面领先。"},
+  {"id": "features", "text": "类型安全的RPC调用、内置数据校验、OpenAPI文档自动生成，开发体验拉满。"},
+  {"id": "runtime", "text": "一套代码，Cloudflare Workers、Deno、Bun、Node全部适配。真正的一次编写、到处运行。"},
+  {"id": "outro", "text": "从边缘计算到云端服务器，Hono已经点燃了整个Web生态。"}
+]

@@ -127,3 +127,89 @@
     @apply font-sans;
     }
 }
+
+/* Typing indicator bounce animation */
+@keyframes typing-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+/* Code syntax highlighting (highlight.js compatible) */
+.hljs {
+  color: var(--foreground);
+  background: transparent;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: var(--muted-foreground);
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-type {
+  color: oklch(0.6 0.2 300);
+}
+
+.dark .hljs-keyword,
+.dark .hljs-selector-tag,
+.dark .hljs-type {
+  color: oklch(0.75 0.15 300);
+}
+
+.hljs-string,
+.hljs-addition {
+  color: oklch(0.55 0.15 150);
+}
+
+.dark .hljs-string,
+.dark .hljs-addition {
+  color: oklch(0.72 0.12 150);
+}
+
+.hljs-number,
+.hljs-literal {
+  color: oklch(0.6 0.18 50);
+}
+
+.dark .hljs-number,
+.dark .hljs-literal {
+  color: oklch(0.75 0.14 50);
+}
+
+.hljs-title,
+.hljs-section,
+.hljs-built_in {
+  color: oklch(0.55 0.2 250);
+}
+
+.dark .hljs-title,
+.dark .hljs-section,
+.dark .hljs-built_in {
+  color: oklch(0.72 0.15 250);
+}
+
+.hljs-attr,
+.hljs-attribute {
+  color: oklch(0.6 0.15 80);
+}
+
+.dark .hljs-attr,
+.dark .hljs-attribute {
+  color: oklch(0.75 0.12 80);
+}
+
+.hljs-deletion {
+  color: var(--destructive);
+}
+
+.hljs-meta {
+  color: var(--muted-foreground);
+}

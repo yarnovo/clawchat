@@ -82,6 +82,9 @@ import { AkExtMemory, AK_EXT_MEMORY_FRAMES } from "./videos/ak-ext-memory/AkExtM
 import { AkChHttp, AK_CH_HTTP_FRAMES } from "./videos/ak-ch-http/AkChHttp";
 import { AkExtSkills, AK_EXT_SKILLS_FRAMES } from "./videos/ak-ext-skills/AkExtSkills";
 import { AkSessionSqlite, AK_SESSION_SQLITE_FRAMES } from "./videos/ak-session-sqlite/AkSessionSqlite";
+import { Hono2026, TOTAL_FRAMES as HONO2026_FRAMES } from "./videos/hono-2026/Hono2026";
+import { LegalAssistant, TOTAL_FRAMES as LEGAL_FRAMES } from "./videos/legal-assistant/LegalAssistant";
+import { LegalCases, TOTAL_FRAMES as LEGAL_CASES_FRAMES } from "./videos/legal-cases/LegalCases";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -678,6 +681,32 @@ export const RemotionRoot: React.FC = () => {
           id="AiTrends2026"
           component={AiTrends2026}
           durationInFrames={AITRENDS_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="Hono2026"
+          component={Hono2026}
+          durationInFrames={HONO2026_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+      </Folder>
+      <Folder name="Agent-Promo">
+        <Composition
+          id="LegalAssistant"
+          component={LegalAssistant}
+          durationInFrames={LEGAL_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="LegalCases"
+          component={LegalCases}
+          durationInFrames={LEGAL_CASES_FRAMES}
           fps={30}
           width={1920}
           height={1080}

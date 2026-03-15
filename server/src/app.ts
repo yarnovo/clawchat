@@ -4,28 +4,35 @@
  */
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
-import { auth } from './auth.js';
-import { agents } from './agents.js';
-import { containers } from './containers.js';
-import { market } from './market.js';
-import { skills } from './skills.js';
-import { toolsMarket } from './tools-market.js';
-import { billing } from './billing.js';
+import { cors } from 'hono/cors';
+import { authMiddleware, type AuthEnv } from './middleware/auth.js';
+import { agentsRoutes } from './routes/agents.js';
+import { proxyRoutes } from './routes/proxy.js';
+import { marketRoutes } from './routes/market.js';
+import { billingRoutes } from './routes/billing.js';
+import { skillsRoutes } from './routes/skills.js';
 
-const app = new Hono();
+const app = new Hono<AuthEnv>();
 
-// 健康检查
+// ---------- Global middleware ----------
+app.use('*', cors());
+
+// Health check (before auth)
 app.get('/health', (c) => c.json({ status: 'ok' }));
 
-// 路由
-app.route('/api/auth', auth);
-app.route('/api/agents', agents);
-app.route('/api/containers', containers);
-app.route('/api/market', market);
-app.route('/api/skills', skills);
-app.route('/api/tools', toolsMarket);
-app.route('/api/billing', billing);
+// JWT auth (skips /health internally)
+app.use('*', authMiddleware());
 
+// ---------- Routes ----------
+app.route('/api/agents', agentsRoutes);
+app.route('/api/proxy', proxyRoutes);
+app.route('/api/market', marketRoutes);
+app.route('/api/billing', billingRoutes);
+app.route('/api/skills', skillsRoutes);
+
+// ---------- Start ----------
 const port = parseInt(process.env.PORT || '3000');
-console.log(`🚀 AgentKit Server on http://localhost:${port}`);
+console.log(`AgentKit Server on http://localhost:${port}`);
 serve({ fetch: app.fetch, port });
+
+export default app;

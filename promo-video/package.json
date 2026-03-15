@@ -46,7 +46,13 @@
     "tts:agentkit-arch": "npx tsx scripts/generate-tts.ts agentkit-arch --force",
     "render:agentkit-arch": "remotion render AgentKitArch out/agentkit-arch.mp4",
     "tts:tools-compare": "npx tsx scripts/generate-tts.ts tools-compare --force",
-    "render:tools-compare": "remotion render ToolsCompare out/tools-compare.mp4"
+    "render:tools-compare": "remotion render ToolsCompare out/tools-compare.mp4",
+    "tts:hono-2026": "npx tsx scripts/generate-tts.ts hono-2026 --force",
+    "render:hono-2026": "remotion render Hono2026 out/hono-2026.mp4",
+    "tts:legal-assistant": "npx tsx scripts/generate-tts.ts legal-assistant --force",
+    "render:legal-assistant": "remotion render LegalAssistant out/legal-assistant.mp4",
+    "tts:legal-cases": "npx tsx scripts/generate-tts.ts legal-cases --force",
+    "render:legal-cases": "remotion render LegalCases out/legal-cases.mp4"
   },
   "keywords": [],
   "author": "",

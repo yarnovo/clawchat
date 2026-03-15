@@ -11,11 +11,18 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.11",
-    "hono": "^4.0.0"
+    "dockerode": "^4.0.9",
+    "drizzle-orm": "^0.45.1",
+    "hono": "^4.0.0",
+    "postgres": "^3.4.8",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/dockerode": "^4.0.1",
     "@types/node": "^22.10.0",
+    "drizzle-kit": "^0.31.9",
     "tsx": "^4.19.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.0"
   }
 }
