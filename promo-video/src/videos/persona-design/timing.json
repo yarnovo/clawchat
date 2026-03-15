@@ -1,0 +1,32 @@
+[
+  {
+    "id": "pd-intro",
+    "startMs": 95,
+    "endMs": 10886
+  },
+  {
+    "id": "pd-openclaw",
+    "startMs": 11409,
+    "endMs": 20545
+  },
+  {
+    "id": "pd-nanoclaw",
+    "startMs": 21068,
+    "endMs": 35784
+  },
+  {
+    "id": "pd-ironclaw",
+    "startMs": 36306,
+    "endMs": 59124
+  },
+  {
+    "id": "pd-agentcore",
+    "startMs": 59647,
+    "endMs": 81636
+  },
+  {
+    "id": "pd-outro",
+    "startMs": 82159,
+    "endMs": 96704
+  }
+]

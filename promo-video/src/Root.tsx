@@ -58,6 +58,7 @@ import { K8sGuide, TOTAL_FRAMES as K8S_FRAMES } from "./videos/k8s-guide/K8sGuid
 import { K8sDeploy, TOTAL_FRAMES as K8SDEPLOY_FRAMES } from "./videos/k8s-deploy/K8sDeploy";
 import { TechArch, TOTAL_FRAMES as TECHARCH_FRAMES } from "./videos/tech-arch/TechArch";
 import { AiTrends2026, TOTAL_FRAMES as AITRENDS_FRAMES } from "./videos/ai-trends-2026/AiTrends2026";
+import { PersonaDesign, TOTAL_FRAMES as PD_FRAMES } from "./videos/persona-design/PersonaDesign";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -545,6 +546,14 @@ export const RemotionRoot: React.FC = () => {
             id="TechArch"
             component={TechArch}
             durationInFrames={TECHARCH_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="PersonaDesign"
+            component={PersonaDesign}
+            durationInFrames={PD_FRAMES}
             fps={30}
             width={1920}
             height={1080}
