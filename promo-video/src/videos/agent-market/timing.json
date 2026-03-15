@@ -1,0 +1,42 @@
+[
+  {
+    "id": "am-intro",
+    "startMs": 95,
+    "endMs": 15443
+  },
+  {
+    "id": "am-browse",
+    "startMs": 15954,
+    "endMs": 29886
+  },
+  {
+    "id": "am-chat",
+    "startMs": 30409,
+    "endMs": 45568
+  },
+  {
+    "id": "am-evolve",
+    "startMs": 46079,
+    "endMs": 63147
+  },
+  {
+    "id": "am-fork",
+    "startMs": 63670,
+    "endMs": 79772
+  },
+  {
+    "id": "am-publish",
+    "startMs": 80295,
+    "endMs": 98636
+  },
+  {
+    "id": "am-flywheel",
+    "startMs": 99159,
+    "endMs": 116352
+  },
+  {
+    "id": "am-outro",
+    "startMs": 116875,
+    "endMs": 131829
+  }
+]
