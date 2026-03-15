@@ -46,12 +46,10 @@ import { OpenclawMemory, TOTAL_FRAMES as OCMEM_FRAMES } from "./videos/openclaw-
 import { DevSetup, TOTAL_FRAMES as DXSETUP_FRAMES } from "./videos/dev-setup/DevSetup";
 import { RuntimeBattle, TOTAL_FRAMES as RB_FRAMES } from "./videos/runtime-battle/RuntimeBattle";
 import { SecurityFaceoff, TOTAL_FRAMES as SF_FRAMES } from "./videos/security-faceoff/SecurityFaceoff";
-import { ToolEcosystem, TOTAL_FRAMES as TE_FRAMES } from "./videos/tool-ecosystem/ToolEcosystem";
 import { StateMemory, TOTAL_FRAMES as SM_FRAMES } from "./videos/state-memory/StateMemory";
 import { BizOpportunities, TOTAL_FRAMES as BIZOP_FRAMES } from "./videos/biz-opportunities/BizOpportunities";
 import { NanoClawGuide, TOTAL_FRAMES as NCG_FRAMES } from "./videos/nanoclaw-guide/NanoClawGuide";
 import { AgentAgency, TOTAL_FRAMES as AAGENCY_FRAMES } from "./videos/agent-agency/AgentAgency";
-import { ToolsCompare, TOTAL_FRAMES as TC_FRAMES } from "./videos/tools-compare/ToolsCompare";
 import { AgentMarket, TOTAL_FRAMES as AMKT_FRAMES } from "./videos/agent-market/AgentMarket";
 import { SeedAgents, TOTAL_FRAMES as SA_FRAMES } from "./videos/seed-agents/SeedAgents";
 import { CoreTools, TOTAL_FRAMES as CT_FRAMES } from "./videos/core-tools/CoreTools";
@@ -59,17 +57,31 @@ import { K8sGuide, TOTAL_FRAMES as K8S_FRAMES } from "./videos/k8s-guide/K8sGuid
 import { K8sDeploy, TOTAL_FRAMES as K8SDEPLOY_FRAMES } from "./videos/k8s-deploy/K8sDeploy";
 import { TechArch, TOTAL_FRAMES as TECHARCH_FRAMES } from "./videos/tech-arch/TechArch";
 import { AiTrends2026, TOTAL_FRAMES as AITRENDS_FRAMES } from "./videos/ai-trends-2026/AiTrends2026";
-import { PersonaDesign, TOTAL_FRAMES as PD_FRAMES } from "./videos/persona-design/PersonaDesign";
-import { LoadStrategy, TOTAL_FRAMES as LS_FRAMES } from "./videos/load-strategy/LoadStrategy";
-import { SkillLoading, TOTAL_FRAMES as SKLOAD_FRAMES } from "./videos/skill-loading/SkillLoading";
-import { AgentCoreWalk, TOTAL_FRAMES as ACW_FRAMES } from "./videos/agent-core-walk/AgentCoreWalk";
-import { TestArch, TOTAL_FRAMES as TA_FRAMES } from "./videos/test-arch/TestArch";
-import { EvalFramework, TOTAL_FRAMES as EF_FRAMES } from "./videos/eval-framework/EvalFramework";
-import { AgentEvals, TOTAL_FRAMES as AE_FRAMES } from "./videos/agent-evals/AgentEvals";
-import { SchedulerDesign, TOTAL_FRAMES as SCHED_FRAMES } from "./videos/scheduler-design/SchedulerDesign";
-import { ChannelDesign, TOTAL_FRAMES as CHDESIGN_FRAMES } from "./videos/channel-design/ChannelDesign";
-import { AgentKitArch, TOTAL_FRAMES as AKARCH_FRAMES } from "./videos/agentkit-arch/AgentKitArch";
-import { BackendArch, TOTAL_FRAMES as BARCH_FRAMES } from "./videos/backend-arch/BackendArch";
+import { AkAgentic, AK_AGENTIC_FRAMES } from "./videos/ak-agentic/AkAgentic";
+import { AkCore, AK_CORE_FRAMES } from "./videos/ak-core/AkCore";
+import { AkProviderOpenai, AK_PROVIDER_OPENAI_FRAMES } from "./videos/ak-provider-openai/AkProviderOpenai";
+import { AkEventLoop, AK_EVENT_LOOP_FRAMES } from "./videos/ak-event-loop/AkEventLoop";
+import { AkEval, AK_EVAL_FRAMES } from "./videos/ak-eval/AkEval";
+import { AkCli, AK_CLI_FRAMES } from "./videos/ak-cli/AkCli";
+import { AkExtensionGuide, AK_EXTENSION_GUIDE_FRAMES } from "./videos/ak-extension-guide/AkExtensionGuide";
+import { AkDevGuide, AK_DEV_GUIDE_FRAMES } from "./videos/ak-dev-guide/AkDevGuide";
+// Walkthrough videos
+import { WkCore, WK_CORE_FRAMES } from "./videos/wk-core/WkCore";
+import { WkEventLoop, WK_EVENT_LOOP_FRAMES } from "./videos/wk-event-loop/WkEventLoop";
+import { WkAgentic, WK_AGENTIC_FRAMES } from "./videos/wk-agentic/WkAgentic";
+import { WkProviderLlm, WK_PROVIDER_LLM_FRAMES } from "./videos/wk-provider-llm/WkProviderLlm";
+import { WkProviderSession, WK_PROVIDER_SESSION_FRAMES } from "./videos/wk-provider-session/WkProviderSession";
+import { WkExtSkills, WK_EXT_SKILLS_FRAMES } from "./videos/wk-ext-skills/WkExtSkills";
+import { WkExtMemory, WK_EXT_MEMORY_FRAMES } from "./videos/wk-ext-memory/WkExtMemory";
+import { WkChHttp, WK_CH_HTTP_FRAMES } from "./videos/wk-ch-http/WkChHttp";
+import { WkChScheduler, WK_CH_SCHEDULER_FRAMES } from "./videos/wk-ch-scheduler/WkChScheduler";
+import { WkEval, WK_EVAL_FRAMES } from "./videos/wk-eval/WkEval";
+import { WkCli, WK_CLI_FRAMES } from "./videos/wk-cli/WkCli";
+import { AkChScheduler, AK_CH_SCHEDULER_FRAMES } from "./videos/ak-ch-scheduler/AkChScheduler";
+import { AkExtMemory, AK_EXT_MEMORY_FRAMES } from "./videos/ak-ext-memory/AkExtMemory";
+import { AkChHttp, AK_CH_HTTP_FRAMES } from "./videos/ak-ch-http/AkChHttp";
+import { AkExtSkills, AK_EXT_SKILLS_FRAMES } from "./videos/ak-ext-skills/AkExtSkills";
+import { AkSessionSqlite, AK_SESSION_SQLITE_FRAMES } from "./videos/ak-session-sqlite/AkSessionSqlite";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -406,14 +418,6 @@ export const RemotionRoot: React.FC = () => {
             height={1080}
           />
           <Composition
-            id="ToolEcosystem"
-            component={ToolEcosystem}
-            durationInFrames={TE_FRAMES}
-            fps={30}
-            width={1920}
-            height={1080}
-          />
-          <Composition
             id="StateMemory"
             component={StateMemory}
             durationInFrames={SM_FRAMES}
@@ -530,14 +534,6 @@ export const RemotionRoot: React.FC = () => {
         </Folder>
         <Folder name="Tech">
           <Composition
-            id="ToolsCompare"
-            component={ToolsCompare}
-            durationInFrames={TC_FRAMES}
-            fps={30}
-            width={1920}
-            height={1080}
-          />
-          <Composition
             id="CoreTools"
             component={CoreTools}
             durationInFrames={CT_FRAMES}
@@ -569,92 +565,108 @@ export const RemotionRoot: React.FC = () => {
             width={1920}
             height={1080}
           />
-          <Composition
-            id="PersonaDesign"
-            component={PersonaDesign}
-            durationInFrames={PD_FRAMES}
-            fps={30}
-            width={1920}
-            height={1080}
-          />
-          <Composition
-            id="LoadStrategy"
-            component={LoadStrategy}
-            durationInFrames={LS_FRAMES}
-            fps={30}
-            width={1920}
-            height={1080}
-          />
-          <Composition
-            id="SkillLoading"
-            component={SkillLoading}
-            durationInFrames={SKLOAD_FRAMES}
-            fps={30}
-            width={1920}
-            height={1080}
-          />
-          <Composition
-            id="SchedulerDesign"
-            component={SchedulerDesign}
-            durationInFrames={SCHED_FRAMES}
-            fps={30}
-            width={1920}
-            height={1080}
-          />
-          <Composition
-            id="ChannelDesign"
-            component={ChannelDesign}
-            durationInFrames={CHDESIGN_FRAMES}
-            fps={30}
-            width={1920}
-            height={1080}
-          />
-          <Composition
-            id="BackendArch"
-            component={BackendArch}
-            durationInFrames={BARCH_FRAMES}
-            fps={30}
-            width={1920}
-            height={1080}
-          />
         </Folder>
         <Folder name="Developer">
           <Composition
-            id="AgentCoreWalk"
-            component={AgentCoreWalk}
-            durationInFrames={ACW_FRAMES}
+            id="AkAgentic"
+            component={AkAgentic}
+            durationInFrames={AK_AGENTIC_FRAMES}
             fps={30}
             width={1920}
             height={1080}
           />
           <Composition
-            id="TestArch"
-            component={TestArch}
-            durationInFrames={TA_FRAMES}
+            id="AkCore"
+            component={AkCore}
+            durationInFrames={AK_CORE_FRAMES}
             fps={30}
             width={1920}
             height={1080}
           />
           <Composition
-            id="EvalFramework"
-            component={EvalFramework}
-            durationInFrames={EF_FRAMES}
+            id="AkProviderOpenai"
+            component={AkProviderOpenai}
+            durationInFrames={AK_PROVIDER_OPENAI_FRAMES}
             fps={30}
             width={1920}
             height={1080}
           />
           <Composition
-            id="AgentEvals"
-            component={AgentEvals}
-            durationInFrames={AE_FRAMES}
+            id="AkEval"
+            component={AkEval}
+            durationInFrames={AK_EVAL_FRAMES}
             fps={30}
             width={1920}
             height={1080}
           />
           <Composition
-            id="AgentKitArch"
-            component={AgentKitArch}
-            durationInFrames={AKARCH_FRAMES}
+            id="AkCli"
+            component={AkCli}
+            durationInFrames={AK_CLI_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="AkExtensionGuide"
+            component={AkExtensionGuide}
+            durationInFrames={AK_EXTENSION_GUIDE_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="AkDevGuide"
+            component={AkDevGuide}
+            durationInFrames={AK_DEV_GUIDE_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="AkChScheduler"
+            component={AkChScheduler}
+            durationInFrames={AK_CH_SCHEDULER_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="AkEventLoop"
+            component={AkEventLoop}
+            durationInFrames={AK_EVENT_LOOP_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="AkExtSkills"
+            component={AkExtSkills}
+            durationInFrames={AK_EXT_SKILLS_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="AkSessionSqlite"
+            component={AkSessionSqlite}
+            durationInFrames={AK_SESSION_SQLITE_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="AkExtMemory"
+            component={AkExtMemory}
+            durationInFrames={AK_EXT_MEMORY_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="AkChHttp"
+            component={AkChHttp}
+            durationInFrames={AK_CH_HTTP_FRAMES}
             fps={30}
             width={1920}
             height={1080}
@@ -670,6 +682,19 @@ export const RemotionRoot: React.FC = () => {
           width={1920}
           height={1080}
         />
+      </Folder>
+      <Folder name="Walkthrough">
+        <Composition id="WkCore" component={WkCore} durationInFrames={WK_CORE_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="WkEventLoop" component={WkEventLoop} durationInFrames={WK_EVENT_LOOP_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="WkAgentic" component={WkAgentic} durationInFrames={WK_AGENTIC_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="WkProviderLlm" component={WkProviderLlm} durationInFrames={WK_PROVIDER_LLM_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="WkProviderSession" component={WkProviderSession} durationInFrames={WK_PROVIDER_SESSION_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="WkExtSkills" component={WkExtSkills} durationInFrames={WK_EXT_SKILLS_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="WkExtMemory" component={WkExtMemory} durationInFrames={WK_EXT_MEMORY_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="WkChHttp" component={WkChHttp} durationInFrames={WK_CH_HTTP_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="WkChScheduler" component={WkChScheduler} durationInFrames={WK_CH_SCHEDULER_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="WkEval" component={WkEval} durationInFrames={WK_EVAL_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="WkCli" component={WkCli} durationInFrames={WK_CLI_FRAMES} fps={30} width={1920} height={1080} />
       </Folder>
     </>
   );

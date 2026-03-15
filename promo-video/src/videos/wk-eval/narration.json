@@ -1,0 +1,6 @@
+[
+  {"id": "wkev-overview", "text": "scorers.ts导出三种评分器：toolCorrectness、trajectoryMatch、contentCheck。EvalCase接口的scorers数组声明这个用例要跑哪些评分器，不分层级，按需组合。"},
+  {"id": "wkev-tool", "text": "toolCorrectness拿到Agent实际调用的工具名列表，和expected逐一比对，计算matched除以expected的比值作为score，阈值0.8，低于就fail。"},
+  {"id": "wkev-trajectory", "text": "trajectoryMatch用子序列匹配。指针j从零开始，遍历actual数组，每命中一个expected就j加一。最终j除以expected长度就是得分，顺序必须对。"},
+  {"id": "wkev-content", "text": "contentCheck检查mustContain和mustNotContain关键词，missing加forbidden就是失败数。runScorers遍历case.scorers数组，按名字分发到对应评分器，收集结果返回。"}
+]

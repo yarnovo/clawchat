@@ -1,0 +1,18 @@
+[
+  {
+    "id": "wkch-overview",
+    "text": "channel-http是AgentKit的HTTP通道实现。纯Node.js的http.createServer，零依赖。内置CORS处理，暴露三个端点：SSE事件推送、Chat聊天接口、Info信息查询。整个文件不到一百行。"
+  },
+  {
+    "id": "wkch-sse",
+    "text": "SSE端点是实时推送的核心。GET /api/events，writeHead设置text/event-stream、no-cache和keep-alive。连接成功后发送connected事件，把response加入sseClients这个Set。客户端断开时自动从Set中移除，内存零泄漏。"
+  },
+  {
+    "id": "wkch-chat",
+    "text": "Chat端点处理用户消息。POST /api/chat，手动收集Buffer拼接解析JSON。拿到text后，先broadcast typing状态，然后push一个message事件到EventLoop等待LLM回复，最后broadcast assistant回复给所有SSE客户端。"
+  },
+  {
+    "id": "wkch-lifecycle",
+    "text": "生命周期管理很干净。setup创建HTTP Server并监听端口，从AgenticContext拿到EventLoop引用。teardown时遍历sseClients逐个end，clear清空Set，最后关闭Server。创建和销毁完全对称，不留任何残留连接。"
+  }
+]

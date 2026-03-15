@@ -1,0 +1,5 @@
+[
+  {"id": "akev-intro", "text": "Eval框架，Agent的考试系统。三种评分器按测试类型分类：工具正确性、轨迹匹配、内容检查。每个用例自己声明用哪些评分器。"},
+  {"id": "akev-design", "text": "三个评分器各司其职。工具正确性检查Agent调用了正确的工具，轨迹匹配验证调用顺序，内容检查确认关键信息。"},
+  {"id": "akev-summary", "text": "每个Agent的evals目录下放测试用例，JSONL格式一行一个。运行agentkit eval，输出通过率报告。红的修，绿的过。"}
+]

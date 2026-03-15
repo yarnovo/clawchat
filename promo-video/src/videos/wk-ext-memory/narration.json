@@ -1,0 +1,5 @@
+[
+  {"id": "wkem-overview", "text": "extension-memory，一个六十行的Extension插件。读取MEMORY点MD注入system prompt，支持热更新。"},
+  {"id": "wkem-setup", "text": "setup钩子读取MEMORY点MD，超过maxSize自动截断并追加truncated标记。systemPrompt方法返回记忆内容，注入到每轮对话。"},
+  {"id": "wkem-postbash", "text": "postBash钩子监听bash命令。如果命令包含MEMORY点MD且使用了重定向或tee，就重新读取文件，实现热更新。"}
+]

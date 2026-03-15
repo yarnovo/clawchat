@@ -1,0 +1,6 @@
+[
+  {"id": "wkag-overview", "text": "Agentic包只有三个文件。index.ts做re-export，interfaces.ts定义Channel和Extension两个核心接口，runner.ts实现AgentRunner把一切串起来。"},
+  {"id": "wkag-interfaces", "text": "interfaces.ts定义了三个接口。Channel是感知加行动，连接外部世界，有name、setup、teardown、info四个方法。Extension是增强Agent行为，systemPrompt注入知识，preBash和postBash拦截命令。AgenticContext传递workDir和eventLoop给两者。"},
+  {"id": "wkag-runner-1", "text": "runner.ts的AgentRunner，构造函数接收workspace和LLM Provider，创建EventLoop。use方法用isExtension鸭子类型检查，自动分流到channels或extensions数组。start流程：先setup所有Extension和Channel，然后收集systemPrompt拼接，最后创建Agent并传入bash hooks。"},
+  {"id": "wkag-runner-2", "text": "最关键的桥接代码：loop点onProcess注册回调，EventLoop收到事件后格式化成文本，调用agent点run驱动LLM思考。Extension的preBash和postBash被路由到Agent的onBeforeBash和onAfterBash。这就是整个Agentic层的核心——它把事件循环、LLM Agent和插件系统粘在一起。"}
+]

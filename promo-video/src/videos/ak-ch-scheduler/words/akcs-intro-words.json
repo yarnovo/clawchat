@@ -1,0 +1,92 @@
+[
+  {
+    "part": "Scheduler ",
+    "start": 95,
+    "end": 606
+  },
+  {
+    "part": "Channel，",
+    "start": 618,
+    "end": 1095
+  },
+  {
+    "part": "Agent",
+    "start": 1311,
+    "end": 1709
+  },
+  {
+    "part": "的",
+    "start": 1709,
+    "end": 1788
+  },
+  {
+    "part": "时间",
+    "start": 1811,
+    "end": 2140
+  },
+  {
+    "part": "感知。",
+    "start": 2152,
+    "end": 2618
+  },
+  {
+    "part": "监听",
+    "start": 3136,
+    "end": 3647
+  },
+  {
+    "part": "HEARTBEAT",
+    "start": 3738,
+    "end": 4272
+  },
+  {
+    "part": "点",
+    "start": 4272,
+    "end": 4545
+  },
+  {
+    "part": "MD",
+    "start": 4636,
+    "end": 4943
+  },
+  {
+    "part": "文件，",
+    "start": 4954,
+    "end": 5409
+  },
+  {
+    "part": "按",
+    "start": 5659,
+    "end": 5863
+  },
+  {
+    "part": "cron",
+    "start": 5863,
+    "end": 6181
+  },
+  {
+    "part": "表达",
+    "start": 6193,
+    "end": 6477
+  },
+  {
+    "part": "式定",
+    "start": 6488,
+    "end": 6818
+  },
+  {
+    "part": "时",
+    "start": 6818,
+    "end": 7124
+  },
+  {
+    "part": "触发",
+    "start": 7215,
+    "end": 7568
+  },
+  {
+    "part": "任务。",
+    "start": 7579,
+    "end": 7965
+  }
+]

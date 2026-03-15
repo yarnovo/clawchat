@@ -1,0 +1,6 @@
+[
+  {"id": "wkcs-overview", "text": "这是channel-scheduler的代码走读。它是一个Channel实现，通过监听HEARTBEAT.md文件变化和cron轮询，把定时事件推送到EventLoop，让Agent拥有时间感知能力。"},
+  {"id": "wkcs-parse", "text": "核心是parseHeartbeat函数。它用正则按##标题分割Markdown，逐段提取cron和prompt字段。每个cron表达式都经过CronExpressionParser校验，无效的直接跳过并记录错误日志。"},
+  {"id": "wkcs-setup", "text": "setup方法是启动入口。先调loadTasks读取HEARTBEAT.md并解析任务列表，然后用fs.watch监听文件变化实现热重载。同时启动一个60秒间隔的setInterval做cron轮询，触发时调用createEvent推送timer事件到EventLoop。"},
+  {"id": "wkcs-logging", "text": "日志模块很简洁。appendLog往logs/scheduler.log追加带时间戳的日志行。每个任务触发前后都有日志，成功打勾，失败记录错误信息。loadTasks里校验失败的任务也会记录Skipped日志，方便排查配置问题。"}
+]

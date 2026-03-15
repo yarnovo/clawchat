@@ -1,0 +1,102 @@
+[
+  {
+    "part": "OpenAI ",
+    "start": 95,
+    "end": 777
+  },
+  {
+    "part": "Provider，",
+    "start": 788,
+    "end": 1356
+  },
+  {
+    "part": "实现",
+    "start": 1606,
+    "end": 2004
+  },
+  {
+    "part": "了",
+    "start": 2004,
+    "end": 2220
+  },
+  {
+    "part": "LLM",
+    "start": 2322,
+    "end": 2924
+  },
+  {
+    "part": "接口。",
+    "start": 2936,
+    "end": 3402
+  },
+  {
+    "part": "支持",
+    "start": 3920,
+    "end": 4261
+  },
+  {
+    "part": "所有",
+    "start": 4272,
+    "end": 4681
+  },
+  {
+    "part": "OpenAI",
+    "start": 4704,
+    "end": 5318
+  },
+  {
+    "part": "兼容",
+    "start": 5318,
+    "end": 5659
+  },
+  {
+    "part": "端点：",
+    "start": 5670,
+    "end": 6113
+  },
+  {
+    "part": "百",
+    "start": 6409,
+    "end": 6590
+  },
+  {
+    "part": "炼",
+    "start": 6590,
+    "end": 6727
+  },
+  {
+    "part": "的",
+    "start": 6727,
+    "end": 6795
+  },
+  {
+    "part": "千问、",
+    "start": 6806,
+    "end": 7272
+  },
+  {
+    "part": "DeepSeek、",
+    "start": 7465,
+    "end": 8090
+  },
+  {
+    "part": "OpenRouter，",
+    "start": 8306,
+    "end": 9022
+  },
+  {
+    "part": "一个",
+    "start": 9295,
+    "end": 9499
+  },
+  {
+    "part": "Provider",
+    "start": 9522,
+    "end": 9988
+  },
+  {
+    "part": "通吃。",
+    "start": 10000,
+    "end": 10477
+  }
+]

@@ -1,9 +1,0 @@
-[
-  {"id": "ls-intro", "text": "人格文件写好了，怎么加载到Agent里？三大Runtime的策略一样：全部拼接成系统提示词。但加载顺序、截断策略、条件过滤各有不同。"},
-  {"id": "ls-where", "text": "加载到哪里？系统提示词的末尾，放在一个叫Project Context的区域。不是用户消息，不是助手消息，是系统级的。每次调用大模型API时都会带上。"},
-  {"id": "ls-order", "text": "加载顺序。OpenClaw的顺序是AGENTS、SOUL、TOOLS、IDENTITY、USER、HEARTBEAT、BOOTSTRAP、MEMORY。IronClaw类似但先加载BOOTSTRAP。顺序决定了优先级，越靠前越重要。"},
-  {"id": "ls-filter", "text": "条件过滤。不是每次都加载所有文件。主会话加载全部。子Agent和定时任务只加载核心文件，不加载MEMORY。群聊不加载MEMORY，防止隐私泄露。"},
-  {"id": "ls-truncate", "text": "截断策略。OpenClaw单个文件最大两万字符，总计最大十五万字符。超过限制的文件在中间插入省略号截断。IronClaw用混合搜索，BM25全文检索加向量语义搜索，只加载最相关的记忆片段。"},
-  {"id": "ls-agentcore", "text": "agent-core怎么做？启动时从容器的文件系统读取AGENT.md、TOOLS.md、MEMORY.md、HEARTBEAT.md，拼接成系统提示词。AGENT.md只读保护，MEMORY.md可读可写。简单直接。"},
-  {"id": "ls-outro", "text": "总结。人格文件全部注入系统提示词。加载有顺序、有条件、有截断。核心原则：越重要的文件越靠前，隐私文件按场景过滤，大文件智能截断。"}
-]

@@ -1,0 +1,222 @@
+[
+  {
+    "part": "run",
+    "start": 28920,
+    "end": 29193
+  },
+  {
+    "part": "命令",
+    "start": 29193,
+    "end": 29624
+  },
+  {
+    "part": "是",
+    "start": 29704,
+    "end": 29874
+  },
+  {
+    "part": "最",
+    "start": 29886,
+    "end": 30102
+  },
+  {
+    "part": "基础",
+    "start": 30102,
+    "end": 30397
+  },
+  {
+    "part": "的",
+    "start": 30397,
+    "end": 30488
+  },
+  {
+    "part": "交互",
+    "start": 30511,
+    "end": 30818
+  },
+  {
+    "part": "方式。",
+    "start": 30829,
+    "end": 31295
+  },
+  {
+    "part": "创建",
+    "start": 31818,
+    "end": 32261
+  },
+  {
+    "part": "AgentRunner，",
+    "start": 32284,
+    "end": 32999
+  },
+  {
+    "part": "注入",
+    "start": 33306,
+    "end": 33704
+  },
+  {
+    "part": "createLLM",
+    "start": 33727,
+    "end": 34772
+  },
+  {
+    "part": "返回",
+    "start": 34784,
+    "end": 35124
+  },
+  {
+    "part": "的",
+    "start": 35125,
+    "end": 35272
+  },
+  {
+    "part": "OpenAIProvider",
+    "start": 35295,
+    "end": 36465
+  },
+  {
+    "part": "和",
+    "start": 36477,
+    "end": 36795
+  },
+  {
+    "part": "SQLiteSession，",
+    "start": 36863,
+    "end": 37943
+  },
+  {
+    "part": "然后",
+    "start": 38159,
+    "end": 38499
+  },
+  {
+    "part": "通过",
+    "start": 38511,
+    "end": 38852
+  },
+  {
+    "part": "点",
+    "start": 38863,
+    "end": 39079
+  },
+  {
+    "part": "use",
+    "start": 39079,
+    "end": 39352
+  },
+  {
+    "part": "链式",
+    "start": 39352,
+    "end": 39624
+  },
+  {
+    "part": "注册",
+    "start": 39636,
+    "end": 40090
+  },
+  {
+    "part": "skillsExtension",
+    "start": 40181,
+    "end": 41295
+  },
+  {
+    "part": "和",
+    "start": 41386,
+    "end": 41556
+  },
+  {
+    "part": "memoryExtension。",
+    "start": 41568,
+    "end": 42624
+  },
+  {
+    "part": "支持",
+    "start": 43147,
+    "end": 43534
+  },
+  {
+    "part": "减",
+    "start": 43556,
+    "end": 43772
+  },
+  {
+    "part": "m",
+    "start": 43772,
+    "end": 44022
+  },
+  {
+    "part": "参数",
+    "start": 44034,
+    "end": 44431
+  },
+  {
+    "part": "单条",
+    "start": 44454,
+    "end": 44749
+  },
+  {
+    "part": "消息",
+    "start": 44761,
+    "end": 45045
+  },
+  {
+    "part": "模式，",
+    "start": 45056,
+    "end": 45522
+  },
+  {
+    "part": "否则",
+    "start": 45784,
+    "end": 46056
+  },
+  {
+    "part": "启动",
+    "start": 46068,
+    "end": 46488
+  },
+  {
+    "part": "readline",
+    "start": 46511,
+    "end": 47000
+  },
+  {
+    "part": "交互",
+    "start": 47022,
+    "end": 47295
+  },
+  {
+    "part": "循环，",
+    "start": 47306,
+    "end": 47852
+  },
+  {
+    "part": "用户",
+    "start": 48079,
+    "end": 48374
+  },
+  {
+    "part": "输入",
+    "start": 48386,
+    "end": 48750
+  },
+  {
+    "part": "直接",
+    "start": 48772,
+    "end": 49068
+  },
+  {
+    "part": "传给",
+    "start": 49079,
+    "end": 49443
+  },
+  {
+    "part": "runner.",
+    "start": 49465,
+    "end": 49806
+  },
+  {
+    "part": "chat。",
+    "start": 49829,
+    "end": 50249
+  }
+]

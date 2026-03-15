@@ -1,0 +1,14 @@
+{
+  "name": "@agentkit/agentic",
+  "version": "0.0.1",
+  "description": "Agent orchestrator — Channel + Extension interfaces + AgentRunner",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": { "build": "tsc" },
+  "dependencies": {
+    "@agentkit/core": "workspace:*",
+    "@agentkit/event-loop": "workspace:*"
+  },
+  "devDependencies": { "@types/node": "^22.10.0", "typescript": "^5.7.0" }
+}

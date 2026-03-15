@@ -1,0 +1,142 @@
+[
+  {
+    "part": "Agentic",
+    "start": 95,
+    "end": 674
+  },
+  {
+    "part": "包",
+    "start": 675,
+    "end": 947
+  },
+  {
+    "part": "只有",
+    "start": 1038,
+    "end": 1277
+  },
+  {
+    "part": "三",
+    "start": 1300,
+    "end": 1515
+  },
+  {
+    "part": "个",
+    "start": 1515,
+    "end": 1595
+  },
+  {
+    "part": "文件。",
+    "start": 1606,
+    "end": 2038
+  },
+  {
+    "part": "index.",
+    "start": 2556,
+    "end": 3090
+  },
+  {
+    "part": "ts",
+    "start": 3261,
+    "end": 3795
+  },
+  {
+    "part": "做",
+    "start": 3886,
+    "end": 4136
+  },
+  {
+    "part": "re-export，",
+    "start": 4136,
+    "end": 4954
+  },
+  {
+    "part": "interfaces.",
+    "start": 5204,
+    "end": 5988
+  },
+  {
+    "part": "ts",
+    "start": 6147,
+    "end": 6545
+  },
+  {
+    "part": "定义",
+    "start": 6556,
+    "end": 6965
+  },
+  {
+    "part": "Channel",
+    "start": 7056,
+    "end": 7511
+  },
+  {
+    "part": "和",
+    "start": 7602,
+    "end": 7806
+  },
+  {
+    "part": "Extension",
+    "start": 7818,
+    "end": 8409
+  },
+  {
+    "part": "两",
+    "start": 8420,
+    "end": 8579
+  },
+  {
+    "part": "个",
+    "start": 8579,
+    "end": 8636
+  },
+  {
+    "part": "核心",
+    "start": 8659,
+    "end": 8999
+  },
+  {
+    "part": "接口，",
+    "start": 9011,
+    "end": 9431
+  },
+  {
+    "part": "runner.",
+    "start": 9647,
+    "end": 10034
+  },
+  {
+    "part": "ts",
+    "start": 10193,
+    "end": 10602
+  },
+  {
+    "part": "实现",
+    "start": 10613,
+    "end": 11056
+  },
+  {
+    "part": "AgentRunner",
+    "start": 11079,
+    "end": 11840
+  },
+  {
+    "part": "把",
+    "start": 11943,
+    "end": 12079
+  },
+  {
+    "part": "一切",
+    "start": 12090,
+    "end": 12420
+  },
+  {
+    "part": "串",
+    "start": 12420,
+    "end": 12613
+  },
+  {
+    "part": "起来。",
+    "start": 12625,
+    "end": 12954
+  }
+]

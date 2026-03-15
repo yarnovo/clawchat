@@ -1,15 +1,31 @@
 /**
- * Scorers — L1/L2/L3 评估评分器
+ * Eval Scorers — 按测试类型评分
+ *
+ * 三种评分器：
+ * - toolCorrectness: Agent 是否调了正确的工具
+ * - trajectoryMatch: 工具调用顺序是否匹配
+ * - contentCheck: 回复是否包含/不包含关键词
+ *
+ * 每个用例直接声明用哪些评分器，不分层级。
  */
 
+export type ScorerName = 'toolCorrectness' | 'trajectoryMatch' | 'contentCheck';
+
 export interface EvalCase {
-  layer: 'L1' | 'L2' | 'L3';
+  /** 用哪些评分器 */
+  scorers: ScorerName[];
+  /** 输入 */
   input: string;
-  expectedTools?: string[];
-  trajectory?: Array<{ tool: string }>;
-  mustContain?: string[];
-  mustNotContain?: string[];
+  /** 场景描述（可选） */
   scenario?: string;
+  /** toolCorrectness: 期望调用的工具 */
+  expectedTools?: string[];
+  /** trajectoryMatch: 期望的调用轨迹 */
+  trajectory?: Array<{ tool: string }>;
+  /** contentCheck: 必须包含 */
+  mustContain?: string[];
+  /** contentCheck: 不能包含 */
+  mustNotContain?: string[];
 }
 
 export interface AgentTrace {
@@ -24,6 +40,8 @@ export interface ScoreResult {
   pass: boolean;
   reason?: string;
 }
+
+// ---- 评分器 ----
 
 export function toolCorrectness(trace: AgentTrace, expected: string[]): ScoreResult {
   if (expected.length === 0 && trace.toolCalls.length === 0)
@@ -57,4 +75,19 @@ export function contentCheck(output: string, mustContain: string[], mustNotConta
   if (missing.length) reasons.push(`Missing: ${missing.join(', ')}`);
   if (forbidden.length) reasons.push(`Forbidden: ${forbidden.join(', ')}`);
   return { name: 'contentCheck', score, pass: failures === 0, reason: reasons.join(' | ') || 'All checks passed' };
+}
+
+/** 根据用例声明的 scorers 运行评分 */
+export function runScorers(c: EvalCase, trace: AgentTrace): ScoreResult[] {
+  const results: ScoreResult[] = [];
+  for (const name of c.scorers) {
+    if (name === 'toolCorrectness') {
+      results.push(toolCorrectness(trace, c.expectedTools || []));
+    } else if (name === 'trajectoryMatch') {
+      results.push(trajectoryMatch(trace, c.trajectory || []));
+    } else if (name === 'contentCheck') {
+      results.push(contentCheck(trace.output, c.mustContain || [], c.mustNotContain || []));
+    }
+  }
+  return results;
 }

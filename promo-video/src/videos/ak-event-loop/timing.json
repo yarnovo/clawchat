@@ -1,0 +1,17 @@
+[
+  {
+    "id": "akel-intro",
+    "startMs": 95,
+    "endMs": 8636
+  },
+  {
+    "id": "akel-design",
+    "startMs": 9159,
+    "endMs": 18397
+  },
+  {
+    "id": "akel-summary",
+    "startMs": 18920,
+    "endMs": 29840
+  }
+]

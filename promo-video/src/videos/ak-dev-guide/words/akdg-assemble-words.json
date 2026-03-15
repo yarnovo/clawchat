@@ -1,0 +1,227 @@
+[
+  {
+    "part": "最后",
+    "start": 82363,
+    "end": 82727
+  },
+  {
+    "part": "一",
+    "start": 82738,
+    "end": 82863
+  },
+  {
+    "part": "步，",
+    "start": 82863,
+    "end": 83079
+  },
+  {
+    "part": "组装。",
+    "start": 83295,
+    "end": 83749
+  },
+  {
+    "part": "AgentRunner",
+    "start": 84250,
+    "end": 84977
+  },
+  {
+    "part": "的",
+    "start": 84977,
+    "end": 85056
+  },
+  {
+    "part": "构造",
+    "start": 85079,
+    "end": 85363
+  },
+  {
+    "part": "函数",
+    "start": 85375,
+    "end": 85715
+  },
+  {
+    "part": "接收",
+    "start": 85727,
+    "end": 86204
+  },
+  {
+    "part": "Provider：",
+    "start": 86295,
+    "end": 86874
+  },
+  {
+    "part": "llm",
+    "start": 87136,
+    "end": 87829
+  },
+  {
+    "part": "和",
+    "start": 87931,
+    "end": 88090
+  },
+  {
+    "part": "session。",
+    "start": 88102,
+    "end": 88579
+  },
+  {
+    "part": "点",
+    "start": 89102,
+    "end": 89329
+  },
+  {
+    "part": "use",
+    "start": 89329,
+    "end": 89568
+  },
+  {
+    "part": "注册",
+    "start": 89579,
+    "end": 90011
+  },
+  {
+    "part": "Channel",
+    "start": 90102,
+    "end": 90568
+  },
+  {
+    "part": "和",
+    "start": 90659,
+    "end": 90863
+  },
+  {
+    "part": "Extension。",
+    "start": 90875,
+    "end": 91556
+  },
+  {
+    "part": "调用",
+    "start": 92079,
+    "end": 92431
+  },
+  {
+    "part": "start，",
+    "start": 92431,
+    "end": 92897
+  },
+  {
+    "part": "Runner",
+    "start": 93170,
+    "end": 93613
+  },
+  {
+    "part": "自动",
+    "start": 93715,
+    "end": 94045
+  },
+  {
+    "part": "把",
+    "start": 94056,
+    "end": 94238
+  },
+  {
+    "part": "EventLoop",
+    "start": 94261,
+    "end": 94988
+  },
+  {
+    "part": "和",
+    "start": 95079,
+    "end": 95272
+  },
+  {
+    "part": "Agent",
+    "start": 95284,
+    "end": 95659
+  },
+  {
+    "part": "连",
+    "start": 95681,
+    "end": 95886
+  },
+  {
+    "part": "起来。",
+    "start": 95886,
+    "end": 96227
+  },
+  {
+    "part": "Extensions",
+    "start": 96738,
+    "end": 97431
+  },
+  {
+    "part": "的",
+    "start": 97431,
+    "end": 97556
+  },
+  {
+    "part": "systemPrompt",
+    "start": 97579,
+    "end": 98431
+  },
+  {
+    "part": "合并",
+    "start": 98511,
+    "end": 98886
+  },
+  {
+    "part": "到",
+    "start": 98886,
+    "end": 99034
+  },
+  {
+    "part": "系统",
+    "start": 99056,
+    "end": 99374
+  },
+  {
+    "part": "提示",
+    "start": 99386,
+    "end": 99681
+  },
+  {
+    "part": "词，",
+    "start": 99681,
+    "end": 100011
+  },
+  {
+    "part": "preBash",
+    "start": 100261,
+    "end": 100886
+  },
+  {
+    "part": "和",
+    "start": 100977,
+    "end": 101147
+  },
+  {
+    "part": "postBash",
+    "start": 101159,
+    "end": 101852
+  },
+  {
+    "part": "接入",
+    "start": 101943,
+    "end": 102318
+  },
+  {
+    "part": "Agent",
+    "start": 102340,
+    "end": 102715
+  },
+  {
+    "part": "的",
+    "start": 102715,
+    "end": 102806
+  },
+  {
+    "part": "bash",
+    "start": 102829,
+    "end": 103090
+  },
+  {
+    "part": "钩子。",
+    "start": 103090,
+    "end": 103499
+  }
+]

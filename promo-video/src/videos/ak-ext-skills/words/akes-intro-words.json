@@ -1,0 +1,92 @@
+[
+  {
+    "part": "Skills ",
+    "start": 95,
+    "end": 572
+  },
+  {
+    "part": "Extension，",
+    "start": 584,
+    "end": 1299
+  },
+  {
+    "part": "Agent",
+    "start": 1515,
+    "end": 1902
+  },
+  {
+    "part": "的",
+    "start": 1902,
+    "end": 2004
+  },
+  {
+    "part": "技能",
+    "start": 2027,
+    "end": 2288
+  },
+  {
+    "part": "系统。",
+    "start": 2300,
+    "end": 2731
+  },
+  {
+    "part": "加载",
+    "start": 3250,
+    "end": 3727
+  },
+  {
+    "part": "SKILL",
+    "start": 3806,
+    "end": 4170
+  },
+  {
+    "part": "点",
+    "start": 4170,
+    "end": 4374
+  },
+  {
+    "part": "MD",
+    "start": 4386,
+    "end": 4704
+  },
+  {
+    "part": "文件，",
+    "start": 4715,
+    "end": 5159
+  },
+  {
+    "part": "注入",
+    "start": 5386,
+    "end": 5636
+  },
+  {
+    "part": "提示",
+    "start": 5647,
+    "end": 5954
+  },
+  {
+    "part": "词，",
+    "start": 5954,
+    "end": 6295
+  },
+  {
+    "part": "执行",
+    "start": 6477,
+    "end": 6829
+  },
+  {
+    "part": "生命",
+    "start": 6852,
+    "end": 7181
+  },
+  {
+    "part": "周期",
+    "start": 7193,
+    "end": 7499
+  },
+  {
+    "part": "钩子。",
+    "start": 7511,
+    "end": 7931
+  }
+]

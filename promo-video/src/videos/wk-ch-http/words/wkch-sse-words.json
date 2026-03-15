@@ -1,0 +1,197 @@
+[
+  {
+    "part": "SSE",
+    "start": 18215,
+    "end": 18818
+  },
+  {
+    "part": "端点",
+    "start": 18829,
+    "end": 19318
+  },
+  {
+    "part": "是",
+    "start": 19340,
+    "end": 19499
+  },
+  {
+    "part": "实时",
+    "start": 19511,
+    "end": 19875
+  },
+  {
+    "part": "推送",
+    "start": 19886,
+    "end": 20238
+  },
+  {
+    "part": "的",
+    "start": 20238,
+    "end": 20306
+  },
+  {
+    "part": "核心。",
+    "start": 20318,
+    "end": 20784
+  },
+  {
+    "part": "GET /",
+    "start": 21306,
+    "end": 21556
+  },
+  {
+    "part": "api/",
+    "start": 21568,
+    "end": 22090
+  },
+  {
+    "part": "events，",
+    "start": 22102,
+    "end": 22647
+  },
+  {
+    "part": "writeHead",
+    "start": 22909,
+    "end": 23443
+  },
+  {
+    "part": "设置",
+    "start": 23454,
+    "end": 23874
+  },
+  {
+    "part": "text/",
+    "start": 23897,
+    "end": 24272
+  },
+  {
+    "part": "event-stream、",
+    "start": 24284,
+    "end": 24988
+  },
+  {
+    "part": "no-cache",
+    "start": 25181,
+    "end": 25772
+  },
+  {
+    "part": "和",
+    "start": 25863,
+    "end": 26011
+  },
+  {
+    "part": "keep-alive。",
+    "start": 26022,
+    "end": 26602
+  },
+  {
+    "part": "连接",
+    "start": 27125,
+    "end": 27431
+  },
+  {
+    "part": "成功",
+    "start": 27443,
+    "end": 27795
+  },
+  {
+    "part": "后",
+    "start": 27795,
+    "end": 28079
+  },
+  {
+    "part": "发送",
+    "start": 28170,
+    "end": 28568
+  },
+  {
+    "part": "connected",
+    "start": 28568,
+    "end": 29056
+  },
+  {
+    "part": "事件，",
+    "start": 29068,
+    "end": 29511
+  },
+  {
+    "part": "把",
+    "start": 29772,
+    "end": 29909
+  },
+  {
+    "part": "response",
+    "start": 29931,
+    "end": 30556
+  },
+  {
+    "part": "加入",
+    "start": 30647,
+    "end": 31090
+  },
+  {
+    "part": "sseClients",
+    "start": 31113,
+    "end": 32170
+  },
+  {
+    "part": "这个",
+    "start": 32181,
+    "end": 32397
+  },
+  {
+    "part": "Set。",
+    "start": 32420,
+    "end": 32784
+  },
+  {
+    "part": "客户端",
+    "start": 33306,
+    "end": 33795
+  },
+  {
+    "part": "断开",
+    "start": 33806,
+    "end": 34159
+  },
+  {
+    "part": "时",
+    "start": 34159,
+    "end": 34477
+  },
+  {
+    "part": "自动",
+    "start": 34568,
+    "end": 34920
+  },
+  {
+    "part": "从",
+    "start": 34931,
+    "end": 35159
+  },
+  {
+    "part": "Set",
+    "start": 35159,
+    "end": 35465
+  },
+  {
+    "part": "中",
+    "start": 35465,
+    "end": 35624
+  },
+  {
+    "part": "移除，",
+    "start": 35636,
+    "end": 36102
+  },
+  {
+    "part": "内存",
+    "start": 36306,
+    "end": 36636
+  },
+  {
+    "part": "零泄漏。",
+    "start": 36659,
+    "end": 37227
+  }
+]

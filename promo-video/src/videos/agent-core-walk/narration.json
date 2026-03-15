@@ -1,8 +1,0 @@
-[
-  {"id": "acw-intro", "text": "agent-core是我们自己写的Agent引擎。不依赖任何闭源SDK，总共六个文件，三百行代码。这个视频带你过一遍核心逻辑。"},
-  {"id": "acw-agent", "text": "agent.ts是核心，不到一百行。一个while循环：调大模型，检查有没有工具调用，有就执行工具把结果传回去，没有就返回文本。这就是Agent的全部。支持workDir参数，自动从文件系统加载人格。"},
-  {"id": "acw-llm", "text": "llm.ts定义了LLMProvider接口。任何模型只要实现chat方法就能接入。openai-provider.ts用openai包实现了这个接口，支持百炼、DeepSeek、GPT等所有OpenAI兼容端点。换模型只需要改三个参数：apiKey、baseURL、model。"},
-  {"id": "acw-persona", "text": "persona.ts负责人格加载。从容器的文件系统读取四个文件：AGENT.md定义人格和规则，受保护不能修改。TOOLS.md描述工具。MEMORY.md存长期记忆，Agent可以读写。HEARTBEAT.md定义定时任务。全部拼接注入系统提示词。"},
-  {"id": "acw-tools", "text": "types.ts定义工具接口。每个工具有名字、描述、参数定义、执行函数。session.ts管理聊天历史，有两个实现：InMemorySession用于测试，SQLiteSession用于生产。SQLite文件在容器内，docker commit能带走。六个文件，职责清晰。"},
-  {"id": "acw-outro", "text": "总结。agent.ts是while循环，llm.ts是模型接口，openai-provider是百炼适配，persona.ts是人格加载，types.ts是工具定义，session.ts是聊天历史持久化。三百行代码，模型无关，已验证百炼qwen-plus跑通工具调用。"}
-]

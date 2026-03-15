@@ -1,9 +1,0 @@
-[
-  {"id": "ak-intro", "text": "AgentKit有六个包，每个包职责清晰。这个视频介绍它们怎么配合工作，从用户发消息到Agent回复的完整链路。"},
-  {"id": "ak-packages", "text": "六个包。core是引擎，while循环加LLM调用。tools是十三个内置工具。eval是评估评分器。channels是接口层，接收外部消息。scheduler是定时任务，读HEARTBEAT.md按cron执行。cli是命令行入口，集成所有包。"},
-  {"id": "ak-flow", "text": "一条消息的完整链路。用户在App里发消息，App调Channel的POST api/chat接口。Channel收到后调agent.run()。core的while循环开始：调LLM，LLM说要用工具，core调tools里的bash或read执行，把结果传回LLM，LLM生成最终回复。Channel通过SSE推回App。"},
-  {"id": "ak-scheduler", "text": "定时任务的链路。scheduler启动时读HEARTBEAT.md，解析cron表达式，计算下次执行时间。到点了直接调agent.run()，跟用户发消息走的是同一条路。结果可以通过Channel推给用户，也可以写入MEMORY.md。"},
-  {"id": "ak-eval", "text": "评估的链路。agentkit eval命令读取evals目录的cases.jsonl，对每条用例模拟Agent调用，用scorers评分。三层评估：L1工具调用、L2轨迹、L3内容。报告输出到evals目录的report.json。"},
-  {"id": "ak-extend", "text": "扩展怎么做。接飞书？在channels里加一个feishu.ts实现Channel接口。加新工具？在tools里加一个文件导出Tool。加新技能？在Agent工作区的skills目录放SKILL.md。核心代码不用改。"},
-  {"id": "ak-outro", "text": "总结。六个包，三条链路。消息链路：Channel到core到tools。定时链路：scheduler到core。评估链路：eval读cases跑scorers。每个包可以独立升级，不会互相影响。这就是AgentKit的架构。"}
-]

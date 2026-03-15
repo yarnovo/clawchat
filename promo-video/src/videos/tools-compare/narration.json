@@ -1,8 +1,0 @@
-[
-  {"id": "tc-intro", "text": "三个Agent Runtime各自有不同的工具体系。OpenClaw二十三个工具，NanoClaw十九个，IronClaw四十多个。这个视频带你对比它们的能力边界。"},
-  {"id": "tc-openclaw", "text": "OpenClaw有二十三个工具。文件操作、Shell执行、网络搜索、记忆系统、多会话管理。独有的亮点是浏览器控制和画布操作，还有内置的文本转语音。灵活但没有沙箱隔离，所有工具和Agent跑在同一个进程里。"},
-  {"id": "tc-nanoclaw", "text": "NanoClaw基于Claude Code的工具集，十九个工具。文件操作用Bash加五个专用工具。独有的是团队协作工具，可以创建多Agent编排。最大特点是MCP通配符扩展，可以接入任何MCP Server的工具。工具在Docker容器里执行，安全隔离。"},
-  {"id": "tc-ironclaw", "text": "IronClaw功能最全，四十多个工具。完整的任务调度系统，定时任务全套管理，技能市场可以动态安装和卸载工具，图像生成和编辑，密钥安全管理。所有工具在WASM沙箱里执行，最安全。"},
-  {"id": "tc-unique", "text": "每个Runtime都有独门绝技。OpenClaw能控制浏览器，适合自动化网页操作。NanoClaw有Agent Teams多智能体协作。IronClaw有完整的工具市场，可以动态安装新能力，还有图像生成和密钥安全管理。"},
-  {"id": "tc-outro", "text": "总结。需要浏览器自动化和灵活操控选OpenClaw。需要容器隔离和多Agent协作选NanoClaw。需要企业级完整功能集选IronClaw。三个Runtime并存不是冗余，是覆盖不同场景。"}
-]

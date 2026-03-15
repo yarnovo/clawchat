@@ -1,0 +1,232 @@
+[
+  {
+    "part": "runner.",
+    "start": 35511,
+    "end": 35954
+  },
+  {
+    "part": "ts",
+    "start": 36181,
+    "end": 36602
+  },
+  {
+    "part": "的",
+    "start": 36602,
+    "end": 36727
+  },
+  {
+    "part": "AgentRunner，",
+    "start": 36750,
+    "end": 37465
+  },
+  {
+    "part": "构造",
+    "start": 37750,
+    "end": 38056
+  },
+  {
+    "part": "函数",
+    "start": 38068,
+    "end": 38420
+  },
+  {
+    "part": "接收",
+    "start": 38431,
+    "end": 38829
+  },
+  {
+    "part": "workspace",
+    "start": 38852,
+    "end": 39522
+  },
+  {
+    "part": "和",
+    "start": 39534,
+    "end": 39840
+  },
+  {
+    "part": "LLM ",
+    "start": 39931,
+    "end": 40511
+  },
+  {
+    "part": "Provider，",
+    "start": 40522,
+    "end": 41079
+  },
+  {
+    "part": "创建",
+    "start": 41318,
+    "end": 41738
+  },
+  {
+    "part": "EventLoop。",
+    "start": 41761,
+    "end": 42431
+  },
+  {
+    "part": "use",
+    "start": 42954,
+    "end": 43238
+  },
+  {
+    "part": "方法",
+    "start": 43238,
+    "end": 43659
+  },
+  {
+    "part": "用",
+    "start": 43670,
+    "end": 43931
+  },
+  {
+    "part": "isExtension",
+    "start": 43954,
+    "end": 44829
+  },
+  {
+    "part": "鸭子",
+    "start": 44852,
+    "end": 45124
+  },
+  {
+    "part": "类型",
+    "start": 45136,
+    "end": 45443
+  },
+  {
+    "part": "检查，",
+    "start": 45454,
+    "end": 45920
+  },
+  {
+    "part": "自动",
+    "start": 46181,
+    "end": 46499
+  },
+  {
+    "part": "分流",
+    "start": 46511,
+    "end": 46806
+  },
+  {
+    "part": "到",
+    "start": 46806,
+    "end": 47045
+  },
+  {
+    "part": "channels",
+    "start": 47136,
+    "end": 47727
+  },
+  {
+    "part": "或",
+    "start": 47818,
+    "end": 48056
+  },
+  {
+    "part": "extensions",
+    "start": 48068,
+    "end": 48715
+  },
+  {
+    "part": "数组。",
+    "start": 48727,
+    "end": 49181
+  },
+  {
+    "part": "start",
+    "start": 49704,
+    "end": 50090
+  },
+  {
+    "part": "流程：",
+    "start": 50090,
+    "end": 50579
+  },
+  {
+    "part": "先",
+    "start": 50829,
+    "end": 51056
+  },
+  {
+    "part": "setup",
+    "start": 51056,
+    "end": 51477
+  },
+  {
+    "part": "所有",
+    "start": 51488,
+    "end": 51886
+  },
+  {
+    "part": "Extension",
+    "start": 51897,
+    "end": 52579
+  },
+  {
+    "part": "和",
+    "start": 52670,
+    "end": 52806
+  },
+  {
+    "part": "Channel，",
+    "start": 52818,
+    "end": 53249
+  },
+  {
+    "part": "然后",
+    "start": 53522,
+    "end": 53784
+  },
+  {
+    "part": "收集",
+    "start": 53795,
+    "end": 54227
+  },
+  {
+    "part": "systemPrompt",
+    "start": 54250,
+    "end": 55000
+  },
+  {
+    "part": "拼接，",
+    "start": 55011,
+    "end": 55477
+  },
+  {
+    "part": "最后",
+    "start": 55681,
+    "end": 56011
+  },
+  {
+    "part": "创建",
+    "start": 56022,
+    "end": 56477
+  },
+  {
+    "part": "Agent",
+    "start": 56568,
+    "end": 57045
+  },
+  {
+    "part": "并",
+    "start": 57136,
+    "end": 57295
+  },
+  {
+    "part": "传入",
+    "start": 57306,
+    "end": 57715
+  },
+  {
+    "part": "bash ",
+    "start": 57738,
+    "end": 57977
+  },
+  {
+    "part": "hooks。",
+    "start": 57988,
+    "end": 58443
+  }
+]

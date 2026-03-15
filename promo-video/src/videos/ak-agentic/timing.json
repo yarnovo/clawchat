@@ -1,0 +1,17 @@
+[
+  {
+    "id": "akag-intro",
+    "startMs": 95,
+    "endMs": 9556
+  },
+  {
+    "id": "akag-design",
+    "startMs": 10079,
+    "endMs": 20999
+  },
+  {
+    "id": "akag-summary",
+    "startMs": 21522,
+    "endMs": 30034
+  }
+]

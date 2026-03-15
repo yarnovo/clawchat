@@ -1,0 +1,5 @@
+[
+  {"id": "wkpllm-overview", "text": "provider-llm-openai实现了LLMProvider接口，依赖openai这一个npm包，支持任何OpenAI兼容端点，百炼、DeepSeek、OpenRouter一个Provider通吃。"},
+  {"id": "wkpllm-constructor", "text": "构造函数接收五个配置项：apiKey、baseURL、model、maxTokens、temperature，用这些参数初始化OpenAI客户端。"},
+  {"id": "wkpllm-chat", "text": "chat方法是核心。先用toOpenAIMessage把ChatMessage转成OpenAI格式，调用completions.create，再从response中提取tool_calls，返回统一的LLMResponse。"}
+]

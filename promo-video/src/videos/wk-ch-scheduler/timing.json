@@ -1,0 +1,22 @@
+[
+  {
+    "id": "wkcs-overview",
+    "startMs": 95,
+    "endMs": 13477
+  },
+  {
+    "id": "wkcs-parse",
+    "startMs": 14000,
+    "endMs": 29022
+  },
+  {
+    "id": "wkcs-setup",
+    "startMs": 29545,
+    "endMs": 49181
+  },
+  {
+    "id": "wkcs-logging",
+    "startMs": 49704,
+    "endMs": 67022
+  }
+]

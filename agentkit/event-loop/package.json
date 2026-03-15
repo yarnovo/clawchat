@@ -1,0 +1,10 @@
+{
+  "name": "@agentkit/event-loop",
+  "version": "0.0.1",
+  "description": "Generic event bus — push/fire/on/emit with queue strategies",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": { "build": "tsc" },
+  "devDependencies": { "@types/node": "^22.10.0", "typescript": "^5.7.0" }
+}

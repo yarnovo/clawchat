@@ -1,0 +1,6 @@
+[
+  {"id": "wkes-overview", "text": "extension-skills是AgentKit的技能加载扩展。一个Extension实现，从工作目录和内置目录加载SKILL点MD、scripts脚本和hooks钩子。"},
+  {"id": "wkes-loading", "text": "loadSkillDir扫描目录，检查SKILL点MD是否存在，遍历scripts目录收集可执行文件，再按HOOK_EVENTS映射发现hooks目录下的四个钩子脚本。"},
+  {"id": "wkes-allskills", "text": "loadAllSkills先加载工作目录的skills，再加载builtin目录，用Set按名称去重。工作目录优先，同名技能不会被内置覆盖。"},
+  {"id": "wkes-extension", "text": "skillsExtension返回完整Extension。setup加载技能和Persona文件，systemPrompt合并所有提示词，preBash和postBash通过spawnSync执行钩子脚本，stdin传JSON上下文，exit code零放行、二拦截。"}
+]

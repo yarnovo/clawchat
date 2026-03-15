@@ -1,0 +1,6 @@
+[
+  {"id": "wkcore-overview", "text": "AgentKit Core只有四个文件，零外部依赖，导出一个Agent类和一套类型接口。"},
+  {"id": "wkcore-agent", "text": "agent.ts是核心。while循环驱动LLM反复思考，内置BASH_TOOL常量作为唯一工具，支持前后钩子拦截。"},
+  {"id": "wkcore-llm", "text": "llm.ts定义了模型无关的接口。LLMProvider约定chat方法，ChatMessage统一四种角色，ToolCall描述工具调用。"},
+  {"id": "wkcore-session", "text": "session.ts极简。ChatSession接口只有三个方法，InMemorySession用数组实现，十五行代码搞定会话管理。"}
+]

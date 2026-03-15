@@ -1,0 +1,8 @@
+[
+  {"id": "akeg-intro", "text": "AgentKit有三种扩展方式。Provider注入核心依赖，Channel连接外部世界，Extension增强Agent行为。这个视频手把手教你怎么写。"},
+  {"id": "akeg-provider", "text": "Provider最简单，实现Core定义的接口就行。比如写一个新的LLM Provider，实现chat方法，传入AgentRunner的构造函数。Session Provider同理，实现getMessages和addMessage。"},
+  {"id": "akeg-channel", "text": "Channel连接外部世界。实现Channel接口，在setup里拿到EventLoop引用，然后往里push事件。比如写一个WebSocket Channel，收到消息时调用eventLoop点push，创建一个message类型的事件。"},
+  {"id": "akeg-extension", "text": "Extension增强Agent行为。可以注入系统提示词，可以在工具执行前后拦截。比如写一个日志Extension，在preToolUse里记录每次工具调用，在systemPrompt里注入额外指令。"},
+  {"id": "akeg-assemble", "text": "最后用AgentRunner组装。Provider传构造函数，Channel和Extension用点use注册。顺序无所谓，AgentRunner会自动分类。一行start，所有扩展同时激活。"},
+  {"id": "akeg-summary", "text": "三种扩展，三个关注点。Provider管供给，Channel管连接，Extension管增强。互不依赖，按需组合。你的Agent需要什么能力，装什么扩展。"}
+]

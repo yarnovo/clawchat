@@ -1,10 +1,10 @@
-{"layer":"L1","input":"帮我读取这个CSV文件 data.csv","expectedTools":["read"],"mustContain":["数据"],"mustNotContain":[]}
-{"layer":"L1","input":"用Python画一个柱状图","expectedTools":["bash"],"mustContain":["matplotlib","plt"],"mustNotContain":[]}
-{"layer":"L1","input":"帮我跑这个SQL查询 SELECT COUNT(*) FROM orders","expectedTools":["bash"],"mustContain":["查询"],"mustNotContain":[]}
-{"layer":"L2","input":"分析data.csv里的用户增长趋势","trajectory":[{"tool":"read"},{"tool":"bash"}],"mustContain":["趋势","增长","图表"]}
-{"layer":"L2","input":"做一个月度销售报告","trajectory":[{"tool":"read"},{"tool":"bash"},{"tool":"write"}],"mustContain":["报告","月度"]}
-{"layer":"L3","input":"我有一份用户行为数据，想知道用户流失的原因","mustContain":["分析","目标","假设"],"mustNotContain":[],"scenario":"churn-analysis"}
-{"layer":"L3","input":"老板让我做一个数据大屏，不知道从哪开始","mustContain":["目标","指标","建议","步骤"],"mustNotContain":[],"scenario":"dashboard-planning"}
-{"layer":"L1","input":"你好","expectedTools":[],"mustContain":[],"mustNotContain":["数据","分析"]}
-{"layer":"L2","input":"帮我预测下个月的销售额","mustContain":["预测","模型","假设","局限"],"mustNotContain":["一定"]}
-{"layer":"L3","input":"这两组数据有显著差异吗？A组均值50，B组均值55","mustContain":["检验","p值","显著","样本量"],"mustNotContain":["肯定有差异"]}
+{"input":"帮我读取这个CSV文件 data.csv","expectedTools":["bash"],"mustContain":["数据"],"mustNotContain":[],"scorers":["toolCorrectness","contentCheck"]}
+{"input":"用Python画一个柱状图","expectedTools":["bash"],"mustContain":["matplotlib","plt"],"mustNotContain":[],"scorers":["toolCorrectness","contentCheck"]}
+{"input":"帮我跑这个SQL查询 SELECT COUNT(*) FROM orders","expectedTools":["bash"],"mustContain":["查询"],"mustNotContain":[],"scorers":["toolCorrectness","contentCheck"]}
+{"input":"分析data.csv里的用户增长趋势","trajectory":[{"tool":"bash"},{"tool":"bash"}],"mustContain":["趋势","增长","图表"],"scorers":["trajectoryMatch","contentCheck"]}
+{"input":"做一个月度销售报告","trajectory":[{"tool":"bash"},{"tool":"bash"},{"tool":"write"}],"mustContain":["报告","月度"],"scorers":["trajectoryMatch","contentCheck"]}
+{"input":"我有一份用户行为数据，想知道用户流失的原因","mustContain":["分析","目标","假设"],"mustNotContain":[],"scenario":"churn-analysis","scorers":["contentCheck"]}
+{"input":"老板让我做一个数据大屏，不知道从哪开始","mustContain":["目标","指标","建议","步骤"],"mustNotContain":[],"scenario":"dashboard-planning","scorers":["contentCheck"]}
+{"input":"你好","expectedTools":[],"mustContain":[],"mustNotContain":["数据","分析"],"scorers":["toolCorrectness","contentCheck"]}
+{"input":"帮我预测下个月的销售额","mustContain":["预测","模型","假设","局限"],"mustNotContain":["一定"],"scorers":["contentCheck"]}
+{"input":"这两组数据有显著差异吗？A组均值50，B组均值55","mustContain":["检验","p值","显著","样本量"],"mustNotContain":["肯定有差异"],"scorers":["contentCheck"]}

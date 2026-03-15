@@ -1,9 +1,0 @@
-[
-  {"id": "ba-intro", "text": "AgentKit的后端架构极简。不需要IM服务器，不需要消息队列，不需要WebSocket推送。聊天记录存在容器内的SQLite里。后端只做一件事：管理容器。"},
-  {"id": "ba-no-im", "text": "为什么不需要IM服务器？因为容器就是Agent。聊天记录在容器的SQLite里，对话通过容器内的Channel接口走SSE推送。后端不碰消息内容，只管容器的生命周期。"},
-  {"id": "ba-api", "text": "五个API模块。auth负责用户登录认证。agents负责Agent的增删改查，对应Docker镜像。containers负责容器生命周期：run启动、stop停止、fork复制、commit保存。market负责市场浏览搜索上架。billing负责按使用量计费。"},
-  {"id": "ba-flow", "text": "用户点开聊的完整链路。App调后端的containers/run接口。后端从镜像启动一个Docker容器。容器内agentkit自动启动Channel的HTTP服务。App拿到容器地址后直接跟容器通信。后端不再介入对话。"},
-  {"id": "ba-fork", "text": "fork的链路。用户点fork，App调后端containers/fork接口。后端执行docker commit保存当前容器状态为新镜像，再docker run启动新容器。新容器继承了所有聊天历史、记忆、安装的技能。整个过程对用户透明。"},
-  {"id": "ba-k3s", "text": "部署方案。单台ECS装k3s。每个容器是一个Pod。用户开聊创建Pod，聊完销毁Pod。k3s自动调度，自动重启。后端就是一个Hono服务加TypeScript，跑在同一台机器上。"},
-  {"id": "ba-outro", "text": "总结。后端只管资源不管对话。五个模块：认证、Agent管理、容器管理、市场、计费。对话在容器内闭环。架构极简，一台ECS就能跑。"}
-]

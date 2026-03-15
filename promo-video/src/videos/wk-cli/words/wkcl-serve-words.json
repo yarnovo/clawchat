@@ -1,0 +1,227 @@
+[
+  {
+    "part": "serve",
+    "start": 50761,
+    "end": 51113
+  },
+  {
+    "part": "命令",
+    "start": 51113,
+    "end": 51568
+  },
+  {
+    "part": "是",
+    "start": 51647,
+    "end": 51806
+  },
+  {
+    "part": "完整",
+    "start": 51818,
+    "end": 52181
+  },
+  {
+    "part": "组装",
+    "start": 52193,
+    "end": 52488
+  },
+  {
+    "part": "形态。",
+    "start": 52500,
+    "end": 52943
+  },
+  {
+    "part": "同样",
+    "start": 53465,
+    "end": 53818
+  },
+  {
+    "part": "的",
+    "start": 53818,
+    "end": 53931
+  },
+  {
+    "part": "AgentRunner",
+    "start": 53954,
+    "end": 54715
+  },
+  {
+    "part": "加",
+    "start": 54806,
+    "end": 54988
+  },
+  {
+    "part": "Provider",
+    "start": 55000,
+    "end": 55556
+  },
+  {
+    "part": "加",
+    "start": 55568,
+    "end": 55749
+  },
+  {
+    "part": "Session，",
+    "start": 55761,
+    "end": 56227
+  },
+  {
+    "part": "但",
+    "start": 56534,
+    "end": 56693
+  },
+  {
+    "part": "额外",
+    "start": 56704,
+    "end": 57090
+  },
+  {
+    "part": "use",
+    "start": 57113,
+    "end": 57386
+  },
+  {
+    "part": "了",
+    "start": 57386,
+    "end": 57534
+  },
+  {
+    "part": "schedulerChannel",
+    "start": 57556,
+    "end": 58477
+  },
+  {
+    "part": "和",
+    "start": 58568,
+    "end": 58772
+  },
+  {
+    "part": "httpChannel。",
+    "start": 58784,
+    "end": 59829
+  },
+  {
+    "part": "还",
+    "start": 60352,
+    "end": 60556
+  },
+  {
+    "part": "支持",
+    "start": 60556,
+    "end": 60988
+  },
+  {
+    "part": "strategy",
+    "start": 61011,
+    "end": 61590
+  },
+  {
+    "part": "队列",
+    "start": 61602,
+    "end": 61874
+  },
+  {
+    "part": "策略",
+    "start": 61886,
+    "end": 62363
+  },
+  {
+    "part": "和",
+    "start": 62454,
+    "end": 62659
+  },
+  {
+    "part": "batchWindow",
+    "start": 62670,
+    "end": 63306
+  },
+  {
+    "part": "批",
+    "start": 63306,
+    "end": 63534
+  },
+  {
+    "part": "处理",
+    "start": 63545,
+    "end": 63886
+  },
+  {
+    "part": "窗口",
+    "start": 63909,
+    "end": 64249
+  },
+  {
+    "part": "参数。",
+    "start": 64261,
+    "end": 64761
+  },
+  {
+    "part": "启动",
+    "start": 65284,
+    "end": 65590
+  },
+  {
+    "part": "后",
+    "start": 65590,
+    "end": 65749
+  },
+  {
+    "part": "监听",
+    "start": 65761,
+    "end": 66250
+  },
+  {
+    "part": "SIGINT",
+    "start": 66329,
+    "end": 66863
+  },
+  {
+    "part": "优雅",
+    "start": 66875,
+    "end": 67181
+  },
+  {
+    "part": "退出。",
+    "start": 67193,
+    "end": 67670
+  },
+  {
+    "part": "一",
+    "start": 68193,
+    "end": 68352
+  },
+  {
+    "part": "行",
+    "start": 68352,
+    "end": 68522
+  },
+  {
+    "part": "命令，",
+    "start": 68534,
+    "end": 68931
+  },
+  {
+    "part": "Extensions",
+    "start": 69170,
+    "end": 69931
+  },
+  {
+    "part": "加",
+    "start": 69943,
+    "end": 70124
+  },
+  {
+    "part": "Channels",
+    "start": 70136,
+    "end": 70693
+  },
+  {
+    "part": "全部",
+    "start": 70784,
+    "end": 71136
+  },
+  {
+    "part": "就绪。",
+    "start": 71147,
+    "end": 71602
+  }
+]

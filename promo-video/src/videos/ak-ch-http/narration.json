@@ -1,0 +1,5 @@
+[
+  {"id": "akch-intro", "text": "HTTP Channel，Agent的网络感官。提供REST接口，外部应用通过HTTP和Agent对话。"},
+  {"id": "akch-design", "text": "三个端点。POST chat发送消息，GET events订阅SSE实时推送，GET info查看Agent状态。简单直接。"},
+  {"id": "akch-summary", "text": "收到HTTP请求后，Channel把消息翻译成事件推入Event Loop。Agent处理完后，结果通过SSE实时推送给所有订阅者。"}
+]

@@ -1,0 +1,107 @@
+[
+  {
+    "part": "provider-session-sqlite",
+    "start": 95,
+    "end": 1368
+  },
+  {
+    "part": "实现",
+    "start": 1379,
+    "end": 1856
+  },
+  {
+    "part": "ChatSession",
+    "start": 1879,
+    "end": 2459
+  },
+  {
+    "part": "接口，",
+    "start": 2470,
+    "end": 2913
+  },
+  {
+    "part": "用",
+    "start": 3175,
+    "end": 3402
+  },
+  {
+    "part": "Drizzle ",
+    "start": 3425,
+    "end": 3754
+  },
+  {
+    "part": "ORM",
+    "start": 3765,
+    "end": 4368
+  },
+  {
+    "part": "加",
+    "start": 4379,
+    "end": 4595
+  },
+  {
+    "part": "better-sqlite",
+    "start": 4606,
+    "end": 5231
+  },
+  {
+    "part": "3",
+    "start": 5243,
+    "end": 5459
+  },
+  {
+    "part": "做",
+    "start": 5459,
+    "end": 5584
+  },
+  {
+    "part": "持久化，",
+    "start": 5595,
+    "end": 6231
+  },
+  {
+    "part": "构造",
+    "start": 6443,
+    "end": 6784
+  },
+  {
+    "part": "函数",
+    "start": 6795,
+    "end": 7249
+  },
+  {
+    "part": "自动",
+    "start": 7272,
+    "end": 7556
+  },
+  {
+    "part": "建表，",
+    "start": 7568,
+    "end": 8034
+  },
+  {
+    "part": "零",
+    "start": 8329,
+    "end": 8511
+  },
+  {
+    "part": "配置",
+    "start": 8522,
+    "end": 8840
+  },
+  {
+    "part": "开箱",
+    "start": 8840,
+    "end": 9238
+  },
+  {
+    "part": "即",
+    "start": 9250,
+    "end": 9443
+  },
+  {
+    "part": "用。",
+    "start": 9443,
+    "end": 9693
+  }
+]

@@ -1,95 +1,75 @@
+/**
+ * Agent — 纯内核
+ *
+ * LLM + bash + System Prompt + While Loop
+ *
+ * bash 是内置的唯一工具，不对外暴露 Tool 接口。
+ * 所有其他能力通过 Skill 的 prompt + scripts 提供。
+ */
+import { execSync } from 'child_process';
 import type { LLMProvider, ChatMessage, ToolDefinition } from './llm.js';
-import type { Tool, ToolResult } from './types.js';
 import type { ChatSession } from './session.js';
 import { InMemorySession } from './session.js';
-import { loadPersonaPrompt } from './persona.js';
 
 export interface AgentOptions {
-  /** LLM 提供者 */
   llm: LLMProvider;
-  /** 可用工具 */
-  tools?: Tool[];
-  /** 系统提示词（直接传入字符串） */
   systemPrompt?: string;
-  /** 工作目录（从中加载 AGENT.md / TOOLS.md / MEMORY.md / HEARTBEAT.md） */
-  workDir?: string;
-  /** 会话存储（默认 InMemorySession） */
   session?: ChatSession;
-  /** 最大工具调用轮数（防止无限循环，默认 20） */
   maxRounds?: number;
-  /** 每轮回调 */
-  onToolCall?: (name: string, args: Record<string, unknown>) => void;
-  onToolResult?: (name: string, result: ToolResult) => void;
+  /** bash 执行前拦截（返回 allowed:false 可阻止） */
+  onBeforeBash?: (command: string) => Promise<{ allowed: boolean; reason?: string }>;
+  /** bash 执行后通知 */
+  onAfterBash?: (command: string, output: string, isError: boolean) => Promise<void>;
+  /** LLM 回复文本时 */
   onText?: (text: string) => void;
 }
 
+/** bash 工具定义（内部，发给 LLM） */
+const BASH_TOOL: ToolDefinition = {
+  type: 'function',
+  function: {
+    name: 'bash',
+    description: 'Execute a shell command and return stdout/stderr',
+    parameters: {
+      type: 'object',
+      properties: { command: { type: 'string', description: 'Shell command to execute' } },
+      required: ['command'],
+    },
+  },
+};
+
 export class Agent {
   private llm: LLMProvider;
-  private tools: Map<string, Tool>;
-  private toolDefs: ToolDefinition[];
   private systemPrompt: string;
   private session: ChatSession;
   private maxRounds: number;
-  private onToolCall?: AgentOptions['onToolCall'];
-  private onToolResult?: AgentOptions['onToolResult'];
+  private onBeforeBash?: AgentOptions['onBeforeBash'];
+  private onAfterBash?: AgentOptions['onAfterBash'];
   private onText?: AgentOptions['onText'];
 
   constructor(options: AgentOptions) {
     this.llm = options.llm;
     this.session = options.session || new InMemorySession();
+    this.systemPrompt = options.systemPrompt || 'You are a helpful assistant.';
     this.maxRounds = options.maxRounds || 20;
-    this.onToolCall = options.onToolCall;
-    this.onToolResult = options.onToolResult;
+    this.onBeforeBash = options.onBeforeBash;
+    this.onAfterBash = options.onAfterBash;
     this.onText = options.onText;
-
-    // 构建系统提示词：直接传入 > 从 workDir 加载人格文件 > 默认
-    if (options.systemPrompt) {
-      this.systemPrompt = options.systemPrompt;
-    } else if (options.workDir) {
-      const personaPrompt = loadPersonaPrompt(options.workDir);
-      this.systemPrompt = personaPrompt || 'You are a helpful assistant.';
-    } else {
-      this.systemPrompt = 'You are a helpful assistant.';
-    }
-
-    // 注册工具
-    this.tools = new Map();
-    this.toolDefs = [];
-    for (const tool of options.tools || []) {
-      this.tools.set(tool.name, tool);
-      this.toolDefs.push({
-        type: 'function',
-        function: {
-          name: tool.name,
-          description: tool.description,
-          parameters: tool.parameters,
-        },
-      });
-    }
   }
 
-  /**
-   * 核心 — while 循环
-   */
   async run(userMessage: string): Promise<string> {
     this.session.addMessage({ role: 'user', content: userMessage });
-
     let round = 0;
 
     while (round < this.maxRounds) {
       round++;
-
       const messages: ChatMessage[] = [
         { role: 'system', content: this.systemPrompt },
         ...this.session.getMessages(),
       ];
 
-      const response = await this.llm.chat(
-        messages,
-        this.toolDefs.length > 0 ? this.toolDefs : undefined,
-      );
+      const response = await this.llm.chat(messages, [BASH_TOOL]);
 
-      // LLM 直接回复文本
       if (response.tool_calls.length === 0) {
         const text = response.content || '';
         this.session.addMessage({ role: 'assistant', content: text });
@@ -97,39 +77,45 @@ export class Agent {
         return text;
       }
 
-      // LLM 要调工具
       this.session.addMessage({
-        role: 'assistant',
-        content: response.content || '',
-        tool_calls: response.tool_calls,
+        role: 'assistant', content: response.content || '', tool_calls: response.tool_calls,
       });
 
       for (const call of response.tool_calls) {
-        const tool = this.tools.get(call.name);
-        let result: ToolResult;
+        let content: string;
+        let isError = false;
 
-        if (!tool) {
-          result = { content: `Tool "${call.name}" not found`, isError: true };
+        if (call.name !== 'bash') {
+          content = `Unknown tool: ${call.name}`;
+          isError = true;
         } else {
-          try {
-            const args = JSON.parse(call.arguments);
-            this.onToolCall?.(call.name, args);
-            result = await tool.execute(args);
-          } catch (err) {
-            result = {
-              content: `Error: ${err instanceof Error ? err.message : String(err)}`,
-              isError: true,
-            };
+          const args = JSON.parse(call.arguments);
+          const command = args.command as string;
+
+          // pre-hook
+          if (this.onBeforeBash) {
+            const check = await this.onBeforeBash(command);
+            if (!check.allowed) {
+              content = `Blocked: ${check.reason}`;
+              isError = true;
+              this.session.addMessage({ role: 'tool', content, tool_call_id: call.id });
+              continue;
+            }
           }
+
+          // execute
+          try {
+            content = execSync(command, { encoding: 'utf-8', timeout: 30000, maxBuffer: 1024 * 1024 }).slice(0, 10000);
+          } catch (err: any) {
+            content = `Error: ${err.stderr || err.message}`.slice(0, 5000);
+            isError = true;
+          }
+
+          // post-hook
+          await this.onAfterBash?.(command, content, isError);
         }
 
-        this.onToolResult?.(call.name, result);
-
-        this.session.addMessage({
-          role: 'tool',
-          content: result.content,
-          tool_call_id: call.id,
-        });
+        this.session.addMessage({ role: 'tool', content, tool_call_id: call.id });
       }
     }
 

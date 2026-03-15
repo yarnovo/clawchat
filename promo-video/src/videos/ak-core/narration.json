@@ -1,0 +1,5 @@
+[
+  {"id": "akcore-intro", "text": "AgentKit Core是Agent的纯内核。只做一件事：LLM加工具加提示词，在while循环里反复思考和行动。"},
+  {"id": "akcore-design", "text": "核心只有四个概念。LLM接口定义思考能力，Tool接口定义行动能力，系统提示词定义身份，Session管理对话历史。零外部依赖，极致纯粹。"},
+  {"id": "akcore-summary", "text": "Core不知道外部世界的存在。不知道HTTP，不知道定时器，不知道技能系统。它就是一个大脑，给它输入，它思考，给你输出。"}
+]

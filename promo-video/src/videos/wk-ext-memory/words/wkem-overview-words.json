@@ -1,0 +1,82 @@
+[
+  {
+    "part": "extension-memory，",
+    "start": 95,
+    "end": 1186
+  },
+  {
+    "part": "一个",
+    "start": 1447,
+    "end": 1640
+  },
+  {
+    "part": "六十",
+    "start": 1663,
+    "end": 1936
+  },
+  {
+    "part": "行",
+    "start": 1936,
+    "end": 2186
+  },
+  {
+    "part": "的",
+    "start": 2186,
+    "end": 2379
+  },
+  {
+    "part": "Extension",
+    "start": 2470,
+    "end": 3027
+  },
+  {
+    "part": "插件。",
+    "start": 3038,
+    "end": 3481
+  },
+  {
+    "part": "读取",
+    "start": 4000,
+    "end": 4500
+  },
+  {
+    "part": "MEMORY",
+    "start": 4590,
+    "end": 4954
+  },
+  {
+    "part": "点",
+    "start": 4954,
+    "end": 5227
+  },
+  {
+    "part": "MD",
+    "start": 5318,
+    "end": 5738
+  },
+  {
+    "part": "注入",
+    "start": 5750,
+    "end": 6102
+  },
+  {
+    "part": "system ",
+    "start": 6125,
+    "end": 6556
+  },
+  {
+    "part": "prompt，",
+    "start": 6568,
+    "end": 7011
+  },
+  {
+    "part": "支持",
+    "start": 7227,
+    "end": 7545
+  },
+  {
+    "part": "热更新。",
+    "start": 7568,
+    "end": 8124
+  }
+]

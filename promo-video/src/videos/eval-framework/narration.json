@@ -1,9 +1,0 @@
-[
-  {"id": "ef-intro", "text": "Agent做出来了，怎么知道它好不好用？不能靠感觉，要靠评估框架。我们调研了所有主流方案，最终选了一个能覆盖全部三层的框架。"},
-  {"id": "ef-landscape", "text": "市面上的方案。Promptfoo刚被OpenAI收购，方向偏安全红队。vitest-evals只覆盖工具调用。agentevals只覆盖轨迹。LangWatch Scenario只覆盖端到端。没有一个能单独覆盖三层。除了DeepEval。"},
-  {"id": "ef-deepeval", "text": "DeepEval，一万两千八百颗星，三百万月下载，Python生态。六个Agent专精指标：ToolCorrectness评工具选择，ArgumentCorrectness评参数，ToolUse评多轮调用，TaskCompletion评任务完成，PlanQuality评规划能力，Orchestration评编排效率。一个框架，全覆盖。"},
-  {"id": "ef-layers", "text": "三层评估全部用DeepEval。L1工具调用：ToolCorrectness加ArgumentCorrectness，对比实际调用和期望工具。L2轨迹：ToolUse加PlanQuality，评完整调用链。L3端到端：TaskCompletion加G-Eval，LLM裁判评分。"},
-  {"id": "ef-integration", "text": "怎么跟我们的TypeScript项目集成？agent-core输出trace的JSON文件，Python脚本读JSON跑DeepEval评估。评估逻辑和被评估系统完全解耦。像pytest一样写测试，CI里跑。"},
-  {"id": "ef-why", "text": "为什么不用其他方案？Promptfoo被OpenAI收购有独立性风险。LangSmith绑定LangChain且要付费。三个小框架组合起来维护成本高。DeepEval是唯一的单框架全覆盖方案，开源免费，社区最大。"},
-  {"id": "ef-outro", "text": "总结。一个框架覆盖三层。六个Agent专精指标。一万两千八百颗星。Python写评估，TypeScript写Agent，JSON做桥梁。不靠感觉，靠DeepEval。"}
-]

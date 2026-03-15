@@ -1,0 +1,22 @@
+[
+  {
+    "id": "wkch-overview",
+    "startMs": 95,
+    "endMs": 17704
+  },
+  {
+    "id": "wkch-sse",
+    "startMs": 18215,
+    "endMs": 37227
+  },
+  {
+    "id": "wkch-chat",
+    "startMs": 37750,
+    "endMs": 56840
+  },
+  {
+    "id": "wkch-lifecycle",
+    "startMs": 57363,
+    "endMs": 76147
+  }
+]

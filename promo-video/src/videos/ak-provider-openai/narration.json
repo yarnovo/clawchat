@@ -1,0 +1,4 @@
+[
+  {"id": "akpo-intro", "text": "OpenAI Provider，实现了LLM接口。支持所有OpenAI兼容端点：百炼的千问、DeepSeek、OpenRouter，一个Provider通吃。"},
+  {"id": "akpo-summary", "text": "传入API Key和端点地址就能用。模型无关，厂商无关。换模型只改一行配置，业务代码零改动。"}
+]

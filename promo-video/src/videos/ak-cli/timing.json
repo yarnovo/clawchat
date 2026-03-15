@@ -1,0 +1,17 @@
+[
+  {
+    "id": "akcl-intro",
+    "startMs": 95,
+    "endMs": 9659
+  },
+  {
+    "id": "akcl-design",
+    "startMs": 10181,
+    "endMs": 21840
+  },
+  {
+    "id": "akcl-summary",
+    "startMs": 22363,
+    "endMs": 35431
+  }
+]

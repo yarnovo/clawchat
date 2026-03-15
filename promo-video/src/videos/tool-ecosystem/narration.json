@@ -1,9 +1,0 @@
-[
-  {"id": "te-intro", "text": "工具是Agent的手。三个Runtime的工具系统设计完全不同，从生态理念到安全边界，各有取舍。"},
-  {"id": "te-openclaw", "text": "OpenClaw走生态路线。三层分布：核心内置少量工具，ClawHub注册表提供第三方技能，用户本地还能自定义。分发靠npm包管理，LLM根据提示词自动选择技能。生态最丰富，但工具跟Agent同进程。"},
-  {"id": "te-ironclaw", "text": "IronClaw走安全路线。也是三层：编译入二进制的内置工具，MCP协议对接外部服务，WASM沙箱加载不受信任的工具。每个WASM工具独立沙箱，有燃料计量、内存限制、endpoint白名单。安全最强，但生态还在建设中。"},
-  {"id": "te-nanoclaw", "text": "NanoClaw走极简路线。依赖Claude Code的Skills生态，用斜杠命令触发。不在核心中堆功能，用户想定制直接改源码。工具最少，但理解成本最低，适合快速原型。"},
-  {"id": "te-mcp", "text": "MCP协议是互操作的桥梁。IronClaw原生支持MCP客户端，OpenClaw可以通过扩展接入，NanoClaw也能通过Skills集成。MCP让工具可以跨Runtime复用，不用重复实现。"},
-  {"id": "te-extend", "text": "扩展难度差异大。OpenClaw写个npm包发布到ClawHub，最简单。IronClaw写WASM工具需要编译到WebAssembly，门槛最高但最安全。NanoClaw直接改TypeScript源码，最直接但不可分发。"},
-  {"id": "te-outro", "text": "三种工具系统对应三种需求。要丰富生态选OpenClaw，要安全隔离选IronClaw，要极简定制选NanoClaw。未来通过MCP协议可以逐步打通。"}
-]

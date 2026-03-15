@@ -1,7 +1,7 @@
 {
   "agent": "legal-assistant",
-  "workspace": "/Users/yarnb/agent-projects/clawchat/agentkit/agents/legal-assistant",
-  "timestamp": "2026-03-15T13:02:38.404Z",
+  "workspace": "/Users/yarnb/agent-projects/clawchat/agents/legal-assistant",
+  "timestamp": "2026-03-15T15:44:21.135Z",
   "duration": 0,
   "summary": {
     "total": 10,
@@ -11,7 +11,10 @@
   },
   "cases": [
     {
-      "layer": "L1",
+      "scorers": [
+        "toolCorrectness",
+        "contentCheck"
+      ],
       "input": "帮我看看这个合同有没有问题",
       "pass": true,
       "scores": [
@@ -30,16 +33,12 @@
       ]
     },
     {
-      "layer": "L1",
+      "scorers": [
+        "contentCheck"
+      ],
       "input": "这个违约条款合理吗？甲方可随时单方面终止合同",
       "pass": true,
       "scores": [
-        {
-          "name": "toolCorrectness",
-          "score": 1,
-          "pass": true,
-          "reason": "No tools expected or called"
-        },
         {
           "name": "contentCheck",
           "score": 1,
@@ -49,7 +48,9 @@
       ]
     },
     {
-      "layer": "L1",
+      "scorers": [
+        "toolCorrectness"
+      ],
       "input": "帮我审查附件里的合同",
       "pass": true,
       "scores": [
@@ -58,17 +59,14 @@
           "score": 1,
           "pass": true,
           "reason": "All tools matched"
-        },
-        {
-          "name": "contentCheck",
-          "score": 1,
-          "pass": true,
-          "reason": "All checks passed"
         }
       ]
     },
     {
-      "layer": "L2",
+      "scorers": [
+        "trajectoryMatch",
+        "contentCheck"
+      ],
       "input": "审查这份合同，重点看违约责任和争议解决条款",
       "pass": false,
       "scores": [
@@ -76,7 +74,7 @@
           "name": "trajectoryMatch",
           "score": 0,
           "pass": false,
-          "reason": "Expected: [read → get_time] | Actual: []"
+          "reason": "Expected: [bash → bash] | Actual: []"
         },
         {
           "name": "contentCheck",
@@ -87,7 +85,10 @@
       ]
     },
     {
-      "layer": "L2",
+      "scorers": [
+        "trajectoryMatch",
+        "contentCheck"
+      ],
       "input": "对比这两份合同的差异",
       "pass": false,
       "scores": [
@@ -95,7 +96,7 @@
           "name": "trajectoryMatch",
           "score": 0,
           "pass": false,
-          "reason": "Expected: [read → read] | Actual: []"
+          "reason": "Expected: [bash → bash] | Actual: []"
         },
         {
           "name": "contentCheck",
@@ -106,7 +107,9 @@
       ]
     },
     {
-      "layer": "L3",
+      "scorers": [
+        "contentCheck"
+      ],
       "input": "我是个自由职业者，客户给了一份服务合同，我不太懂法律，帮我看看有没有坑",
       "pass": true,
       "scores": [
@@ -119,7 +122,9 @@
       ]
     },
     {
-      "layer": "L3",
+      "scorers": [
+        "contentCheck"
+      ],
       "input": "这份保密协议的竞业禁止条款是不是太苛刻了？禁止两年内从事同行业",
       "pass": true,
       "scores": [
@@ -132,16 +137,12 @@
       ]
     },
     {
-      "layer": "L1",
+      "scorers": [
+        "contentCheck"
+      ],
       "input": "你好",
       "pass": true,
       "scores": [
-        {
-          "name": "toolCorrectness",
-          "score": 1,
-          "pass": true,
-          "reason": "No tools expected or called"
-        },
         {
           "name": "contentCheck",
           "score": 1,
@@ -151,7 +152,9 @@
       ]
     },
     {
-      "layer": "L2",
+      "scorers": [
+        "contentCheck"
+      ],
       "input": "帮我写一份合同",
       "pass": true,
       "scores": [
@@ -164,7 +167,9 @@
       ]
     },
     {
-      "layer": "L3",
+      "scorers": [
+        "contentCheck"
+      ],
       "input": "这个合同里的格式条款有效吗？第三条写着本合同解释权归甲方所有",
       "pass": true,
       "scores": [

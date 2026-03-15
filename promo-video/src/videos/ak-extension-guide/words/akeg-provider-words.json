@@ -1,0 +1,162 @@
+[
+  {
+    "part": "Provider",
+    "start": 11897,
+    "end": 12443
+  },
+  {
+    "part": "最",
+    "start": 12465,
+    "end": 12647
+  },
+  {
+    "part": "简单，",
+    "start": 12647,
+    "end": 13102
+  },
+  {
+    "part": "实现",
+    "start": 13318,
+    "end": 13727
+  },
+  {
+    "part": "Core",
+    "start": 13750,
+    "end": 13988
+  },
+  {
+    "part": "定义",
+    "start": 13988,
+    "end": 14284
+  },
+  {
+    "part": "的",
+    "start": 14284,
+    "end": 14374
+  },
+  {
+    "part": "接口",
+    "start": 14386,
+    "end": 14715
+  },
+  {
+    "part": "就",
+    "start": 14727,
+    "end": 14863
+  },
+  {
+    "part": "行。",
+    "start": 14863,
+    "end": 15170
+  },
+  {
+    "part": "比如",
+    "start": 15681,
+    "end": 15999
+  },
+  {
+    "part": "写",
+    "start": 16022,
+    "end": 16181
+  },
+  {
+    "part": "一个",
+    "start": 16181,
+    "end": 16340
+  },
+  {
+    "part": "新",
+    "start": 16363,
+    "end": 16613
+  },
+  {
+    "part": "的",
+    "start": 16613,
+    "end": 16829
+  },
+  {
+    "part": "LLM ",
+    "start": 16920,
+    "end": 17511
+  },
+  {
+    "part": "Provider，",
+    "start": 17522,
+    "end": 18113
+  },
+  {
+    "part": "实现",
+    "start": 18352,
+    "end": 18727
+  },
+  {
+    "part": "chat",
+    "start": 18750,
+    "end": 19022
+  },
+  {
+    "part": "方法，",
+    "start": 19034,
+    "end": 19477
+  },
+  {
+    "part": "传入",
+    "start": 19738,
+    "end": 20170
+  },
+  {
+    "part": "AgentRunner",
+    "start": 20193,
+    "end": 20874
+  },
+  {
+    "part": "的",
+    "start": 20875,
+    "end": 20954
+  },
+  {
+    "part": "构造",
+    "start": 20977,
+    "end": 21249
+  },
+  {
+    "part": "函数。",
+    "start": 21261,
+    "end": 21772
+  },
+  {
+    "part": "Session ",
+    "start": 22295,
+    "end": 22715
+  },
+  {
+    "part": "Provider",
+    "start": 22727,
+    "end": 23181
+  },
+  {
+    "part": "同理，",
+    "start": 23193,
+    "end": 23636
+  },
+  {
+    "part": "实现",
+    "start": 23863,
+    "end": 24340
+  },
+  {
+    "part": "getMessages",
+    "start": 24363,
+    "end": 25227
+  },
+  {
+    "part": "和",
+    "start": 25318,
+    "end": 25511
+  },
+  {
+    "part": "addMessage。",
+    "start": 25522,
+    "end": 26204
+  }
+]

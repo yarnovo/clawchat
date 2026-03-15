@@ -1,0 +1,22 @@
+[
+  {
+    "id": "wkcl-overview",
+    "startMs": 95,
+    "endMs": 28397
+  },
+  {
+    "id": "wkcl-run",
+    "startMs": 28920,
+    "endMs": 50249
+  },
+  {
+    "id": "wkcl-serve",
+    "startMs": 50761,
+    "endMs": 71602
+  },
+  {
+    "id": "wkcl-eval",
+    "startMs": 72125,
+    "endMs": 95170
+  }
+]

@@ -1,0 +1,252 @@
+[
+  {
+    "part": "这",
+    "start": 95,
+    "end": 265
+  },
+  {
+    "part": "是",
+    "start": 265,
+    "end": 584
+  },
+  {
+    "part": "CLI",
+    "start": 663,
+    "end": 1220
+  },
+  {
+    "part": "包",
+    "start": 1220,
+    "end": 1390
+  },
+  {
+    "part": "的",
+    "start": 1390,
+    "end": 1470
+  },
+  {
+    "part": "代码",
+    "start": 1481,
+    "end": 1754
+  },
+  {
+    "part": "走读。",
+    "start": 1765,
+    "end": 2243
+  },
+  {
+    "part": "main.",
+    "start": 2761,
+    "end": 3056
+  },
+  {
+    "part": "ts",
+    "start": 3056,
+    "end": 3613
+  },
+  {
+    "part": "是",
+    "start": 3704,
+    "end": 3965
+  },
+  {
+    "part": "AgentKit",
+    "start": 3977,
+    "end": 4556
+  },
+  {
+    "part": "的",
+    "start": 4556,
+    "end": 4647
+  },
+  {
+    "part": "命令",
+    "start": 4670,
+    "end": 4931
+  },
+  {
+    "part": "行",
+    "start": 4943,
+    "end": 5147
+  },
+  {
+    "part": "入口，",
+    "start": 5147,
+    "end": 5534
+  },
+  {
+    "part": "基于",
+    "start": 5829,
+    "end": 6113
+  },
+  {
+    "part": "commander",
+    "start": 6136,
+    "end": 6681
+  },
+  {
+    "part": "实现",
+    "start": 6761,
+    "end": 7102
+  },
+  {
+    "part": "四",
+    "start": 7125,
+    "end": 7295
+  },
+  {
+    "part": "个",
+    "start": 7295,
+    "end": 7363
+  },
+  {
+    "part": "命令：",
+    "start": 7375,
+    "end": 7784
+  },
+  {
+    "part": "run、",
+    "start": 8056,
+    "end": 8352
+  },
+  {
+    "part": "eval、",
+    "start": 8545,
+    "end": 8977
+  },
+  {
+    "part": "info、",
+    "start": 9181,
+    "end": 9602
+  },
+  {
+    "part": "serve。",
+    "start": 9818,
+    "end": 10147
+  },
+  {
+    "part": "文件",
+    "start": 10670,
+    "end": 11011
+  },
+  {
+    "part": "头部",
+    "start": 11022,
+    "end": 11477
+  },
+  {
+    "part": "从",
+    "start": 11568,
+    "end": 11772
+  },
+  {
+    "part": "所有",
+    "start": 11784,
+    "end": 12090
+  },
+  {
+    "part": "包导",
+    "start": 12102,
+    "end": 12409
+  },
+  {
+    "part": "入：",
+    "start": 12409,
+    "end": 12659
+  },
+  {
+    "part": "agentic、",
+    "start": 12943,
+    "end": 13624
+  },
+  {
+    "part": "provider-llm-openai、",
+    "start": 13852,
+    "end": 15227
+  },
+  {
+    "part": "provider-session-sqlite、",
+    "start": 15443,
+    "end": 16772
+  },
+  {
+    "part": "extension-skills、",
+    "start": 17034,
+    "end": 18136
+  },
+  {
+    "part": "extension-memory、",
+    "start": 18363,
+    "end": 19386
+  },
+  {
+    "part": "channel-scheduler、",
+    "start": 19568,
+    "end": 20488
+  },
+  {
+    "part": "channel-http、",
+    "start": 20704,
+    "end": 21840
+  },
+  {
+    "part": "eval。",
+    "start": 22045,
+    "end": 22443
+  },
+  {
+    "part": "BUILTIN",
+    "start": 22965,
+    "end": 23420
+  },
+  {
+    "part": "_",
+    "start": 23420,
+    "end": 23999
+  },
+  {
+    "part": "SKILLS",
+    "start": 24011,
+    "end": 24534
+  },
+  {
+    "part": "_",
+    "start": 24534,
+    "end": 25136
+  },
+  {
+    "part": "DIR",
+    "start": 25147,
+    "end": 25670
+  },
+  {
+    "part": "指向",
+    "start": 25681,
+    "end": 26124
+  },
+  {
+    "part": "extension-skills",
+    "start": 26147,
+    "end": 27181
+  },
+  {
+    "part": "下",
+    "start": 27181,
+    "end": 27409
+  },
+  {
+    "part": "的",
+    "start": 27409,
+    "end": 27522
+  },
+  {
+    "part": "builtins",
+    "start": 27545,
+    "end": 28022
+  },
+  {
+    "part": "目录。",
+    "start": 28034,
+    "end": 28397
+  }
+]

@@ -1,0 +1,132 @@
+[
+  {
+    "part": "contentCheck",
+    "start": 38965,
+    "end": 39681
+  },
+  {
+    "part": "检查",
+    "start": 39693,
+    "end": 40147
+  },
+  {
+    "part": "mustContain",
+    "start": 40170,
+    "end": 40931
+  },
+  {
+    "part": "和",
+    "start": 41022,
+    "end": 41215
+  },
+  {
+    "part": "mustNotContain",
+    "start": 41227,
+    "end": 42193
+  },
+  {
+    "part": "关键词，",
+    "start": 42204,
+    "end": 42874
+  },
+  {
+    "part": "missing",
+    "start": 43181,
+    "end": 43613
+  },
+  {
+    "part": "加",
+    "start": 43625,
+    "end": 43795
+  },
+  {
+    "part": "forbidden",
+    "start": 43806,
+    "end": 44352
+  },
+  {
+    "part": "就",
+    "start": 44443,
+    "end": 44602
+  },
+  {
+    "part": "是",
+    "start": 44602,
+    "end": 44704
+  },
+  {
+    "part": "失败数。",
+    "start": 44715,
+    "end": 45352
+  },
+  {
+    "part": "runScorers",
+    "start": 45875,
+    "end": 46681
+  },
+  {
+    "part": "遍历",
+    "start": 46693,
+    "end": 47034
+  },
+  {
+    "part": "case.",
+    "start": 47034,
+    "end": 47443
+  },
+  {
+    "part": "scorers",
+    "start": 47625,
+    "end": 48125
+  },
+  {
+    "part": "数组，",
+    "start": 48136,
+    "end": 48602
+  },
+  {
+    "part": "按",
+    "start": 48829,
+    "end": 48999
+  },
+  {
+    "part": "名字",
+    "start": 49011,
+    "end": 49454
+  },
+  {
+    "part": "分发",
+    "start": 49534,
+    "end": 49863
+  },
+  {
+    "part": "到",
+    "start": 49863,
+    "end": 50022
+  },
+  {
+    "part": "对应",
+    "start": 50045,
+    "end": 50306
+  },
+  {
+    "part": "评分器，",
+    "start": 50318,
+    "end": 50943
+  },
+  {
+    "part": "收集",
+    "start": 51147,
+    "end": 51499
+  },
+  {
+    "part": "结果",
+    "start": 51511,
+    "end": 51806
+  },
+  {
+    "part": "返回。",
+    "start": 51818,
+    "end": 52306
+  }
+]

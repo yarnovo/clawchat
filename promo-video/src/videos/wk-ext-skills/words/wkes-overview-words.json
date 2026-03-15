@@ -1,0 +1,127 @@
+[
+  {
+    "part": "extension-skills",
+    "start": 95,
+    "end": 1277
+  },
+  {
+    "part": "是",
+    "start": 1368,
+    "end": 1629
+  },
+  {
+    "part": "AgentKit",
+    "start": 1640,
+    "end": 2243
+  },
+  {
+    "part": "的",
+    "start": 2243,
+    "end": 2334
+  },
+  {
+    "part": "技能",
+    "start": 2356,
+    "end": 2663
+  },
+  {
+    "part": "加载",
+    "start": 2675,
+    "end": 2993
+  },
+  {
+    "part": "扩展。",
+    "start": 3004,
+    "end": 3470
+  },
+  {
+    "part": "一个",
+    "start": 3988,
+    "end": 4261
+  },
+  {
+    "part": "Extension",
+    "start": 4284,
+    "end": 4840
+  },
+  {
+    "part": "实现，",
+    "start": 4852,
+    "end": 5306
+  },
+  {
+    "part": "从",
+    "start": 5590,
+    "end": 5806
+  },
+  {
+    "part": "工作",
+    "start": 5829,
+    "end": 6113
+  },
+  {
+    "part": "目录",
+    "start": 6125,
+    "end": 6522
+  },
+  {
+    "part": "和",
+    "start": 6545,
+    "end": 6704
+  },
+  {
+    "part": "内置",
+    "start": 6715,
+    "end": 6988
+  },
+  {
+    "part": "目录",
+    "start": 7000,
+    "end": 7227
+  },
+  {
+    "part": "加载",
+    "start": 7238,
+    "end": 7693
+  },
+  {
+    "part": "SKILL",
+    "start": 7784,
+    "end": 8136
+  },
+  {
+    "part": "点",
+    "start": 8136,
+    "end": 8386
+  },
+  {
+    "part": "MD、",
+    "start": 8477,
+    "end": 8909
+  },
+  {
+    "part": "scripts",
+    "start": 9113,
+    "end": 9590
+  },
+  {
+    "part": "脚本",
+    "start": 9590,
+    "end": 10034
+  },
+  {
+    "part": "和",
+    "start": 10125,
+    "end": 10272
+  },
+  {
+    "part": "hooks",
+    "start": 10284,
+    "end": 10647
+  },
+  {
+    "part": "钩子。",
+    "start": 10647,
+    "end": 11068
+  }
+]

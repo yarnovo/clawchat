@@ -1,0 +1,82 @@
+[
+  {
+    "part": "HTTP ",
+    "start": 95,
+    "end": 799
+  },
+  {
+    "part": "Channel，",
+    "start": 811,
+    "end": 1311
+  },
+  {
+    "part": "Agent",
+    "start": 1527,
+    "end": 1924
+  },
+  {
+    "part": "的",
+    "start": 1925,
+    "end": 2004
+  },
+  {
+    "part": "网络",
+    "start": 2027,
+    "end": 2299
+  },
+  {
+    "part": "感官。",
+    "start": 2311,
+    "end": 2754
+  },
+  {
+    "part": "提供",
+    "start": 3272,
+    "end": 3715
+  },
+  {
+    "part": "REST",
+    "start": 3806,
+    "end": 4113
+  },
+  {
+    "part": "接口，",
+    "start": 4113,
+    "end": 4590
+  },
+  {
+    "part": "外部",
+    "start": 4840,
+    "end": 5113
+  },
+  {
+    "part": "应用",
+    "start": 5125,
+    "end": 5465
+  },
+  {
+    "part": "通过",
+    "start": 5477,
+    "end": 5931
+  },
+  {
+    "part": "HTTP",
+    "start": 6011,
+    "end": 6784
+  },
+  {
+    "part": "和",
+    "start": 6795,
+    "end": 6988
+  },
+  {
+    "part": "Agent",
+    "start": 7000,
+    "end": 7375
+  },
+  {
+    "part": "对话。",
+    "start": 7386,
+    "end": 7795
+  }
+]

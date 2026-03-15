@@ -1,0 +1,162 @@
+[
+  {
+    "part": "skillsExtension",
+    "start": 35090,
+    "end": 36215
+  },
+  {
+    "part": "返回",
+    "start": 36295,
+    "end": 36613
+  },
+  {
+    "part": "完整",
+    "start": 36625,
+    "end": 37079
+  },
+  {
+    "part": "Extension。",
+    "start": 37170,
+    "end": 37852
+  },
+  {
+    "part": "setup",
+    "start": 38375,
+    "end": 38931
+  },
+  {
+    "part": "加载",
+    "start": 38954,
+    "end": 39249
+  },
+  {
+    "part": "技能和",
+    "start": 39261,
+    "end": 39852
+  },
+  {
+    "part": "Persona",
+    "start": 39943,
+    "end": 40420
+  },
+  {
+    "part": "文件，",
+    "start": 40431,
+    "end": 40874
+  },
+  {
+    "part": "systemPrompt",
+    "start": 41136,
+    "end": 42000
+  },
+  {
+    "part": "合并",
+    "start": 42079,
+    "end": 42499
+  },
+  {
+    "part": "所有",
+    "start": 42522,
+    "end": 42806
+  },
+  {
+    "part": "提示",
+    "start": 42818,
+    "end": 43124
+  },
+  {
+    "part": "词，",
+    "start": 43125,
+    "end": 43443
+  },
+  {
+    "part": "preBash",
+    "start": 43659,
+    "end": 44272
+  },
+  {
+    "part": "和",
+    "start": 44363,
+    "end": 44545
+  },
+  {
+    "part": "postBash",
+    "start": 44556,
+    "end": 45249
+  },
+  {
+    "part": "通过",
+    "start": 45340,
+    "end": 45704
+  },
+  {
+    "part": "spawnSync",
+    "start": 45727,
+    "end": 46374
+  },
+  {
+    "part": "执行",
+    "start": 46465,
+    "end": 46818
+  },
+  {
+    "part": "钩子",
+    "start": 46840,
+    "end": 47068
+  },
+  {
+    "part": "脚本，",
+    "start": 47079,
+    "end": 47499
+  },
+  {
+    "part": "stdin",
+    "start": 47772,
+    "end": 48102
+  },
+  {
+    "part": "传",
+    "start": 48102,
+    "end": 48443
+  },
+  {
+    "part": "JSON",
+    "start": 48534,
+    "end": 49340
+  },
+  {
+    "part": "上下文，",
+    "start": 49352,
+    "end": 50011
+  },
+  {
+    "part": "exit ",
+    "start": 50238,
+    "end": 50659
+  },
+  {
+    "part": "code",
+    "start": 50670,
+    "end": 50954
+  },
+  {
+    "part": "零",
+    "start": 50954,
+    "end": 51124
+  },
+  {
+    "part": "放行、",
+    "start": 51136,
+    "end": 51636
+  },
+  {
+    "part": "二",
+    "start": 51795,
+    "end": 51977
+  },
+  {
+    "part": "拦截。",
+    "start": 51977,
+    "end": 52477
+  }
+]

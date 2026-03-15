@@ -1,0 +1,14 @@
+{
+  "name": "@agentkit/extension-skills",
+  "version": "0.0.1",
+  "description": "Skills plugin — load SKILL.md, inject prompts, execute hooks",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": { "build": "tsc" },
+  "dependencies": {
+    "@agentkit/agentic": "workspace:*",
+    "@agentkit/core": "workspace:*"
+  },
+  "devDependencies": { "@types/node": "^22.10.0", "typescript": "^5.7.0" }
+}

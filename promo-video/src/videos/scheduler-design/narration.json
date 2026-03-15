@@ -1,9 +1,0 @@
-[
-  {"id": "sd-intro", "text": "AI Agent不只是被动应答，它需要主动做事。每天定时汇报、定期检查数据、到点发提醒。定时任务是Agent从聊天机器人进化成真正助手的关键能力。三大Claw Runtime各自怎么实现？我们来对比看看。"},
-  {"id": "sd-openclaw", "text": "OpenClaw的cron系统最成熟。三种调度格式：at做一次性定时，every做固定间隔，cron表达式做复杂周期。用croner库解析，支持时区。任务分两种payload：systemEvent注入文本到主会话，agentTurn在隔离会话跑完整Agent。结果可以announce到聊天频道，或webhook回调HTTP。有heartbeat唤醒机制，有失败告警，有运行日志。功能最全，但概念也最多。"},
-  {"id": "sd-nanoclaw", "text": "NanoClaw走简洁路线。三种调度：cron表达式、interval固定毫秒间隔、once一次性。用cron-parser解析。定时器是个轮询循环，每隔固定间隔查SQLite里到期的任务。执行方式统一：起一个容器跑Agent，结果直接发回聊天群。任务可以用群上下文也可以隔离。有运行日志表记录每次执行。简单直接，够用就好。"},
-  {"id": "sd-ironclaw", "text": "IronClaw叫routine，不叫cron。四种触发器：cron定时、event消息匹配、system_event结构化事件、manual手动触发。cron用六字段表达式含秒级精度。两种执行模式：lightweight单轮LLM调用，full_job多步骤带工具。有护栏机制：cooldown冷却防止重复触发，max_concurrent并发限制。通知通过channel发送。最灵活，但也最复杂。"},
-  {"id": "sd-design", "text": "三者对比后，ClawChat怎么设计？核心原则：对用户简单，对系统灵活。用户说每天九点提醒我，Agent自己翻译成cron表达式。前端只需要展示任务列表和执行记录。后端需要：调度器解析cron和interval，轮询检查到期任务，调用Agent执行，结果通过IM推送。"},
-  {"id": "sd-impl", "text": "实现方案。agent-server加scheduler模块，数据库存任务定义和执行日志。每个Agent可以有多个定时任务。调度器轮询检查，到期就调openclaw容器执行。结果通过im-server回调推送给用户。支持cron表达式和固定间隔两种格式，覆盖百分之九十的场景。先做最小可用版本，复杂功能后续迭代。"},
-  {"id": "sd-outro", "text": "总结。定时任务让Agent从被动变主动。OpenClaw最全面，NanoClaw最简洁，IronClaw最灵活。ClawChat取各家所长：用NanoClaw的简洁架构，借OpenClaw的调度格式，学IronClaw的执行分层。先MVP再迭代，这就是我们的路径。"}
-]

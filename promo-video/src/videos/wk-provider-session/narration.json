@@ -1,0 +1,5 @@
+[
+  {"id": "wkps-overview", "text": "provider-session-sqlite实现ChatSession接口，用Drizzle ORM加better-sqlite3做持久化，构造函数自动建表，零配置开箱即用。"},
+  {"id": "wkps-schema", "text": "schema.ts用Drizzle定义messages表。六个字段：自增主键、sessionId、role枚举四种角色、content文本、toolCallId和toolCalls的JSON字符串，再加创建时间。"},
+  {"id": "wkps-class", "text": "SQLiteSession类三个关键方法。构造函数用createRequire解决ESM兼容问题，自动执行CREATE TABLE。getMessages做Drizzle查询加JSON反序列化toolCalls。addMessage用Drizzle插入，自动序列化工具调用。"}
+]

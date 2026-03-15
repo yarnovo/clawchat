@@ -1,0 +1,182 @@
+[
+  {
+    "part": "第二个",
+    "start": 26204,
+    "end": 26545
+  },
+  {
+    "part": "扩展",
+    "start": 26556,
+    "end": 26943
+  },
+  {
+    "part": "点：",
+    "start": 26943,
+    "end": 27181
+  },
+  {
+    "part": "Session ",
+    "start": 27431,
+    "end": 27806
+  },
+  {
+    "part": "Provider。",
+    "start": 27818,
+    "end": 28374
+  },
+  {
+    "part": "Core",
+    "start": 28897,
+    "end": 29170
+  },
+  {
+    "part": "定义",
+    "start": 29181,
+    "end": 29499
+  },
+  {
+    "part": "了",
+    "start": 29500,
+    "end": 29715
+  },
+  {
+    "part": "ChatSession",
+    "start": 29806,
+    "end": 30397
+  },
+  {
+    "part": "接口，",
+    "start": 30409,
+    "end": 30840
+  },
+  {
+    "part": "三",
+    "start": 31045,
+    "end": 31261
+  },
+  {
+    "part": "个",
+    "start": 31261,
+    "end": 31329
+  },
+  {
+    "part": "方法：",
+    "start": 31340,
+    "end": 31749
+  },
+  {
+    "part": "getMessages",
+    "start": 32022,
+    "end": 32806
+  },
+  {
+    "part": "获取",
+    "start": 32829,
+    "end": 33124
+  },
+  {
+    "part": "历史，",
+    "start": 33136,
+    "end": 33602
+  },
+  {
+    "part": "addMessage",
+    "start": 33829,
+    "end": 34431
+  },
+  {
+    "part": "添加",
+    "start": 34454,
+    "end": 34749
+  },
+  {
+    "part": "消息，",
+    "start": 34761,
+    "end": 35215
+  },
+  {
+    "part": "clear",
+    "start": 35420,
+    "end": 35738
+  },
+  {
+    "part": "清空。",
+    "start": 35738,
+    "end": 36193
+  },
+  {
+    "part": "内存版",
+    "start": 36704,
+    "end": 37340
+  },
+  {
+    "part": "InMemorySession",
+    "start": 37431,
+    "end": 38397
+  },
+  {
+    "part": "是",
+    "start": 38477,
+    "end": 38624
+  },
+  {
+    "part": "默认",
+    "start": 38636,
+    "end": 38943
+  },
+  {
+    "part": "实现。",
+    "start": 38954,
+    "end": 39443
+  },
+  {
+    "part": "要",
+    "start": 39965,
+    "end": 40136
+  },
+  {
+    "part": "持久化？",
+    "start": 40147,
+    "end": 40829
+  },
+  {
+    "part": "写",
+    "start": 41352,
+    "end": 41602
+  },
+  {
+    "part": "一个",
+    "start": 41602,
+    "end": 41965
+  },
+  {
+    "part": "SQLite",
+    "start": 42045,
+    "end": 42852
+  },
+  {
+    "part": "或",
+    "start": 42943,
+    "end": 43159
+  },
+  {
+    "part": "Redis",
+    "start": 43170,
+    "end": 43590
+  },
+  {
+    "part": "实现",
+    "start": 43613,
+    "end": 43965
+  },
+  {
+    "part": "就",
+    "start": 43977,
+    "end": 44090
+  },
+  {
+    "part": "行。",
+    "start": 44090,
+    "end": 44397
+  }
+]

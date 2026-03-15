@@ -1,2 +1,2 @@
-export { toolCorrectness, trajectoryMatch, contentCheck } from './scorers.js';
-export type { EvalCase, AgentTrace, ScoreResult } from './scorers.js';
+export { toolCorrectness, trajectoryMatch, contentCheck, runScorers } from './scorers.js';
+export type { EvalCase, AgentTrace, ScoreResult, ScorerName } from './scorers.js';

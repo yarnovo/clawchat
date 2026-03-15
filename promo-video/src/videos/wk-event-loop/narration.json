@@ -1,0 +1,6 @@
+[
+  {"id": "wkel-overview", "text": "EventLoop单文件零依赖，导出AgentEvent类型、createEvent工厂和EventLoop类。"},
+  {"id": "wkel-event", "text": "AgentEvent带id、type、source和priority，createEvent一行生成完整事件对象。"},
+  {"id": "wkel-class", "text": "EventLoop核心：push返回Promise，drain逐个消费队列，QueueItem用resolve和reject回传结果。"},
+  {"id": "wkel-strategies", "text": "三种策略：sequential逐个处理，batch用scheduleBatch加定时器合并，priority按数字排序优先消费。"}
+]

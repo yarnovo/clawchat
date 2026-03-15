@@ -1,0 +1,17 @@
+[
+  {
+    "id": "akch-intro",
+    "startMs": 95,
+    "endMs": 7795
+  },
+  {
+    "id": "akch-design",
+    "startMs": 8318,
+    "endMs": 17636
+  },
+  {
+    "id": "akch-summary",
+    "startMs": 18147,
+    "endMs": 28715
+  }
+]

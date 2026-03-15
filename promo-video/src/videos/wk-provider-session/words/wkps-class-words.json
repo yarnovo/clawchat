@@ -1,0 +1,177 @@
+[
+  {
+    "part": "SQLiteSession",
+    "start": 24715,
+    "end": 25761
+  },
+  {
+    "part": "类",
+    "start": 25761,
+    "end": 26000
+  },
+  {
+    "part": "三",
+    "start": 26090,
+    "end": 26329
+  },
+  {
+    "part": "个",
+    "start": 26329,
+    "end": 26397
+  },
+  {
+    "part": "关键",
+    "start": 26420,
+    "end": 26727
+  },
+  {
+    "part": "方法。",
+    "start": 26738,
+    "end": 27136
+  },
+  {
+    "part": "构造",
+    "start": 27659,
+    "end": 27943
+  },
+  {
+    "part": "函数",
+    "start": 27954,
+    "end": 28465
+  },
+  {
+    "part": "用",
+    "start": 28556,
+    "end": 28749
+  },
+  {
+    "part": "createRequire",
+    "start": 28761,
+    "end": 29670
+  },
+  {
+    "part": "解决",
+    "start": 29681,
+    "end": 30147
+  },
+  {
+    "part": "ESM",
+    "start": 30238,
+    "end": 30852
+  },
+  {
+    "part": "兼容",
+    "start": 30863,
+    "end": 31170
+  },
+  {
+    "part": "问题，",
+    "start": 31181,
+    "end": 31613
+  },
+  {
+    "part": "自动",
+    "start": 31886,
+    "end": 32193
+  },
+  {
+    "part": "执行",
+    "start": 32204,
+    "end": 32670
+  },
+  {
+    "part": "CREATE ",
+    "start": 32761,
+    "end": 33102
+  },
+  {
+    "part": "TABLE。",
+    "start": 33113,
+    "end": 33534
+  },
+  {
+    "part": "getMessages",
+    "start": 34056,
+    "end": 34852
+  },
+  {
+    "part": "做",
+    "start": 34863,
+    "end": 35079
+  },
+  {
+    "part": "Drizzle",
+    "start": 35079,
+    "end": 35443
+  },
+  {
+    "part": "查询",
+    "start": 35454,
+    "end": 35806
+  },
+  {
+    "part": "加",
+    "start": 35818,
+    "end": 36056
+  },
+  {
+    "part": "JSON",
+    "start": 36147,
+    "end": 36999
+  },
+  {
+    "part": "反序",
+    "start": 37000,
+    "end": 37352
+  },
+  {
+    "part": "列化",
+    "start": 37363,
+    "end": 37704
+  },
+  {
+    "part": "toolCalls。",
+    "start": 37704,
+    "end": 38352
+  },
+  {
+    "part": "addMessage",
+    "start": 38875,
+    "end": 39647
+  },
+  {
+    "part": "用",
+    "start": 39738,
+    "end": 39931
+  },
+  {
+    "part": "Drizzle",
+    "start": 39943,
+    "end": 40295
+  },
+  {
+    "part": "插入，",
+    "start": 40306,
+    "end": 40738
+  },
+  {
+    "part": "自动",
+    "start": 41000,
+    "end": 41329
+  },
+  {
+    "part": "序列化",
+    "start": 41340,
+    "end": 41772
+  },
+  {
+    "part": "工具",
+    "start": 41784,
+    "end": 42102
+  },
+  {
+    "part": "调用。",
+    "start": 42113,
+    "end": 42522
+  }
+]

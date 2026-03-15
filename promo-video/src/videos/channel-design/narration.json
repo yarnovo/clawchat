@@ -1,9 +1,0 @@
-[
-  {"id": "ch-intro", "text": "Agent跑在容器里，用户在手机上。中间怎么连？需要一个Channel层，把消息从App、网页、WhatsApp、Telegram送到Agent，再把回复送回去。"},
-  {"id": "ch-protocol", "text": "通信协议。WebSocket是主流，双向实时，适合聊天场景。SSE单向推送，适合Agent流式回复。HTTP轮询最简单但延迟高。我们选WebSocket加SSE混合：WebSocket保持连接，SSE推送流式回复。"},
-  {"id": "ch-interface", "text": "Channel接口。每个渠道实现四个方法：connect连接、onMessage接收消息、sendMessage发送回复、disconnect断开。Web聊天、Telegram机器人、WhatsApp，只要实现这四个方法就能接入。"},
-  {"id": "ch-web", "text": "最基础的渠道：Web聊天。一个HTTP服务加SSE推送，浏览器打开就能聊。我们之前在NanoClaw的demo-agent里已经写过了。HTML加JavaScript，不需要任何前端框架。"},
-  {"id": "ch-app", "text": "移动端怎么做？ClawChat已经有Flutter App。IM核心、WebSocket推送、跨平台。Agent的回复通过im-server推送到App。用户在手机上聊天，跟微信一样自然。"},
-  {"id": "ch-multi", "text": "多渠道同时接入。NanoClaw的Channel Registry模式：启动时扫描哪些渠道有凭证，有就连，没有就跳过。一个Agent可以同时连Web、Telegram、Slack。消息统一汇聚到同一个while循环。"},
-  {"id": "ch-outro", "text": "总结。Channel层是Agent和用户之间的桥梁。统一接口，四个方法。Web最快上线，App体验最好，多渠道覆盖最广。先做Web聊天，再接App，最后开放第三方渠道。"}
-]

@@ -1,10 +1,10 @@
-{"layer":"L1","input":"帮我审查这个文件 src/auth.ts","expectedTools":["read"],"mustContain":["审查"],"mustNotContain":[]}
-{"layer":"L1","input":"这段代码有SQL注入风险吗？\nconst query = `SELECT * FROM users WHERE id = ${userId}`","expectedTools":[],"mustContain":["SQL注入","参数化","🔴"],"mustNotContain":["没有问题"]}
-{"layer":"L1","input":"搜一下这个依赖有没有已知漏洞 lodash@4.17.20","expectedTools":["web_search"],"mustContain":["漏洞"],"mustNotContain":[]}
-{"layer":"L2","input":"审查整个 src/ 目录的代码质量","trajectory":[{"tool":"bash"},{"tool":"read"}],"mustContain":["质量","建议"]}
-{"layer":"L2","input":"检查这个项目的依赖安全性","trajectory":[{"tool":"bash"},{"tool":"read"}],"mustContain":["依赖","安全"]}
-{"layer":"L3","input":"我是初级开发者，帮我看看这段登录逻辑写得对不对","mustContain":["建议","修复"],"mustNotContain":[],"scenario":"junior-dev"}
-{"layer":"L3","input":"这个函数太长了有200行，怎么重构","mustContain":["重构","拆分","函数","建议"],"mustNotContain":[],"scenario":"refactor"}
-{"layer":"L1","input":"你好","expectedTools":[],"mustContain":[],"mustNotContain":["代码","审查"]}
-{"layer":"L2","input":"帮我写一个登录功能","mustContain":[],"mustNotContain":[],"scenario":"code-writing-not-review"}
-{"layer":"L3","input":"eval(userInput) 这样写有什么问题","mustContain":["安全","注入","🔴","危险"],"mustNotContain":["没问题"]}
+{"input":"帮我审查这个文件 src/auth.ts","expectedTools":["bash"],"mustContain":["审查"],"mustNotContain":[],"scorers":["toolCorrectness","contentCheck"]}
+{"input":"这段代码有SQL注入风险吗？\nconst query = `SELECT * FROM users WHERE id = ${userId}`","expectedTools":[],"mustContain":["SQL注入","参数化","🔴"],"mustNotContain":["没有问题"],"scorers":["toolCorrectness","contentCheck"]}
+{"input":"搜一下这个依赖有没有已知漏洞 lodash@4.17.20","expectedTools":["web_search"],"mustContain":["漏洞"],"mustNotContain":[],"scorers":["toolCorrectness","contentCheck"]}
+{"input":"审查整个 src/ 目录的代码质量","trajectory":[{"tool":"bash"},{"tool":"bash"}],"mustContain":["质量","建议"],"scorers":["trajectoryMatch","contentCheck"]}
+{"input":"检查这个项目的依赖安全性","trajectory":[{"tool":"bash"},{"tool":"bash"}],"mustContain":["依赖","安全"],"scorers":["trajectoryMatch","contentCheck"]}
+{"input":"我是初级开发者，帮我看看这段登录逻辑写得对不对","mustContain":["建议","修复"],"mustNotContain":[],"scenario":"junior-dev","scorers":["contentCheck"]}
+{"input":"这个函数太长了有200行，怎么重构","mustContain":["重构","拆分","函数","建议"],"mustNotContain":[],"scenario":"refactor","scorers":["contentCheck"]}
+{"input":"你好","expectedTools":[],"mustContain":[],"mustNotContain":["代码","审查"],"scorers":["toolCorrectness","contentCheck"]}
+{"input":"帮我写一个登录功能","mustContain":[],"mustNotContain":[],"scenario":"code-writing-not-review","scorers":["contentCheck"]}
+{"input":"eval(userInput) 这样写有什么问题","mustContain":["安全","注入","🔴","危险"],"mustNotContain":["没问题"],"scorers":["contentCheck"]}

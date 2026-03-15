@@ -1,0 +1,137 @@
+[
+  {
+    "part": "chat",
+    "start": 22931,
+    "end": 23318
+  },
+  {
+    "part": "方法",
+    "start": 23329,
+    "end": 23681
+  },
+  {
+    "part": "是",
+    "start": 23681,
+    "end": 23818
+  },
+  {
+    "part": "核心。",
+    "start": 23829,
+    "end": 24329
+  },
+  {
+    "part": "先",
+    "start": 24852,
+    "end": 25102
+  },
+  {
+    "part": "用",
+    "start": 25102,
+    "end": 25318
+  },
+  {
+    "part": "toOpenAIMessage",
+    "start": 25340,
+    "end": 26681
+  },
+  {
+    "part": "把",
+    "start": 26681,
+    "end": 26863
+  },
+  {
+    "part": "ChatMessage",
+    "start": 26875,
+    "end": 27579
+  },
+  {
+    "part": "转成",
+    "start": 27579,
+    "end": 27999
+  },
+  {
+    "part": "OpenAI",
+    "start": 28022,
+    "end": 28579
+  },
+  {
+    "part": "格式，",
+    "start": 28590,
+    "end": 29045
+  },
+  {
+    "part": "调用",
+    "start": 29295,
+    "end": 29647
+  },
+  {
+    "part": "completions.",
+    "start": 29670,
+    "end": 30420
+  },
+  {
+    "part": "create，",
+    "start": 30602,
+    "end": 31193
+  },
+  {
+    "part": "再",
+    "start": 31397,
+    "end": 31579
+  },
+  {
+    "part": "从",
+    "start": 31579,
+    "end": 31795
+  },
+  {
+    "part": "response",
+    "start": 31818,
+    "end": 32306
+  },
+  {
+    "part": "中",
+    "start": 32306,
+    "end": 32568
+  },
+  {
+    "part": "提取",
+    "start": 32659,
+    "end": 33034
+  },
+  {
+    "part": "tool",
+    "start": 33034,
+    "end": 33295
+  },
+  {
+    "part": "_",
+    "start": 33306,
+    "end": 33829
+  },
+  {
+    "part": "calls，",
+    "start": 33829,
+    "end": 34284
+  },
+  {
+    "part": "返回",
+    "start": 34534,
+    "end": 34840
+  },
+  {
+    "part": "统一",
+    "start": 34852,
+    "end": 35204
+  },
+  {
+    "part": "的",
+    "start": 35204,
+    "end": 35363
+  },
+  {
+    "part": "LLMResponse。",
+    "start": 35375,
+    "end": 36602
+  }
+]

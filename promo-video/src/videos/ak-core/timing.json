@@ -1,0 +1,17 @@
+[
+  {
+    "id": "akcore-intro",
+    "startMs": 95,
+    "endMs": 8954
+  },
+  {
+    "id": "akcore-design",
+    "startMs": 9477,
+    "endMs": 21829
+  },
+  {
+    "id": "akcore-summary",
+    "startMs": 22340,
+    "endMs": 33136
+  }
+]

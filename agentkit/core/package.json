@@ -1,7 +1,7 @@
 {
   "name": "@agentkit/core",
   "version": "0.0.1",
-  "description": "LLM + Tools + Memory + While Loop",
+  "description": "Agent engine — LLM + Tools + System Prompt + While Loop",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -10,13 +10,7 @@
     "test": "vitest run",
     "dev": "tsc --watch"
   },
-  "dependencies": {
-    "better-sqlite3": "^11.8.1",
-    "drizzle-orm": "^0.45.1",
-    "openai": "^4.0.0"
-  },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
