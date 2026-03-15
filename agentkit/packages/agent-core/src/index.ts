@@ -4,3 +4,4 @@ export { type LLMProvider, type ChatMessage, type ToolCall, type ToolDefinition 
 export { type Memory } from './memory.js';
 export { InMemory } from './memory.js';
 export { OpenAIProvider, type OpenAIProviderOptions } from './openai-provider.js';
+export { loadPersonaFiles, loadPersonaPrompt, buildPersonaPrompt, writeMemory, appendMemory, type PersonaFile } from './persona.js';

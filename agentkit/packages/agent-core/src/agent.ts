@@ -2,14 +2,17 @@ import type { LLMProvider, ChatMessage, ToolDefinition } from './llm.js';
 import type { Tool, ToolResult } from './types.js';
 import type { Memory } from './memory.js';
 import { InMemory } from './memory.js';
+import { loadPersonaPrompt } from './persona.js';
 
 export interface AgentOptions {
   /** LLM 提供者 */
   llm: LLMProvider;
   /** 可用工具 */
   tools?: Tool[];
-  /** 系统提示词 */
+  /** 系统提示词（直接传入字符串） */
   systemPrompt?: string;
+  /** 工作目录（从中加载 AGENT.md / TOOLS.md / MEMORY.md / HEARTBEAT.md） */
+  workDir?: string;
   /** 记忆（默认 InMemory） */
   memory?: Memory;
   /** 最大工具调用轮数（防止无限循环，默认 20） */
@@ -33,12 +36,21 @@ export class Agent {
 
   constructor(options: AgentOptions) {
     this.llm = options.llm;
-    this.systemPrompt = options.systemPrompt || 'You are a helpful assistant.';
     this.memory = options.memory || new InMemory();
     this.maxRounds = options.maxRounds || 20;
     this.onToolCall = options.onToolCall;
     this.onToolResult = options.onToolResult;
     this.onText = options.onText;
+
+    // 构建系统提示词：直接传入 > 从 workDir 加载人格文件 > 默认
+    if (options.systemPrompt) {
+      this.systemPrompt = options.systemPrompt;
+    } else if (options.workDir) {
+      const personaPrompt = loadPersonaPrompt(options.workDir);
+      this.systemPrompt = personaPrompt || 'You are a helpful assistant.';
+    } else {
+      this.systemPrompt = 'You are a helpful assistant.';
+    }
 
     // 注册工具
     this.tools = new Map();
