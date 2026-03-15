@@ -1,0 +1,37 @@
+[
+  {
+    "id": "ae-intro",
+    "startMs": 95,
+    "endMs": 11943
+  },
+  {
+    "id": "ae-consensus",
+    "startMs": 12465,
+    "endMs": 32272
+  },
+  {
+    "id": "ae-graders",
+    "startMs": 32795,
+    "endMs": 50249
+  },
+  {
+    "id": "ae-format",
+    "startMs": 50761,
+    "endMs": 67181
+  },
+  {
+    "id": "ae-layers",
+    "startMs": 67693,
+    "endMs": 86102
+  },
+  {
+    "id": "ae-gate",
+    "startMs": 86625,
+    "endMs": 102272
+  },
+  {
+    "id": "ae-outro",
+    "startMs": 102795,
+    "endMs": 119977
+  }
+]

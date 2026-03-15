@@ -65,6 +65,7 @@ import { SkillLoading, TOTAL_FRAMES as SKLOAD_FRAMES } from "./videos/skill-load
 import { AgentCoreWalk, TOTAL_FRAMES as ACW_FRAMES } from "./videos/agent-core-walk/AgentCoreWalk";
 import { TestArch, TOTAL_FRAMES as TA_FRAMES } from "./videos/test-arch/TestArch";
 import { EvalFramework, TOTAL_FRAMES as EF_FRAMES } from "./videos/eval-framework/EvalFramework";
+import { AgentEvals, TOTAL_FRAMES as AE_FRAMES } from "./videos/agent-evals/AgentEvals";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -610,6 +611,14 @@ export const RemotionRoot: React.FC = () => {
             id="EvalFramework"
             component={EvalFramework}
             durationInFrames={EF_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="AgentEvals"
+            component={AgentEvals}
+            durationInFrames={AE_FRAMES}
             fps={30}
             width={1920}
             height={1080}
