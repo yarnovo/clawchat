@@ -5,6 +5,9 @@
  * SQLiteSession:   生产、容器内持久化（docker commit 能带走）
  */
 import { createRequire } from 'module';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { eq } from 'drizzle-orm';
+import { messages } from './schema.js';
 import type { ChatMessage } from './llm.js';
 
 export interface ChatSession {
@@ -17,38 +20,38 @@ export interface ChatSession {
  * 内存 Session — 重启就丢，适合测试
  */
 export class InMemorySession implements ChatSession {
-  private messages: ChatMessage[] = [];
+  private msgs: ChatMessage[] = [];
 
   getMessages(): ChatMessage[] {
-    return [...this.messages];
+    return [...this.msgs];
   }
 
   addMessage(message: ChatMessage): void {
-    this.messages.push(message);
+    this.msgs.push(message);
   }
 
   clear(): void {
-    this.messages = [];
+    this.msgs = [];
   }
 }
 
 /**
- * SQLite Session — 持久化到文件，docker commit 能带走
+ * SQLite Session — Drizzle ORM 类型安全，持久化到文件
  */
 export class SQLiteSession implements ChatSession {
-  private db: any;
+  private db: ReturnType<typeof drizzle>;
+  private rawDb: any;
   private sessionId: string;
 
   constructor(dbPath: string, sessionId?: string) {
     const require = createRequire(import.meta.url);
     const Database = require('better-sqlite3');
-    this.db = new Database(dbPath);
+    this.rawDb = new Database(dbPath);
+    this.db = drizzle(this.rawDb);
     this.sessionId = sessionId || 'default';
-    this.init();
-  }
 
-  private init(): void {
-    this.db.exec(`
+    // 自动建表
+    this.rawDb.exec(`
       CREATE TABLE IF NOT EXISTS messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         session_id TEXT NOT NULL,
@@ -63,43 +66,38 @@ export class SQLiteSession implements ChatSession {
   }
 
   getMessages(): ChatMessage[] {
-    const rows = this.db.prepare(
-      'SELECT role, content, tool_call_id, tool_calls FROM messages WHERE session_id = ? ORDER BY id'
-    ).all(this.sessionId) as Array<{
-      role: string;
-      content: string;
-      tool_call_id: string | null;
-      tool_calls: string | null;
-    }>;
+    const rows = this.db
+      .select()
+      .from(messages)
+      .where(eq(messages.sessionId, this.sessionId))
+      .all();
 
     return rows.map(row => {
       const msg: ChatMessage = {
-        role: row.role as ChatMessage['role'],
+        role: row.role,
         content: row.content,
       };
-      if (row.tool_call_id) msg.tool_call_id = row.tool_call_id;
-      if (row.tool_calls) msg.tool_calls = JSON.parse(row.tool_calls);
+      if (row.toolCallId) msg.tool_call_id = row.toolCallId;
+      if (row.toolCalls) msg.tool_calls = JSON.parse(row.toolCalls);
       return msg;
     });
   }
 
   addMessage(message: ChatMessage): void {
-    this.db.prepare(
-      'INSERT INTO messages (session_id, role, content, tool_call_id, tool_calls) VALUES (?, ?, ?, ?, ?)'
-    ).run(
-      this.sessionId,
-      message.role,
-      message.content,
-      message.tool_call_id || null,
-      message.tool_calls ? JSON.stringify(message.tool_calls) : null,
-    );
+    this.db.insert(messages).values({
+      sessionId: this.sessionId,
+      role: message.role,
+      content: message.content,
+      toolCallId: message.tool_call_id || null,
+      toolCalls: message.tool_calls ? JSON.stringify(message.tool_calls) : null,
+    }).run();
   }
 
   clear(): void {
-    this.db.prepare('DELETE FROM messages WHERE session_id = ?').run(this.sessionId);
+    this.db.delete(messages).where(eq(messages.sessionId, this.sessionId)).run();
   }
 
   close(): void {
-    this.db.close();
+    this.rawDb.close();
   }
 }

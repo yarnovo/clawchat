@@ -5,3 +5,4 @@ export { type ChatSession } from './session.js';
 export { InMemorySession, SQLiteSession } from './session.js';
 export { OpenAIProvider, type OpenAIProviderOptions } from './openai-provider.js';
 export { loadPersonaFiles, loadPersonaPrompt, buildPersonaPrompt, writeMemory, appendMemory, type PersonaFile } from './persona.js';
+export { messages as messagesTable, type Message, type NewMessage } from './schema.js';
