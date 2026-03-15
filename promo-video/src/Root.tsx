@@ -568,6 +568,8 @@ export const RemotionRoot: React.FC = () => {
             width={1920}
             height={1080}
           />
+        </Folder>
+        <Folder name="Developer">
           <Composition
             id="AgentCoreWalk"
             component={AgentCoreWalk}
