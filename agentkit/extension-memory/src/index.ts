@@ -38,8 +38,32 @@ export function memoryExtension(opts: MemoryExtensionOptions = {}): Extension {
     },
 
     systemPrompt: () => {
-      if (!content) return undefined;
-      return `## Long-term Memory\n\n${content}`;
+      const instructions = `## Memory — 长期记忆
+
+你有一个长期记忆文件 \`${filename}\`。
+
+### 读取记忆
+\`\`\`bash
+cat ${filename}
+\`\`\`
+
+### 追加记忆
+\`\`\`bash
+echo "## $(date +%Y-%m-%d)
+- 要记住的内容" >> ${filename}
+\`\`\`
+
+### 什么时候该写入
+- 用户明确要求你记住某事
+- 发现了重要的偏好或模式
+- 关键决策和原因
+
+不要记录临时信息（调试中间结果等）。`;
+
+      if (content) {
+        return instructions + `\n\n### 当前记忆内容\n\n${content}`;
+      }
+      return instructions;
     },
 
     // post-bash: 如果 Agent 写了 MEMORY.md，热更新记忆

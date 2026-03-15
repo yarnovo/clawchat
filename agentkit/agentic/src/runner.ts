@@ -60,8 +60,11 @@ export class AgentRunner {
     for (const ext of this.extensions) await ext.setup?.(ctx);
     for (const ch of this.channels) await ch.setup(ctx);
 
-    // 2. 收集 system prompt
-    const prompts = this.extensions.map(e => e.systemPrompt?.()).filter((s): s is string => !!s);
+    // 2. 收集 system prompt（Extensions + Channels 都可以注入）
+    const prompts = [
+      ...this.extensions.map(e => e.systemPrompt?.()),
+      ...this.channels.map(c => c.systemPrompt?.()),
+    ].filter((s): s is string => !!s);
     const systemPrompt = prompts.join('\n\n') || 'You are a helpful assistant.';
 
     // 3. 创建 Agent（bash 内置，hooks 路由到 Extensions）

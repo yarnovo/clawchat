@@ -22,6 +22,8 @@ export interface Channel {
   name: string;
   setup(ctx: AgenticContext): Promise<void>;
   teardown?(): Promise<void>;
+  /** 教 Agent 怎么跟这个 Channel 配合 */
+  systemPrompt?(): string | undefined;
   info?(): Record<string, unknown>;
 }
 

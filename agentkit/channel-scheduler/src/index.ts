@@ -113,6 +113,38 @@ export function schedulerChannel(): Channel {
       appendLog(workDir, 'Stopped');
     },
 
+    systemPrompt: () => `## Scheduler — 定时任务
+
+你可以设置定时任务。系统自动监听 HEARTBEAT.md 文件变化，按 cron 表达式定时执行。
+
+### 创建定时任务
+
+用 bash 写入 HEARTBEAT.md：
+
+\`\`\`bash
+cat > HEARTBEAT.md << 'EOF'
+## 每日新闻简报
+cron: 0 9 * * *
+prompt: 从 Hacker News 抓取今日热门，生成简报
+EOF
+\`\`\`
+
+### 格式规则
+- 每个任务以 \`## 任务名\` 开头
+- \`cron:\` 行是标准 cron 表达式（分 时 日 月 周）
+- \`prompt:\` 行是到时间后要执行的指令
+- 格式错误的条目会被静默跳过
+
+### 常用 cron
+- \`0 9 * * *\` 每天 9:00
+- \`*/30 * * * *\` 每 30 分钟
+- \`0 10 * * 1\` 每周一 10:00
+
+### 查看当前任务
+\`\`\`bash
+cat HEARTBEAT.md
+\`\`\``,
+
     info: () => ({
       tasks: tasks.map(t => ({ name: t.name, cron: t.cron, nextRun: t.nextRun?.toISOString() })),
     }),
