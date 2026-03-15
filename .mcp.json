@@ -1,15 +1,15 @@
 {
   "mcpServers": {
-    "dart": {
-      "command": "dart",
-      "args": ["mcp-server"]
-    },
     "playwright": {
       "command": "npx",
       "args": [
         "@playwright/mcp@latest",
         "--isolated"
       ]
+    },
+    "shadcn": {
+      "command": "npx",
+      "args": ["shadcn@latest", "mcp"]
     }
   }
 }
