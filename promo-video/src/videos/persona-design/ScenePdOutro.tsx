@@ -10,7 +10,7 @@ import { Particles } from "../../Particles";
 import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
 const steps = [
-  { label: "OpenClaw", detail: "无", color: COLORS.subtle },
+  { label: "OpenClaw", detail: "八文件", color: COLORS.text },
   { label: "NanoClaw", detail: "单文件", color: COLORS.muted },
   { label: "IronClaw", detail: "五文件", color: COLORS.text },
   { label: "agent-core", detail: "四文件（精简）", color: COLORS.accent },

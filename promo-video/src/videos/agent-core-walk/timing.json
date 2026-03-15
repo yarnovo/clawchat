@@ -1,0 +1,32 @@
+[
+  {
+    "id": "acw-intro",
+    "startMs": 95,
+    "endMs": 10465
+  },
+  {
+    "id": "acw-agent",
+    "startMs": 10977,
+    "endMs": 28784
+  },
+  {
+    "id": "acw-llm",
+    "startMs": 29306,
+    "endMs": 51136
+  },
+  {
+    "id": "acw-persona",
+    "startMs": 51659,
+    "endMs": 73727
+  },
+  {
+    "id": "acw-tools",
+    "startMs": 74238,
+    "endMs": 89511
+  },
+  {
+    "id": "acw-outro",
+    "startMs": 90034,
+    "endMs": 110624
+  }
+]

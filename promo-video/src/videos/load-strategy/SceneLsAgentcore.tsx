@@ -10,23 +10,21 @@ import { Particles } from "../../Particles";
 import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
 const files = [
-  { name: "AGENTS.md", desc: "行为规则", highlight: false },
-  { name: "SOUL.md", desc: "人格灵魂", highlight: true },
-  { name: "IDENTITY.md", desc: "身份信息", highlight: false },
-  { name: "USER.md", desc: "用户偏好", highlight: false },
-  { name: "TOOLS.md", desc: "工具说明", highlight: false },
-  { name: "MEMORY.md", desc: "长期记忆", highlight: false },
-  { name: "HEARTBEAT.md", desc: "定时任务", highlight: false },
-  { name: "BOOTSTRAP.md", desc: "首次运行", highlight: false },
+  { name: "AGENT.md", perm: "只读", protected: true },
+  { name: "TOOLS.md", perm: "只读", protected: false },
+  { name: "MEMORY.md", perm: "读写", protected: false },
+  { name: "HEARTBEAT.md", perm: "只读", protected: false },
 ];
 
-export const ScenePdOpenclaw: React.FC = () => {
+const steps = ["读文件", "拼接", "System Prompt"];
+
+export const SceneLsAgentcore: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const labelProg = spring({ frame, fps, config: { damping: 14 } });
   const titleProg = spring({ frame: frame - 8, fps, config: { damping: 14 } });
-  const soulNoteProg = spring({ frame: frame - 60, fps, config: { damping: 14 } });
+  const flowProg = spring({ frame: frame - 40, fps, config: { damping: 14 } });
 
   return (
     <AbsoluteFill>
@@ -37,7 +35,7 @@ export const ScenePdOpenclaw: React.FC = () => {
           justifyContent: "center",
           alignItems: "center",
           flexDirection: "column",
-          gap: 24,
+          gap: 28,
           paddingBottom: 140,
         }}
       >
@@ -51,7 +49,7 @@ export const ScenePdOpenclaw: React.FC = () => {
             opacity: interpolate(labelProg, [0, 1], [0, 1]),
           }}
         >
-          OpenClaw
+          agent-core
         </div>
 
         <div
@@ -62,42 +60,40 @@ export const ScenePdOpenclaw: React.FC = () => {
             color: COLORS.text,
             opacity: interpolate(titleProg, [0, 1], [0, 1]),
             transform: `translateY(${interpolate(titleProg, [0, 1], [20, 0])}px)`,
-            marginBottom: 8,
+            marginBottom: 4,
           }}
         >
-          八文件人格体系
+          读文件 → 拼接 → System Prompt
         </div>
 
         <div
           style={{
             display: "flex",
-            gap: 16,
-            flexWrap: "wrap",
+            gap: 24,
             justifyContent: "center",
-            maxWidth: 1500,
           }}
         >
           {files.map((f, i) => {
-            const delay = 18 + i * 6;
+            const delay = 18 + i * 8;
             const prog = spring({ frame: frame - delay, fps, config: { damping: 14, mass: 0.6 } });
             return (
               <div
                 key={f.name}
                 style={{
-                  padding: "20px 28px",
+                  padding: "24px 32px",
                   borderRadius: 14,
-                  background: f.highlight
-                    ? `linear-gradient(135deg, ${COLORS.card}, rgba(218, 119, 86, 0.08))`
+                  background: f.protected
+                    ? `linear-gradient(135deg, ${COLORS.card}, rgba(218, 119, 86, 0.06))`
                     : COLORS.card,
-                  border: f.highlight
+                  border: f.protected
                     ? `2px solid ${COLORS.accent}`
                     : `1px solid ${COLORS.border}`,
                   boxShadow: COLORS.cardShadow,
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
-                  gap: 8,
-                  minWidth: 180,
+                  gap: 10,
+                  minWidth: 210,
                   opacity: interpolate(prog, [0, 1], [0, 1]),
                   transform: `translateY(${interpolate(prog, [0, 1], [30, 0])}px)`,
                   position: "relative",
@@ -106,9 +102,9 @@ export const ScenePdOpenclaw: React.FC = () => {
                 <div
                   style={{
                     fontFamily: MONO,
-                    fontSize: 26,
+                    fontSize: 28,
                     fontWeight: 700,
-                    color: f.highlight ? COLORS.accent : COLORS.text,
+                    color: f.protected ? COLORS.accent : COLORS.text,
                   }}
                 >
                   {f.name}
@@ -117,12 +113,13 @@ export const ScenePdOpenclaw: React.FC = () => {
                   style={{
                     fontFamily: FONT_SANS,
                     fontSize: 24,
-                    color: COLORS.muted,
+                    color: f.perm === "读写" ? "#4CAF50" : COLORS.muted,
+                    fontWeight: f.perm === "读写" ? 600 : 400,
                   }}
                 >
-                  {f.desc}
+                  {f.perm}
                 </div>
-                {f.highlight && (
+                {f.protected && (
                   <div
                     style={{
                       position: "absolute",
@@ -137,7 +134,7 @@ export const ScenePdOpenclaw: React.FC = () => {
                       borderRadius: 8,
                     }}
                   >
-                    embody
+                    受保护
                   </div>
                 )}
               </div>
@@ -147,19 +144,38 @@ export const ScenePdOpenclaw: React.FC = () => {
 
         <div
           style={{
-            fontFamily: FONT_SANS,
-            fontSize: 26,
-            color: COLORS.accent,
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
             marginTop: 8,
-            padding: "8px 24px",
-            borderRadius: 8,
-            background: "rgba(218, 119, 86, 0.08)",
-            border: `1px solid rgba(218, 119, 86, 0.2)`,
-            opacity: interpolate(soulNoteProg, [0, 1], [0, 1]),
-            transform: `translateY(${interpolate(soulNoteProg, [0, 1], [16, 0])}px)`,
+            opacity: interpolate(flowProg, [0, 1], [0, 1]),
+            transform: `translateY(${interpolate(flowProg, [0, 1], [16, 0])}px)`,
           }}
         >
-          SOUL.md 特殊处理：系统提示要求 Agent 体现人格和语调
+          {steps.map((s, i) => (
+            <div key={s} style={{ display: "flex", alignItems: "center", gap: 16 }}>
+              <div
+                style={{
+                  fontFamily: FONT_SANS,
+                  fontSize: 26,
+                  fontWeight: 600,
+                  color: i === steps.length - 1 ? COLORS.accent : COLORS.text,
+                  padding: "10px 24px",
+                  borderRadius: 10,
+                  background: COLORS.card,
+                  border: i === steps.length - 1 ? `2px solid ${COLORS.accent}` : `1px solid ${COLORS.border}`,
+                  boxShadow: COLORS.cardShadow,
+                }}
+              >
+                {s}
+              </div>
+              {i < steps.length - 1 && (
+                <div style={{ fontFamily: FONT_SANS, fontSize: 32, color: COLORS.subtle }}>
+                  →
+                </div>
+              )}
+            </div>
+          ))}
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

@@ -9,24 +9,20 @@ import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
 import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
-const files = [
-  { name: "AGENTS.md", desc: "行为规则", highlight: false },
-  { name: "SOUL.md", desc: "人格灵魂", highlight: true },
-  { name: "IDENTITY.md", desc: "身份信息", highlight: false },
-  { name: "USER.md", desc: "用户偏好", highlight: false },
-  { name: "TOOLS.md", desc: "工具说明", highlight: false },
-  { name: "MEMORY.md", desc: "长期记忆", highlight: false },
-  { name: "HEARTBEAT.md", desc: "定时任务", highlight: false },
-  { name: "BOOTSTRAP.md", desc: "首次运行", highlight: false },
+const personaFiles = [
+  { name: "AGENT.md", desc: "人格和规则", protected: true },
+  { name: "TOOLS.md", desc: "描述工具", protected: false },
+  { name: "MEMORY.md", desc: "长期记忆（可读写）", protected: false },
+  { name: "HEARTBEAT.md", desc: "定时任务", protected: false },
 ];
 
-export const ScenePdOpenclaw: React.FC = () => {
+export const SceneAcwPersona: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const labelProg = spring({ frame, fps, config: { damping: 14 } });
   const titleProg = spring({ frame: frame - 8, fps, config: { damping: 14 } });
-  const soulNoteProg = spring({ frame: frame - 60, fps, config: { damping: 14 } });
+  const arrowProg = spring({ frame: frame - 60, fps, config: { damping: 14 } });
 
   return (
     <AbsoluteFill>
@@ -51,13 +47,13 @@ export const ScenePdOpenclaw: React.FC = () => {
             opacity: interpolate(labelProg, [0, 1], [0, 1]),
           }}
         >
-          OpenClaw
+          persona.ts · 人格加载
         </div>
 
         <div
           style={{
             fontFamily: FONT,
-            fontSize: 48,
+            fontSize: 42,
             fontWeight: 700,
             color: COLORS.text,
             opacity: interpolate(titleProg, [0, 1], [0, 1]),
@@ -65,50 +61,43 @@ export const ScenePdOpenclaw: React.FC = () => {
             marginBottom: 8,
           }}
         >
-          八文件人格体系
+          从文件系统读取四个文件
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            gap: 16,
-            flexWrap: "wrap",
-            justifyContent: "center",
-            maxWidth: 1500,
-          }}
-        >
-          {files.map((f, i) => {
-            const delay = 18 + i * 6;
+        {/* Four file cards in a row */}
+        <div style={{ display: "flex", gap: 20, justifyContent: "center" }}>
+          {personaFiles.map((f, i) => {
+            const delay = 18 + i * 10;
             const prog = spring({ frame: frame - delay, fps, config: { damping: 14, mass: 0.6 } });
             return (
               <div
                 key={f.name}
                 style={{
-                  padding: "20px 28px",
+                  padding: "28px 32px",
                   borderRadius: 14,
-                  background: f.highlight
-                    ? `linear-gradient(135deg, ${COLORS.card}, rgba(218, 119, 86, 0.08))`
+                  background: f.protected
+                    ? `linear-gradient(135deg, ${COLORS.card}, rgba(218, 119, 86, 0.06))`
                     : COLORS.card,
-                  border: f.highlight
+                  border: f.protected
                     ? `2px solid ${COLORS.accent}`
                     : `1px solid ${COLORS.border}`,
                   boxShadow: COLORS.cardShadow,
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
-                  gap: 8,
-                  minWidth: 180,
+                  gap: 10,
+                  minWidth: 220,
                   opacity: interpolate(prog, [0, 1], [0, 1]),
                   transform: `translateY(${interpolate(prog, [0, 1], [30, 0])}px)`,
-                  position: "relative",
+                  position: "relative" as const,
                 }}
               >
                 <div
                   style={{
                     fontFamily: MONO,
-                    fontSize: 26,
+                    fontSize: 28,
                     fontWeight: 700,
-                    color: f.highlight ? COLORS.accent : COLORS.text,
+                    color: f.protected ? COLORS.accent : COLORS.text,
                   }}
                 >
                   {f.name}
@@ -122,7 +111,7 @@ export const ScenePdOpenclaw: React.FC = () => {
                 >
                   {f.desc}
                 </div>
-                {f.highlight && (
+                {f.protected && (
                   <div
                     style={{
                       position: "absolute",
@@ -137,7 +126,7 @@ export const ScenePdOpenclaw: React.FC = () => {
                       borderRadius: 8,
                     }}
                   >
-                    embody
+                    受保护
                   </div>
                 )}
               </div>
@@ -145,21 +134,41 @@ export const ScenePdOpenclaw: React.FC = () => {
           })}
         </div>
 
+        {/* Arrow to system prompt */}
         <div
           style={{
-            fontFamily: FONT_SANS,
-            fontSize: 26,
-            color: COLORS.accent,
-            marginTop: 8,
-            padding: "8px 24px",
-            borderRadius: 8,
-            background: "rgba(218, 119, 86, 0.08)",
-            border: `1px solid rgba(218, 119, 86, 0.2)`,
-            opacity: interpolate(soulNoteProg, [0, 1], [0, 1]),
-            transform: `translateY(${interpolate(soulNoteProg, [0, 1], [16, 0])}px)`,
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            marginTop: 12,
+            opacity: interpolate(arrowProg, [0, 1], [0, 1]),
+            transform: `translateY(${interpolate(arrowProg, [0, 1], [16, 0])}px)`,
           }}
         >
-          SOUL.md 特殊处理：系统提示要求 Agent 体现人格和语调
+          <div
+            style={{
+              fontFamily: FONT_SANS,
+              fontSize: 32,
+              color: COLORS.subtle,
+            }}
+          >
+            ↓ 拼接注入
+          </div>
+          <div
+            style={{
+              fontFamily: MONO,
+              fontSize: 28,
+              fontWeight: 700,
+              color: COLORS.accent,
+              padding: "12px 28px",
+              borderRadius: 12,
+              background: COLORS.card,
+              border: `2px solid ${COLORS.accent}`,
+              boxShadow: COLORS.cardShadow,
+            }}
+          >
+            system prompt
+          </div>
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

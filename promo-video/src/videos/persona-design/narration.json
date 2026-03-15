@@ -1,8 +1,8 @@
 [
   {"id": "pd-intro", "text": "Agent不是冷冰冰的工具，它有人格。人格文件定义了Agent是谁、怎么做事、记住什么。三大Runtime对人格的设计完全不同。"},
-  {"id": "pd-openclaw", "text": "OpenClaw最简单，没有集中的人格文件。Agent的行为分散在渠道配置和插件里。灵活但缺乏统一的身份定义。"},
+  {"id": "pd-openclaw", "text": "OpenClaw最完善，八个人格文件。AGENTS.md定义行为规则，SOUL.md定义灵魂和价值观，IDENTITY.md定义身份，USER.md存用户偏好，还有MEMORY、HEARTBEAT、BOOTSTRAP、TOOLS。SOUL.md有特殊处理，系统提示明确要求Agent体现它的人格和语调。"},
   {"id": "pd-nanoclaw", "text": "NanoClaw用CLAUDE.md。分两层：global层定义所有群组共享的基础人格，每个群组可以有自己的CLAUDE.md覆盖。Agent容器启动时自动加载。但它跟Claude绑定了名字。"},
   {"id": "pd-ironclaw", "text": "IronClaw最完善，五个文件。AGENTS.md定义行为规则和指令。SOUL.md定义核心价值观。IDENTITY.md定义名字和个性。USER.md存储用户偏好。HEARTBEAT.md是定时执行的检查清单。SOUL和IDENTITY受保护，Agent不能修改自己的价值观。"},
   {"id": "pd-agentcore", "text": "我们的agent-core怎么设计？叫AGENT.md，不绑定任何模型。分四个文件：AGENT.md定义人格和行为规则，TOOLS.md描述已安装工具，MEMORY.md存储长期记忆，HEARTBEAT.md定义定时任务。Agent可以修改MEMORY，但不能修改AGENT.md。"},
-  {"id": "pd-outro", "text": "总结。人格文件是Agent的灵魂。从OpenClaw的无到NanoClaw的单文件到IronClaw的五文件体系，设计越来越精细。agent-core取其精华，四个文件，模型无关，保护核心身份。"}
+  {"id": "pd-outro", "text": "总结。人格文件是Agent的灵魂。OpenClaw八文件最完善，NanoClaw单文件简洁，IronClaw五文件受保护。agent-core取其精华，四个文件，模型无关，保护核心身份。"}
 ]

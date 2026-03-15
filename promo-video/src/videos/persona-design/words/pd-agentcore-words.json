@@ -1,242 +1,242 @@
 [
   {
     "part": "我们",
-    "start": 59647,
-    "end": 59886
+    "start": 72443,
+    "end": 72681
   },
   {
     "part": "的",
-    "start": 59886,
-    "end": 60022
+    "start": 72681,
+    "end": 72818
   },
   {
     "part": "agent-core",
-    "start": 60045,
-    "end": 60715
+    "start": 72840,
+    "end": 73511
   },
   {
     "part": "怎么",
-    "start": 60818,
-    "end": 61022
+    "start": 73613,
+    "end": 73818
   },
   {
     "part": "设计？",
-    "start": 61034,
-    "end": 61511
+    "start": 73829,
+    "end": 74306
   },
   {
     "part": "叫",
-    "start": 62034,
-    "end": 62272
+    "start": 74829,
+    "end": 75068
   },
   {
     "part": "AGENT.",
-    "start": 62272,
-    "end": 62761
+    "start": 75068,
+    "end": 75556
   },
   {
     "part": "md，",
-    "start": 63011,
-    "end": 63465
+    "start": 75806,
+    "end": 76261
   },
   {
     "part": "不",
-    "start": 63636,
-    "end": 63750
+    "start": 76431,
+    "end": 76545
   },
   {
     "part": "绑定",
-    "start": 63750,
-    "end": 64079
+    "start": 76545,
+    "end": 76874
   },
   {
     "part": "任何",
-    "start": 64102,
-    "end": 64431
+    "start": 76897,
+    "end": 77227
   },
   {
     "part": "模型。",
-    "start": 64443,
-    "end": 64897
+    "start": 77238,
+    "end": 77693
   },
   {
     "part": "分",
-    "start": 65420,
-    "end": 65636
+    "start": 78215,
+    "end": 78431
   },
   {
     "part": "四",
-    "start": 65647,
-    "end": 65806
+    "start": 78443,
+    "end": 78602
   },
   {
     "part": "个",
-    "start": 65806,
-    "end": 65886
+    "start": 78602,
+    "end": 78681
   },
   {
     "part": "文件：",
-    "start": 65897,
-    "end": 66340
+    "start": 78693,
+    "end": 79136
   },
   {
     "part": "AGENT.",
-    "start": 66568,
-    "end": 67090
+    "start": 79363,
+    "end": 79886
   },
   {
     "part": "md",
-    "start": 67329,
-    "end": 67772
+    "start": 80125,
+    "end": 80568
   },
   {
     "part": "定义",
-    "start": 67784,
-    "end": 68068
+    "start": 80579,
+    "end": 80863
   },
   {
     "part": "人格",
-    "start": 68090,
-    "end": 68477
+    "start": 80886,
+    "end": 81272
   },
   {
     "part": "和",
-    "start": 68500,
-    "end": 68613
+    "start": 81295,
+    "end": 81409
   },
   {
     "part": "行为",
-    "start": 68625,
-    "end": 68931
+    "start": 81420,
+    "end": 81727
   },
   {
     "part": "规则，",
-    "start": 68943,
-    "end": 69443
+    "start": 81738,
+    "end": 82238
   },
   {
     "part": "TOOLS.",
-    "start": 69704,
-    "end": 70227
+    "start": 82500,
+    "end": 83022
   },
   {
     "part": "md",
-    "start": 70363,
-    "end": 70704
+    "start": 83159,
+    "end": 83499
   },
   {
     "part": "描述",
-    "start": 70715,
-    "end": 71181
+    "start": 83511,
+    "end": 83977
   },
   {
     "part": "已",
-    "start": 71204,
-    "end": 71329
+    "start": 84000,
+    "end": 84125
   },
   {
     "part": "安装",
-    "start": 71340,
-    "end": 71636
+    "start": 84136,
+    "end": 84431
   },
   {
     "part": "工具，",
-    "start": 71647,
-    "end": 72090
+    "start": 84443,
+    "end": 84886
   },
   {
     "part": "MEMORY.",
-    "start": 72295,
-    "end": 72784
+    "start": 85090,
+    "end": 85579
   },
   {
     "part": "md",
-    "start": 72943,
-    "end": 73374
+    "start": 85738,
+    "end": 86170
   },
   {
     "part": "存储",
-    "start": 73386,
-    "end": 73750
+    "start": 86181,
+    "end": 86545
   },
   {
     "part": "长期",
-    "start": 73772,
-    "end": 74136
+    "start": 86568,
+    "end": 86931
   },
   {
     "part": "记忆，",
-    "start": 74147,
-    "end": 74556
+    "start": 86943,
+    "end": 87352
   },
   {
     "part": "HEARTBEAT.",
-    "start": 74806,
-    "end": 75397
+    "start": 87602,
+    "end": 88193
   },
   {
     "part": "md",
-    "start": 75613,
-    "end": 76079
+    "start": 88409,
+    "end": 88874
   },
   {
     "part": "定义",
-    "start": 76090,
-    "end": 76397
+    "start": 88886,
+    "end": 89193
   },
   {
     "part": "定时",
-    "start": 76420,
-    "end": 76727
+    "start": 89215,
+    "end": 89522
   },
   {
     "part": "任务。",
-    "start": 76738,
-    "end": 77125
+    "start": 89534,
+    "end": 89920
   },
   {
     "part": "Agent",
-    "start": 77647,
-    "end": 78113
+    "start": 90443,
+    "end": 90909
   },
   {
     "part": "可以",
-    "start": 78136,
-    "end": 78352
+    "start": 90931,
+    "end": 91147
   },
   {
     "part": "修改",
-    "start": 78363,
-    "end": 78806
+    "start": 91159,
+    "end": 91602
   },
   {
     "part": "MEMORY，",
-    "start": 78897,
-    "end": 79340
+    "start": 91693,
+    "end": 92136
   },
   {
     "part": "但",
-    "start": 79590,
-    "end": 79727
+    "start": 92386,
+    "end": 92522
   },
   {
     "part": "不能",
-    "start": 79738,
-    "end": 79943
+    "start": 92534,
+    "end": 92738
   },
   {
     "part": "修改",
-    "start": 79954,
-    "end": 80397
+    "start": 92750,
+    "end": 93193
   },
   {
     "part": "AGENT.",
-    "start": 80488,
-    "end": 80954
+    "start": 93284,
+    "end": 93749
   },
   {
     "part": "md。",
-    "start": 81170,
-    "end": 81636
+    "start": 93965,
+    "end": 94431
   }
 ]

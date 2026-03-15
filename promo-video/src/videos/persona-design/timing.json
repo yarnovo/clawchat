@@ -7,26 +7,26 @@
   {
     "id": "pd-openclaw",
     "startMs": 11409,
-    "endMs": 20545
+    "endMs": 33340
   },
   {
     "id": "pd-nanoclaw",
-    "startMs": 21068,
-    "endMs": 35784
+    "startMs": 33863,
+    "endMs": 48579
   },
   {
     "id": "pd-ironclaw",
-    "startMs": 36306,
-    "endMs": 59124
+    "startMs": 49102,
+    "endMs": 71920
   },
   {
     "id": "pd-agentcore",
-    "startMs": 59647,
-    "endMs": 81636
+    "startMs": 72443,
+    "endMs": 94431
   },
   {
     "id": "pd-outro",
-    "startMs": 82159,
-    "endMs": 96704
+    "startMs": 94954,
+    "endMs": 109249
   }
 ]

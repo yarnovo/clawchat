@@ -59,6 +59,8 @@ import { K8sDeploy, TOTAL_FRAMES as K8SDEPLOY_FRAMES } from "./videos/k8s-deploy
 import { TechArch, TOTAL_FRAMES as TECHARCH_FRAMES } from "./videos/tech-arch/TechArch";
 import { AiTrends2026, TOTAL_FRAMES as AITRENDS_FRAMES } from "./videos/ai-trends-2026/AiTrends2026";
 import { PersonaDesign, TOTAL_FRAMES as PD_FRAMES } from "./videos/persona-design/PersonaDesign";
+import { LoadStrategy, TOTAL_FRAMES as LS_FRAMES } from "./videos/load-strategy/LoadStrategy";
+import { AgentCoreWalk, TOTAL_FRAMES as ACW_FRAMES } from "./videos/agent-core-walk/AgentCoreWalk";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -554,6 +556,22 @@ export const RemotionRoot: React.FC = () => {
             id="PersonaDesign"
             component={PersonaDesign}
             durationInFrames={PD_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="LoadStrategy"
+            component={LoadStrategy}
+            durationInFrames={LS_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="AgentCoreWalk"
+            component={AgentCoreWalk}
+            durationInFrames={ACW_FRAMES}
             fps={30}
             width={1920}
             height={1080}

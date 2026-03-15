@@ -1,192 +1,192 @@
 [
   {
     "part": "NanoClaw",
-    "start": 21068,
-    "end": 21704
+    "start": 33863,
+    "end": 34500
   },
   {
     "part": "用",
-    "start": 21715,
-    "end": 21909
+    "start": 34511,
+    "end": 34704
   },
   {
     "part": "CLAUDE.",
-    "start": 21909,
-    "end": 22340
+    "start": 34704,
+    "end": 35136
   },
   {
     "part": "md。",
-    "start": 22545,
-    "end": 22988
+    "start": 35340,
+    "end": 35784
   },
   {
     "part": "分",
-    "start": 23511,
-    "end": 23693
+    "start": 36306,
+    "end": 36488
   },
   {
     "part": "两",
-    "start": 23704,
-    "end": 23886
+    "start": 36500,
+    "end": 36681
   },
   {
     "part": "层：",
-    "start": 23886,
-    "end": 24215
+    "start": 36681,
+    "end": 37011
   },
   {
     "part": "global",
-    "start": 24443,
-    "end": 24852
+    "start": 37238,
+    "end": 37647
   },
   {
     "part": "层",
-    "start": 24852,
-    "end": 25204
+    "start": 37647,
+    "end": 37999
   },
   {
     "part": "定义",
-    "start": 25295,
-    "end": 25602
+    "start": 38090,
+    "end": 38397
   },
   {
     "part": "所有",
-    "start": 25625,
-    "end": 25920
+    "start": 38420,
+    "end": 38715
   },
   {
     "part": "群组",
-    "start": 25931,
-    "end": 26284
+    "start": 38727,
+    "end": 39079
   },
   {
     "part": "共享",
-    "start": 26306,
-    "end": 26624
+    "start": 39102,
+    "end": 39420
   },
   {
     "part": "的",
-    "start": 26625,
-    "end": 26693
+    "start": 39420,
+    "end": 39488
   },
   {
     "part": "基础",
-    "start": 26715,
-    "end": 26977
+    "start": 39511,
+    "end": 39772
   },
   {
     "part": "人格，",
-    "start": 26988,
-    "end": 27431
+    "start": 39784,
+    "end": 40227
   },
   {
     "part": "每个",
-    "start": 27704,
-    "end": 27920
+    "start": 40500,
+    "end": 40715
   },
   {
     "part": "群组",
-    "start": 27931,
-    "end": 28397
+    "start": 40727,
+    "end": 41193
   },
   {
     "part": "可以",
-    "start": 28420,
-    "end": 28602
+    "start": 41215,
+    "end": 41397
   },
   {
     "part": "有",
-    "start": 28613,
-    "end": 28750
+    "start": 41409,
+    "end": 41545
   },
   {
     "part": "自己",
-    "start": 28772,
-    "end": 29068
+    "start": 41568,
+    "end": 41863
   },
   {
     "part": "的",
-    "start": 29068,
-    "end": 29261
+    "start": 41863,
+    "end": 42056
   },
   {
     "part": "CLAUDE.",
-    "start": 29352,
-    "end": 29761
+    "start": 42147,
+    "end": 42556
   },
   {
     "part": "md",
-    "start": 29818,
-    "end": 30181
+    "start": 42613,
+    "end": 42977
   },
   {
     "part": "覆盖。",
-    "start": 30193,
-    "end": 30590
+    "start": 42988,
+    "end": 43386
   },
   {
     "part": "Agent",
-    "start": 31113,
-    "end": 31556
+    "start": 43909,
+    "end": 44352
   },
   {
     "part": "容器",
-    "start": 31568,
-    "end": 31886
+    "start": 44363,
+    "end": 44681
   },
   {
     "part": "启动",
-    "start": 31897,
-    "end": 32249
+    "start": 44693,
+    "end": 45045
   },
   {
     "part": "时",
-    "start": 32250,
-    "end": 32579
+    "start": 45045,
+    "end": 45374
   },
   {
     "part": "自动",
-    "start": 32670,
-    "end": 32999
+    "start": 45465,
+    "end": 45795
   },
   {
     "part": "加载。",
-    "start": 33011,
-    "end": 33420
+    "start": 45806,
+    "end": 46215
   },
   {
     "part": "但",
-    "start": 33943,
-    "end": 34102
+    "start": 46738,
+    "end": 46897
   },
   {
     "part": "它",
-    "start": 34102,
-    "end": 34204
+    "start": 46897,
+    "end": 46999
   },
   {
     "part": "跟",
-    "start": 34215,
-    "end": 34386
+    "start": 47011,
+    "end": 47181
   },
   {
     "part": "Claude",
-    "start": 34386,
-    "end": 34829
+    "start": 47181,
+    "end": 47624
   },
   {
     "part": "绑定",
-    "start": 34920,
-    "end": 35249
+    "start": 47715,
+    "end": 48045
   },
   {
     "part": "了",
-    "start": 35250,
-    "end": 35329
+    "start": 48045,
+    "end": 48124
   },
   {
     "part": "名字。",
-    "start": 35340,
-    "end": 35784
+    "start": 48136,
+    "end": 48579
   }
 ]
