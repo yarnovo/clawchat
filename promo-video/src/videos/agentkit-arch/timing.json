@@ -1,0 +1,37 @@
+[
+  {
+    "id": "ak-intro",
+    "startMs": 95,
+    "endMs": 9124
+  },
+  {
+    "id": "ak-packages",
+    "startMs": 9647,
+    "endMs": 29965
+  },
+  {
+    "id": "ak-flow",
+    "startMs": 30477,
+    "endMs": 53977
+  },
+  {
+    "id": "ak-scheduler",
+    "startMs": 54500,
+    "endMs": 72261
+  },
+  {
+    "id": "ak-eval",
+    "startMs": 72784,
+    "endMs": 90659
+  },
+  {
+    "id": "ak-extend",
+    "startMs": 91181,
+    "endMs": 108852
+  },
+  {
+    "id": "ak-outro",
+    "startMs": 109363,
+    "endMs": 126397
+  }
+]

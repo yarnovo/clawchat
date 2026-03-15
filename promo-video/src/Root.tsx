@@ -68,6 +68,8 @@ import { EvalFramework, TOTAL_FRAMES as EF_FRAMES } from "./videos/eval-framewor
 import { AgentEvals, TOTAL_FRAMES as AE_FRAMES } from "./videos/agent-evals/AgentEvals";
 import { SchedulerDesign, TOTAL_FRAMES as SCHED_FRAMES } from "./videos/scheduler-design/SchedulerDesign";
 import { ChannelDesign, TOTAL_FRAMES as CHDESIGN_FRAMES } from "./videos/channel-design/ChannelDesign";
+import { AgentKitArch, TOTAL_FRAMES as AKARCH_FRAMES } from "./videos/agentkit-arch/AgentKitArch";
+import { BackendArch, TOTAL_FRAMES as BARCH_FRAMES } from "./videos/backend-arch/BackendArch";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -607,6 +609,14 @@ export const RemotionRoot: React.FC = () => {
             width={1920}
             height={1080}
           />
+          <Composition
+            id="BackendArch"
+            component={BackendArch}
+            durationInFrames={BARCH_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
         </Folder>
         <Folder name="Developer">
           <Composition
@@ -637,6 +647,14 @@ export const RemotionRoot: React.FC = () => {
             id="AgentEvals"
             component={AgentEvals}
             durationInFrames={AE_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="AgentKitArch"
+            component={AgentKitArch}
+            durationInFrames={AKARCH_FRAMES}
             fps={30}
             width={1920}
             height={1080}
