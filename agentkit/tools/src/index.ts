@@ -1,23 +1,23 @@
 import type { Tool } from '@agentkit/core';
 
 // 第一层：生存工具（5 个）
-import { bash } from './bash.js';
-import { read } from './read.js';
-import { write } from './write.js';
-import { webSearch } from './web-search.js';
-import { webFetch } from './web-fetch.js';
+import { bash } from './survive/bash.js';
+import { read } from './survive/read.js';
+import { write } from './survive/write.js';
+import { webSearch } from './survive/web-search.js';
+import { webFetch } from './survive/web-fetch.js';
 
 // 第二层：进化工具（5 个）
-import { skillSearch } from './skill-search.js';
-import { skillInstall } from './skill-install.js';
-import { toolList, setRegisteredTools } from './tool-list.js';
-import { memoryWrite } from './memory-write.js';
-import { memoryRead } from './memory-read.js';
+import { skillSearch } from './evolve/skill-search.js';
+import { skillInstall } from './evolve/skill-install.js';
+import { toolList, setRegisteredTools } from './evolve/tool-list.js';
+import { memoryWrite } from './evolve/memory-write.js';
+import { memoryRead } from './evolve/memory-read.js';
 
 // 第三层：协作工具（3 个）
-import { message, setMessageHandler } from './message.js';
-import { taskCreate } from './task-create.js';
-import { taskStatus } from './task-status.js';
+import { message, setMessageHandler } from './collaborate/message.js';
+import { taskCreate } from './collaborate/task-create.js';
+import { taskStatus } from './collaborate/task-status.js';
 
 export {
   // 生存
