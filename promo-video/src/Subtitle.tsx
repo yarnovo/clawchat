@@ -65,7 +65,7 @@ export const Subtitle: React.FC<{
           background: "rgba(255,255,255,0.85)",
           backdropFilter: "blur(12px)",
           boxShadow: "0 2px 16px rgba(0,0,0,0.08)",
-          maxWidth: 1100,
+          maxWidth: 1500,
         }}
       >
         {words.map((w, i) => {

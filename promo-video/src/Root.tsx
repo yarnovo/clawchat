@@ -8,10 +8,53 @@ import { Marketplace, TOTAL_FRAMES as MARKETPLACE_FRAMES } from "./videos/market
 import { AgentDb, TOTAL_FRAMES as AGENTDB_FRAMES } from "./videos/agent-db/AgentDb";
 import { SkillTutorial, TOTAL_FRAMES as SKILLTUT_FRAMES } from "./videos/skill-tutorial/SkillTutorial";
 import { SkillDevwalk, TOTAL_FRAMES as SKILLDEV_FRAMES } from "./videos/skill-devwalk/SkillDevwalk";
+import { Architecture, TOTAL_FRAMES as ARCH_FRAMES } from "./videos/architecture/Architecture";
+import { Saga, TOTAL_FRAMES as SAGA_FRAMES } from "./videos/saga/Saga";
+import { Runtime, TOTAL_FRAMES as RUNTIME_FRAMES } from "./videos/runtime/Runtime";
+import { Testing, TOTAL_FRAMES as TESTING_FRAMES } from "./videos/testing/Testing";
+import { AgentPromo, TOTAL_FRAMES as AGENTPROMO_FRAMES } from "./videos/agent-promo/AgentPromo";
+import { QuickStart, TOTAL_FRAMES as QS_FRAMES } from "./videos/quickstart/QuickStart";
+import { MessageSystem, TOTAL_FRAMES as MSG_FRAMES } from "./videos/message-system/MessageSystem";
+import { ImServerWalk, TOTAL_FRAMES as IMW_FRAMES } from "./videos/im-server-walk/ImServerWalk";
+import { AgentServerWalk, TOTAL_FRAMES as ASW_FRAMES } from "./videos/agent-server-walk/AgentServerWalk";
+import { ContainerWalk, TOTAL_FRAMES as CW_FRAMES } from "./videos/container-walk/ContainerWalk";
+import { OpenclawVolume, TOTAL_FRAMES as OV_FRAMES } from "./videos/openclaw-volume/OpenclawVolume";
+import { Deploy, TOTAL_FRAMES as DEPLOY_FRAMES } from "./videos/deploy/Deploy";
+import { Business, TOTAL_FRAMES as BIZ_FRAMES } from "./videos/business/Business";
+import { Security, TOTAL_FRAMES as SEC_FRAMES } from "./videos/security/Security";
+import { AccountSystem, TOTAL_FRAMES as ACCT_FRAMES } from "./videos/account-system/AccountSystem";
+import { WebSocketVideo, TOTAL_FRAMES as WS_FRAMES } from "./videos/websocket/WebSocketVideo";
+import { CrossPlatform, TOTAL_FRAMES as CP_FRAMES } from "./videos/cross-platform/CrossPlatform";
+import { FriendTutorial, TOTAL_FRAMES as FT_FRAMES } from "./videos/friend-tutorial/FriendTutorial";
+import { AgentConfig, TOTAL_FRAMES as AC_FRAMES } from "./videos/agent-config/AgentConfig";
+import { Roadmap, TOTAL_FRAMES as RM_FRAMES } from "./videos/roadmap/Roadmap";
+import { Container, TOTAL_FRAMES as CONTAINER_FRAMES } from "./videos/container/Container";
+import { Vision, TOTAL_FRAMES as VIS_FRAMES } from "./videos/vision/Vision";
+import { TechStack, TOTAL_FRAMES as TS_FRAMES } from "./videos/tech-stack/TechStack";
+import { ErrorHandling, TOTAL_FRAMES as EH_FRAMES } from "./videos/error-handling/ErrorHandling";
+import { Mcp, TOTAL_FRAMES as MCP_FRAMES } from "./videos/mcp/Mcp";
+import { OpenSource, TOTAL_FRAMES as OS_FRAMES } from "./videos/open-source/OpenSource";
+import { SkillBrowserVideo, TOTAL_FRAMES as SB_FRAMES } from "./videos/skill-browser/SkillBrowserVideo";
+import { OpenclawPlugin, TOTAL_FRAMES as OP_FRAMES } from "./videos/openclaw-plugin/OpenclawPlugin";
+import { VolumeSafety, TOTAL_FRAMES as VS_FRAMES } from "./videos/volume-safety/VolumeSafety";
+import { PainPoints, TOTAL_FRAMES as PP_FRAMES } from "./videos/pain-points/PainPoints";
+import { ShareSaga, TOTAL_FRAMES as SSAGA_FRAMES } from "./videos/share-saga/ShareSaga";
+import { ShareVolume, TOTAL_FRAMES as SVOL_FRAMES } from "./videos/share-volume/ShareVolume";
+import { InvestorPitch, TOTAL_FRAMES as INVESTOR_FRAMES } from "./videos/investor-pitch/InvestorPitch";
+import { VideoGuide, TOTAL_FRAMES as VG_FRAMES } from "./videos/video-guide/VideoGuide";
 
 export const RemotionRoot: React.FC = () => {
   return (
     <>
+      {/* 元视频：视频导览（根级别，所有 Folder 之前） */}
+      <Composition
+        id="VideoGuide"
+        component={VideoGuide}
+        durationInFrames={VG_FRAMES}
+        fps={30}
+        width={1920}
+        height={1080}
+      />
       <Folder name="宣传">
         <Composition
           id="Main"
@@ -37,12 +80,96 @@ export const RemotionRoot: React.FC = () => {
           width={1920}
           height={1080}
         />
+        <Composition
+          id="AgentPromo"
+          component={AgentPromo}
+          durationInFrames={AGENTPROMO_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="Security"
+          component={Security}
+          durationInFrames={SEC_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="CrossPlatform"
+          component={CrossPlatform}
+          durationInFrames={CP_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="Vision"
+          component={Vision}
+          durationInFrames={VIS_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="OpenSource"
+          component={OpenSource}
+          durationInFrames={OS_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Folder name="痛点攻坚">
+          <Composition
+            id="PainPoints"
+            component={PainPoints}
+            durationInFrames={PP_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+        </Folder>
+        <Folder name="投资人">
+          <Composition
+            id="InvestorPitch"
+            component={InvestorPitch}
+            durationInFrames={INVESTOR_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+        </Folder>
       </Folder>
       <Folder name="教程">
         <Composition
           id="SkillTutorial"
           component={SkillTutorial}
           durationInFrames={SKILLTUT_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="QuickStart"
+          component={QuickStart}
+          durationInFrames={QS_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="FriendTutorial"
+          component={FriendTutorial}
+          durationInFrames={FT_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="AgentConfig"
+          component={AgentConfig}
+          durationInFrames={AC_FRAMES}
           fps={30}
           width={1920}
           height={1080}
@@ -81,12 +208,198 @@ export const RemotionRoot: React.FC = () => {
           width={1920}
           height={1080}
         />
+        <Composition
+          id="Architecture"
+          component={Architecture}
+          durationInFrames={ARCH_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="Saga"
+          component={Saga}
+          durationInFrames={SAGA_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="Runtime"
+          component={Runtime}
+          durationInFrames={RUNTIME_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="Testing"
+          component={Testing}
+          durationInFrames={TESTING_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="MessageSystem"
+          component={MessageSystem}
+          durationInFrames={MSG_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="Deploy"
+          component={Deploy}
+          durationInFrames={DEPLOY_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="Business"
+          component={Business}
+          durationInFrames={BIZ_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="AccountSystem"
+          component={AccountSystem}
+          durationInFrames={ACCT_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="WebSocket"
+          component={WebSocketVideo}
+          durationInFrames={WS_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="Roadmap"
+          component={Roadmap}
+          durationInFrames={RM_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="Container"
+          component={Container}
+          durationInFrames={CONTAINER_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="TechStack"
+          component={TechStack}
+          durationInFrames={TS_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="ErrorHandling"
+          component={ErrorHandling}
+          durationInFrames={EH_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="Mcp"
+          component={Mcp}
+          durationInFrames={MCP_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="SkillBrowser"
+          component={SkillBrowserVideo}
+          durationInFrames={SB_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="OpenclawPlugin"
+          component={OpenclawPlugin}
+          durationInFrames={OP_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="VolumeSafety"
+          component={VolumeSafety}
+          durationInFrames={VS_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
       </Folder>
       <Folder name="开发">
         <Composition
           id="SkillDevwalk"
           component={SkillDevwalk}
           durationInFrames={SKILLDEV_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="ImServerWalk"
+          component={ImServerWalk}
+          durationInFrames={IMW_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="AgentServerWalk"
+          component={AgentServerWalk}
+          durationInFrames={ASW_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="ContainerWalk"
+          component={ContainerWalk}
+          durationInFrames={CW_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="OpenclawVolume"
+          component={OpenclawVolume}
+          durationInFrames={OV_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+      </Folder>
+      <Folder name="技术分享">
+        <Composition
+          id="ShareSaga"
+          component={ShareSaga}
+          durationInFrames={SSAGA_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="ShareVolume"
+          component={ShareVolume}
+          durationInFrames={SVOL_FRAMES}
           fps={30}
           width={1920}
           height={1080}
