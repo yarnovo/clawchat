@@ -45,7 +45,7 @@ function buildEnv(config: InstanceConfig): string[] {
     `HTTP_PORT=${WEBHOOK_PORT}`,
     `HTTP_WEBHOOK_SECRET=${deriveWebhookSecret(config.agentId)}`,
     `DATABASE_BACKEND=libsql`,
-    `LIBSQL_PATH=/tmp/ironclaw.db`,
+    `LIBSQL_PATH=/data/ironclaw.db`,
     `AGENT_NAME=agent-${config.agentId}`,
     // Skip onboarding wizard in container mode
     `ONBOARD_COMPLETED=true`,
@@ -57,14 +57,22 @@ function buildEnv(config: InstanceConfig): string[] {
   ];
 }
 
+function volumeName(agentId: string): string {
+  return `ironclaw-data-${agentId}`;
+}
+
 // Create and start an IronClaw instance for an Agent
 export async function createInstance(
   config: InstanceConfig,
-): Promise<{ containerId: string }> {
+): Promise<{ containerId: string; volumeName: string }> {
   const name = containerName(config.agentId);
+  const volName = volumeName(config.agentId);
 
   // Store accountId mapping for callback
   agentAccountMap.set(config.agentId, config.accountId);
+
+  // Create persistent volume for Agent data (LibSQL database)
+  await containerClient.createVolume(volName);
 
   const result = await containerClient.createContainer({
     name,
@@ -72,10 +80,11 @@ export async function createInstance(
     env: buildEnv(config),
     network: IRONCLAW_NETWORK,
     ports: { [WEBHOOK_PORT]: 0 }, // 0 = random host port
+    volumes: { [volName]: "/data" }, // persist IronClaw LibSQL data
     cpus: 1,
   });
 
-  return { containerId: result.id };
+  return { containerId: result.id, volumeName: volName };
 }
 
 // Send a chat message to an Agent's IronClaw container via HTTP webhook
@@ -158,6 +167,7 @@ export async function startInstance(agentId: string): Promise<void> {
 // Remove an Agent's IronClaw instance
 export async function removeInstance(
   agentId: string,
+  removeData = false,
 ): Promise<void> {
   const name = containerName(agentId);
   agentAccountMap.delete(agentId);
@@ -166,6 +176,14 @@ export async function removeInstance(
     await containerClient.removeContainer(name);
   } catch {
     // Container might not exist
+  }
+
+  if (removeData) {
+    try {
+      await containerClient.removeVolume(volumeName(agentId));
+    } catch {
+      // Volume might not exist
+    }
   }
 }
 

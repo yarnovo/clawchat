@@ -28,7 +28,7 @@ export async function createInstance(opts: {
   systemPrompt?: string;
   gatewayToken?: string;
   requestId?: string;
-}): Promise<{ containerId: string }> {
+}): Promise<{ containerId: string; volumeName: string }> {
   const { requestId: reqId, ...body } = opts;
   const res = await request("/instances", {
     method: "POST",

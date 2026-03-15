@@ -88,3 +88,20 @@ export async function getContainerLogs(
   const res = await request(`/${id}/logs?tail=${tail}`);
   return res.data.logs;
 }
+
+export async function createVolume(name: string): Promise<void> {
+  const res = await request("/volumes", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+  if (res.status !== 201) {
+    throw new Error(res.data.error || "Failed to create volume");
+  }
+}
+
+export async function removeVolume(name: string): Promise<void> {
+  const res = await request(`/volumes/${name}`, { method: "DELETE" });
+  if (res.status !== 200) {
+    throw new Error(res.data.error || "Failed to remove volume");
+  }
+}

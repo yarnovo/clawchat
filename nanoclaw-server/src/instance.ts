@@ -52,11 +52,19 @@ function buildEnv(config: InstanceConfig): string[] {
   ];
 }
 
+function volumeName(agentId: string): string {
+  return `nanoclaw-data-${agentId}`;
+}
+
 // Create and start a NanoClaw instance for an Agent
 export async function createInstance(
   config: InstanceConfig,
-): Promise<{ containerId: string }> {
+): Promise<{ containerId: string; volumeName: string }> {
   const name = containerName(config.agentId);
+  const volName = volumeName(config.agentId);
+
+  // Create persistent volume for Agent data
+  await containerClient.createVolume(volName);
 
   const result = await containerClient.createContainer({
     name,
@@ -64,10 +72,11 @@ export async function createInstance(
     env: buildEnv(config),
     network: NANOCLAW_NETWORK,
     ports: { [WEBHOOK_PORT]: 0 }, // 0 = random host port
+    volumes: { [volName]: "/app/data" }, // persist NanoClaw data
     cpus: 1,
   });
 
-  return { containerId: result.id };
+  return { containerId: result.id, volumeName: volName };
 }
 
 // Send a chat message to an Agent's NanoClaw container via bridge webhook
@@ -116,6 +125,7 @@ export async function startInstance(agentId: string): Promise<void> {
 // Remove an Agent's NanoClaw instance
 export async function removeInstance(
   agentId: string,
+  removeData = false,
 ): Promise<void> {
   const name = containerName(agentId);
 
@@ -123,6 +133,14 @@ export async function removeInstance(
     await containerClient.removeContainer(name);
   } catch {
     // Container might not exist
+  }
+
+  if (removeData) {
+    try {
+      await containerClient.removeVolume(volumeName(agentId));
+    } catch {
+      // Volume might not exist
+    }
   }
 }
 

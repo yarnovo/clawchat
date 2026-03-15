@@ -64,9 +64,9 @@ beforeEach(() => {
   vi.mocked(prisma.agent.delete).mockResolvedValue(mockAgent as never);
   vi.mocked(prisma.agent.findUnique).mockResolvedValue(mockAgent as never);
   vi.mocked(prisma.agentConfig.update).mockResolvedValue({} as never);
-  vi.mocked(openclawClient.createInstance).mockResolvedValue({ containerId: "ctr-1" });
+  vi.mocked(openclawClient.createInstance).mockResolvedValue({ containerId: "ctr-1", volumeName: "vol-1" });
   vi.mocked(openclawClient.removeInstance).mockResolvedValue(undefined);
-  vi.mocked(nanoclawClient.createInstance).mockResolvedValue({ containerId: "nc-ctr-1" });
+  vi.mocked(nanoclawClient.createInstance).mockResolvedValue({ containerId: "nc-ctr-1", volumeName: "nc-vol-1" });
   vi.mocked(nanoclawClient.removeInstance).mockResolvedValue(undefined);
 });
 

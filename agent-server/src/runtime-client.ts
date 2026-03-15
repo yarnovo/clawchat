@@ -25,7 +25,7 @@ export interface ChatOpts {
 }
 
 export interface RuntimeClient {
-  createInstance(opts: CreateInstanceOpts): Promise<{ containerId: string }>;
+  createInstance(opts: CreateInstanceOpts): Promise<{ containerId: string; volumeName: string }>;
   stopInstance(agentId: string, requestId?: string): Promise<void>;
   removeInstance(agentId: string, requestId?: string): Promise<void>;
   chat(opts: ChatOpts): Promise<void>;

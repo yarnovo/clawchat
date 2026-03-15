@@ -21,6 +21,7 @@ export interface CreateAgentContext {
   imAccountId?: string;
   agentId?: string;
   containerId?: string;
+  volumeName?: string;
   gatewayToken?: string;
 }
 
@@ -111,12 +112,14 @@ const steps: SagaStep<CreateAgentContext>[] = [
         gatewayToken: ctx.gatewayToken ?? undefined,
       });
       ctx.containerId = result.containerId;
+      ctx.volumeName = result.volumeName;
 
       await prisma.agentConfig.update({
         where: { agentId: ctx.agentId! },
         data: {
           status: "running",
           containerId: result.containerId,
+          volumeName: result.volumeName,
           startedAt: new Date(),
         },
       });

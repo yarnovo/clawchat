@@ -13,7 +13,7 @@ vi.mock("../im-client.js", () => ({
 }));
 
 vi.mock("../openclaw-client.js", () => ({
-  createInstance: vi.fn(async () => ({ containerId: "mock-container-123" })),
+  createInstance: vi.fn(async () => ({ containerId: "mock-container-123", volumeName: "mock-vol-123" })),
   startInstance: vi.fn(async () => {}),
   stopInstance: vi.fn(async () => {}),
   removeInstance: vi.fn(async () => {}),
@@ -25,7 +25,7 @@ vi.mock("../openclaw-client.js", () => ({
 }));
 
 vi.mock("../nanoclaw-client.js", () => ({
-  createInstance: vi.fn(async () => ({ containerId: "mock-nanoclaw-ctr-123" })),
+  createInstance: vi.fn(async () => ({ containerId: "mock-nanoclaw-ctr-123", volumeName: "mock-nc-vol-123" })),
   startInstance: vi.fn(async () => {}),
   stopInstance: vi.fn(async () => {}),
   removeInstance: vi.fn(async () => {}),
@@ -363,6 +363,7 @@ describe("Agent Lifecycle", () => {
     // Reset mock to succeed
     vi.mocked(openclawClient.createInstance).mockResolvedValueOnce({
       containerId: "new-container-456",
+      volumeName: "new-vol-456",
     });
 
     const res = await request(`/${lifecycleAgentId}/start`, { method: "POST" });

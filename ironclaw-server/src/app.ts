@@ -96,8 +96,9 @@ app.post("/instances/:agentId/stop", async (c) => {
 // Remove an instance
 app.delete("/instances/:agentId", async (c) => {
   const agentId = c.req.param("agentId");
+  const removeData = c.req.query("removeData") === "true";
   try {
-    await instance.removeInstance(agentId);
+    await instance.removeInstance(agentId, removeData);
     return c.json({ ok: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
