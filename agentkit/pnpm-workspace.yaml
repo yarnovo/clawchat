@@ -4,5 +4,4 @@ packages:
   - "eval"
   - "channels"
   - "scheduler"
-  - "server"
   - "cli"

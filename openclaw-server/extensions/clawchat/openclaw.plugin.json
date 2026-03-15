@@ -1,9 +1,0 @@
-{
-  "id": "clawchat",
-  "channels": ["clawchat"],
-  "configSchema": {
-    "type": "object",
-    "additionalProperties": false,
-    "properties": {}
-  }
-}
