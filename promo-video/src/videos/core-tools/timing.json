@@ -1,0 +1,32 @@
+[
+  {
+    "id": "ct-intro",
+    "startMs": 95,
+    "endMs": 9772
+  },
+  {
+    "id": "ct-survive",
+    "startMs": 10295,
+    "endMs": 28374
+  },
+  {
+    "id": "ct-evolve",
+    "startMs": 28886,
+    "endMs": 50363
+  },
+  {
+    "id": "ct-social",
+    "startMs": 50886,
+    "endMs": 64511
+  },
+  {
+    "id": "ct-compare",
+    "startMs": 65034,
+    "endMs": 77284
+  },
+  {
+    "id": "ct-outro",
+    "startMs": 77806,
+    "endMs": 91636
+  }
+]

@@ -1,0 +1,8 @@
+[
+  {"id": "ct-intro", "text": "一个Agent需要多少工具才能干活？答案是十三个。分三层：生存、进化、协作。这个视频逐层展开。"},
+  {"id": "ct-survive", "text": "第一层，五个生存工具。bash执行命令，万能瑞士军刀。read和write操作文件，输入输出的基础。web_search搜索网页获取外部知识。web_fetch抓取网页内容。有了这五个，Agent就能干活了。"},
+  {"id": "ct-evolve", "text": "第二层，五个进化工具。skill_search搜索技能市场，skill_install安装新技能。Agent自己判断缺什么能力，自己去装。tool_list查看已有工具，知道自己能做什么。memory_write和memory_read管理记忆，记住学到的东西。"},
+  {"id": "ct-social", "text": "第三层，三个协作工具。message发消息给用户，保持沟通。task_create创建子任务，拆解复杂工作。task_status查看任务进度，管理工作流。"},
+  {"id": "ct-compare", "text": "对比一下。OpenClaw二十三个工具，NanoClaw十九个，IronClaw四十多个。我们十三个。少即是多。每个工具都有明确的存在理由，没有冗余。"},
+  {"id": "ct-outro", "text": "总结。五个生存工具让Agent能干活。五个进化工具让Agent能成长。三个协作工具让Agent能沟通。十三个工具，三层架构，一个能自我进化的Agent。"}
+]

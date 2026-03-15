@@ -53,6 +53,7 @@ import { NanoClawGuide, TOTAL_FRAMES as NCG_FRAMES } from "./videos/nanoclaw-gui
 import { AgentAgency, TOTAL_FRAMES as AAGENCY_FRAMES } from "./videos/agent-agency/AgentAgency";
 import { ToolsCompare, TOTAL_FRAMES as TC_FRAMES } from "./videos/tools-compare/ToolsCompare";
 import { AgentMarket, TOTAL_FRAMES as AMKT_FRAMES } from "./videos/agent-market/AgentMarket";
+import { CoreTools, TOTAL_FRAMES as CT_FRAMES } from "./videos/core-tools/CoreTools";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -404,14 +405,6 @@ export const RemotionRoot: React.FC = () => {
             width={1920}
             height={1080}
           />
-          <Composition
-            id="ToolsCompare"
-            component={ToolsCompare}
-            durationInFrames={TC_FRAMES}
-            fps={30}
-            width={1920}
-            height={1080}
-          />
         </Folder>
       </Folder>
       <Folder name="Developer">
@@ -482,31 +475,53 @@ export const RemotionRoot: React.FC = () => {
           height={1080}
         />
       </Folder>
-      <Folder name="Biz">
-        <Composition
-          id="BizOpportunities"
-          component={BizOpportunities}
-          durationInFrames={BIZOP_FRAMES}
-          fps={30}
-          width={1920}
-          height={1080}
-        />
-        <Composition
-          id="AgentAgency"
-          component={AgentAgency}
-          durationInFrames={AAGENCY_FRAMES}
-          fps={30}
-          width={1920}
-          height={1080}
-        />
-        <Composition
-          id="AgentMarket"
-          component={AgentMarket}
-          durationInFrames={AMKT_FRAMES}
-          fps={30}
-          width={1920}
-          height={1080}
-        />
+      <Folder name="Startup">
+        <Folder name="Roadmap">
+          <Composition
+            id="AgentMarket"
+            component={AgentMarket}
+            durationInFrames={AMKT_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+        </Folder>
+        <Folder name="Biz-Model">
+          <Composition
+            id="BizOpportunities"
+            component={BizOpportunities}
+            durationInFrames={BIZOP_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="AgentAgency"
+            component={AgentAgency}
+            durationInFrames={AAGENCY_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+        </Folder>
+        <Folder name="Tech">
+          <Composition
+            id="ToolsCompare"
+            component={ToolsCompare}
+            durationInFrames={TC_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="CoreTools"
+            component={CoreTools}
+            durationInFrames={CT_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+        </Folder>
       </Folder>
     </>
   );
