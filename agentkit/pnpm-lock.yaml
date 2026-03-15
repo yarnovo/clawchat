@@ -35,6 +35,9 @@ importers:
       vitest:
         specifier: ^3.0.0
         version: 3.2.4(@types/node@22.19.15)
+      vitest-evals:
+        specifier: ^0.6.0
+        version: 0.6.0(tinyrainbow@2.0.0)(vitest@3.2.4(@types/node@22.19.15))
 
 packages:
 
@@ -1258,6 +1261,19 @@ packages:
       yaml:
         optional: true
 
+  vitest-evals@0.6.0:
+    resolution: {integrity: sha512-6DjQRALjHjUPsHEkz28oSjO+q6uEp7HR4aU3qXr32D9vsHGOmyfxZn7fK6PDuHzE/5hDP8dtkkgZQZ6fAmV5vA==}
+    peerDependencies:
+      ai: ^4.0.0
+      tinyrainbow: '*'
+      vitest: '*'
+      zod: ^3.0.0
+    peerDependenciesMeta:
+      ai:
+        optional: true
+      zod:
+        optional: true
+
   vitest@3.2.4:
     resolution: {integrity: sha512-LUCP5ev3GURDysTWiP47wRRUpLKMOfPh+yKTx3kVIEiu5KOMeqzpnYNsKyOoVrULivR8tLcks4+lga33Whn90A==}
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
@@ -2236,6 +2252,11 @@ snapshots:
     optionalDependencies:
       '@types/node': 22.19.15
       fsevents: 2.3.3
+
+  vitest-evals@0.6.0(tinyrainbow@2.0.0)(vitest@3.2.4(@types/node@22.19.15)):
+    dependencies:
+      tinyrainbow: 2.0.0
+      vitest: 3.2.4(@types/node@22.19.15)
 
   vitest@3.2.4(@types/node@22.19.15):
     dependencies:
