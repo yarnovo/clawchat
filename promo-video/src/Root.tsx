@@ -60,6 +60,7 @@ import { TechArch, TOTAL_FRAMES as TECHARCH_FRAMES } from "./videos/tech-arch/Te
 import { AiTrends2026, TOTAL_FRAMES as AITRENDS_FRAMES } from "./videos/ai-trends-2026/AiTrends2026";
 import { PersonaDesign, TOTAL_FRAMES as PD_FRAMES } from "./videos/persona-design/PersonaDesign";
 import { LoadStrategy, TOTAL_FRAMES as LS_FRAMES } from "./videos/load-strategy/LoadStrategy";
+import { SkillLoading, TOTAL_FRAMES as SKLOAD_FRAMES } from "./videos/skill-loading/SkillLoading";
 import { AgentCoreWalk, TOTAL_FRAMES as ACW_FRAMES } from "./videos/agent-core-walk/AgentCoreWalk";
 import { TestArch, TOTAL_FRAMES as TA_FRAMES } from "./videos/test-arch/TestArch";
 
@@ -565,6 +566,14 @@ export const RemotionRoot: React.FC = () => {
             id="LoadStrategy"
             component={LoadStrategy}
             durationInFrames={LS_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="SkillLoading"
+            component={SkillLoading}
+            durationInFrames={SKLOAD_FRAMES}
             fps={30}
             width={1920}
             height={1080}

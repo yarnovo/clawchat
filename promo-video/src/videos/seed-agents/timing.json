@@ -1,0 +1,37 @@
+[
+  {
+    "id": "sa-intro",
+    "startMs": 95,
+    "endMs": 9556
+  },
+  {
+    "id": "sa-legal",
+    "startMs": 10079,
+    "endMs": 25624
+  },
+  {
+    "id": "sa-ecommerce",
+    "startMs": 26147,
+    "endMs": 40306
+  },
+  {
+    "id": "sa-code",
+    "startMs": 40818,
+    "endMs": 53352
+  },
+  {
+    "id": "sa-service",
+    "startMs": 53875,
+    "endMs": 64715
+  },
+  {
+    "id": "sa-data",
+    "startMs": 65238,
+    "endMs": 78454
+  },
+  {
+    "id": "sa-outro",
+    "startMs": 78977,
+    "endMs": 92284
+  }
+]

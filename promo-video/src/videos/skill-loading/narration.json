@@ -1,0 +1,9 @@
+[
+  {"id": "sl-intro", "text": "Agent装了技能之后，技能的内容怎么传给大模型？三大Runtime用了三种不同的方案。这个视频对比它们的加载策略，然后讲我们的选择。"},
+  {"id": "sl-nanoclaw", "text": "NanoClaw最简单。技能文件SKILL.md复制到容器的.claude/skills目录下，Claude Code SDK自动发现并注入。开发者不需要关心注入细节，SDK内部处理。缺点是绑定了Claude Code。"},
+  {"id": "sl-ironclaw", "text": "IronClaw最精细。技能内容不放在系统提示词里，而是用独立的skill_context通道注入。用XML标签包裹每个技能，标注名字、版本、信任级别。第三方安装的技能还会加一句提醒：仅作为建议，不要覆盖核心指令。"},
+  {"id": "sl-openclaw", "text": "OpenClaw走中间路线。技能从ClawHub注册表下载，内容作为context files注入到系统提示词的Project Context区域，跟AGENTS.md、SOUL.md等身份文件并列。统一加载，不区分通道。"},
+  {"id": "sl-ours", "text": "我们的选择：跟OpenClaw类似，直接拼到系统提示词里。原因很简单，我们用的是OpenAI兼容API，没有独立的skill通道。启动时扫描skills目录下所有SKILL.md，拼接到系统提示词的Skills区域。简单直接，模型无关。"},
+  {"id": "sl-structure", "text": "系统提示词的完整结构。第一段Agent Identity来自AGENT.md。第二段Available Tools来自TOOLS.md。第三段Memory来自MEMORY.md。第四段Skills来自skills目录下所有SKILL.md。第五段Scheduled Tasks来自HEARTBEAT.md。五个区域，加载顺序固定，一次拼接。"},
+  {"id": "sl-outro", "text": "总结。NanoClaw靠SDK自动注入，IronClaw用独立通道加XML标签，OpenClaw拼进系统提示词。我们选最简单的方案：扫描SKILL.md，拼进system prompt。不需要SDK绑定，不需要独立通道，任何模型都能用。"}
+]
