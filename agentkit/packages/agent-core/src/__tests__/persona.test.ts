@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
-import { loadPersonaFiles, buildPersonaPrompt, appendMemory } from '../persona.js';
+import { loadPersonaFiles, loadSkills, buildPersonaPrompt, appendMemory } from '../persona.js';
 
 const testDir = '/tmp/test-persona-vitest';
 
@@ -73,6 +73,61 @@ describe('buildPersonaPrompt', () => {
 
   it('returns empty string for no files', () => {
     expect(buildPersonaPrompt([])).toBe('');
+  });
+});
+
+describe('loadSkills', () => {
+  it('loads SKILL.md from subdirectories', () => {
+    setup({ 'AGENT.md': 'base' });
+    fs.mkdirSync(path.join(testDir, 'skills', 'legal'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'skills', 'legal', 'SKILL.md'), '审查合同条款');
+    const skills = loadSkills(testDir);
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('skill:legal');
+    expect(skills[0].content).toBe('审查合同条款');
+  });
+
+  it('loads flat .md files from skills/', () => {
+    setup({ 'AGENT.md': 'base' });
+    fs.mkdirSync(path.join(testDir, 'skills'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'skills', 'translate.md'), '翻译技能');
+    const skills = loadSkills(testDir);
+    expect(skills).toHaveLength(1);
+    expect(skills[0].name).toBe('skill:translate');
+  });
+
+  it('loads multiple skills', () => {
+    setup({ 'AGENT.md': 'base' });
+    fs.mkdirSync(path.join(testDir, 'skills', 'a'), { recursive: true });
+    fs.mkdirSync(path.join(testDir, 'skills', 'b'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'skills', 'a', 'SKILL.md'), 'skill a');
+    fs.writeFileSync(path.join(testDir, 'skills', 'b', 'SKILL.md'), 'skill b');
+    const skills = loadSkills(testDir);
+    expect(skills).toHaveLength(2);
+  });
+
+  it('returns empty for no skills dir', () => {
+    setup({ 'AGENT.md': 'base' });
+    expect(loadSkills(testDir)).toHaveLength(0);
+  });
+
+  it('skills appear in persona prompt with Skill: header', () => {
+    setup({ 'AGENT.md': 'identity' });
+    fs.mkdirSync(path.join(testDir, 'skills', 'legal'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'skills', 'legal', 'SKILL.md'), '审查合同');
+    const files = loadPersonaFiles(testDir);
+    const prompt = buildPersonaPrompt(files);
+    expect(prompt).toContain('## Skill: legal');
+    expect(prompt).toContain('审查合同');
+  });
+
+  it('skills load between MEMORY and HEARTBEAT', () => {
+    setup({ 'AGENT.md': 'a', 'MEMORY.md': 'm', 'HEARTBEAT.md': 'h' });
+    fs.mkdirSync(path.join(testDir, 'skills', 'x'), { recursive: true });
+    fs.writeFileSync(path.join(testDir, 'skills', 'x', 'SKILL.md'), 's');
+    const files = loadPersonaFiles(testDir);
+    const names = files.map(f => f.name);
+    expect(names).toEqual(['AGENT.md', 'MEMORY.md', 'skill:x', 'HEARTBEAT.md']);
   });
 });
 
