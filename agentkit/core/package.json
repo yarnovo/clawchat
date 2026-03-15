@@ -1,22 +1,22 @@
 {
-  "name": "@agentkit/eval",
+  "name": "@agentkit/core",
   "version": "0.0.1",
-  "description": "Agent evaluation CLI — L1/L2/L3 coverage in TypeScript",
+  "description": "LLM + Tools + Memory + While Loop",
   "type": "module",
   "main": "dist/index.js",
-  "bin": {
-    "agent-eval": "dist/cli.js"
-  },
+  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dev": "tsc --watch"
   },
   "dependencies": {
-    "@agentkit/core": "workspace:*",
-    "commander": "^14.0.3",
+    "better-sqlite3": "^11.8.1",
+    "drizzle-orm": "^0.45.1",
     "openai": "^4.0.0"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"

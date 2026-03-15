@@ -1,0 +1,23 @@
+{
+  "name": "@agentkit/cli",
+  "version": "0.0.1",
+  "description": "AgentKit CLI — run, eval, info",
+  "type": "module",
+  "bin": {
+    "agentkit": "dist/main.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@agentkit/core": "workspace:*",
+    "@agentkit/eval": "workspace:*",
+    "@agentkit/tools": "workspace:*",
+    "commander": "^14.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  }
+}

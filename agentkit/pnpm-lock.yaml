@@ -8,14 +8,33 @@ importers:
 
   .: {}
 
-  cli/core:
+  cli:
+    dependencies:
+      '@agentkit/core':
+        specifier: workspace:*
+        version: link:../core
+      '@agentkit/eval':
+        specifier: workspace:*
+        version: link:../eval
+      '@agentkit/tools':
+        specifier: workspace:*
+        version: link:../tools
+      commander:
+        specifier: ^14.0.3
+        version: 14.0.3
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.19.15
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
+  core:
     dependencies:
       better-sqlite3:
         specifier: ^11.8.1
         version: 11.10.0
-      commander:
-        specifier: ^14.0.3
-        version: 14.0.3
       drizzle-orm:
         specifier: ^0.45.1
         version: 0.45.1(@types/better-sqlite3@7.6.13)(better-sqlite3@11.10.0)
@@ -36,17 +55,27 @@ importers:
         specifier: ^3.0.0
         version: 3.2.4(@types/node@22.19.15)
 
-  cli/eval:
+  eval:
     dependencies:
       '@agentkit/core':
         specifier: workspace:*
         version: link:../core
-      commander:
-        specifier: ^14.0.3
-        version: 14.0.3
-      openai:
-        specifier: ^4.0.0
-        version: 4.104.0(ws@8.19.0)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.10.0
+        version: 22.19.15
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@22.19.15)
+
+  tools:
+    dependencies:
+      '@agentkit/core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@types/node':
         specifier: ^22.10.0

@@ -1,2 +1,5 @@
 packages:
-  - "cli/*"
+  - "core"
+  - "tools"
+  - "eval"
+  - "cli"
