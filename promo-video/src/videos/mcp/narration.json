@@ -1,0 +1,7 @@
+[
+  {"id": "mcp-intro", "text": "来看ClawChat的MCP服务。MCP是Model Context Protocol，让Agent能调用外部工具，扩展能力边界。"},
+  {"id": "mcp-what", "text": "MCP是一个标准协议，定义了AI模型如何调用工具。ClawChat用Python的FastAPI实现了MCP服务端，Agent通过它调用各种工具，从网页搜索到文件操作。"},
+  {"id": "mcp-arch", "text": "架构很简单。mcp-server跑在8000端口，FastAPI提供HTTP接口。Agent容器通过网络请求调用工具，MCP服务执行后返回结果。解耦了Agent和工具的实现。"},
+  {"id": "mcp-tools", "text": "工具是可扩展的。每个工具是一个Python函数，注册到MCP服务后Agent就能调用。添加新工具只需要写函数和描述，不需要改Agent代码。"},
+  {"id": "mcp-outro", "text": "总结一下：MCP标准协议，FastAPI实现，工具可扩展，Agent和工具解耦。让Agent的能力没有天花板。"}
+]

@@ -1,0 +1,8 @@
+[
+  {"id": "test-intro", "text": "来聊一下ClawChat的测试体系。我们采用三层测试策略，从单元测试到全链路集成，层层递进，确保每次提交都有信心。"},
+  {"id": "test-l1", "text": "L1是单元和Widget测试。Flutter端用widget test验证每个UI组件，im-server用vitest做JWT等模块的单元测试。全部mock HTTP依赖，CI每次push自动跑。"},
+  {"id": "test-l2", "text": "L2是API端到端测试。im-server通过Hono的app.request直连测试数据库，不mock任何东西。覆盖注册、登录、好友、消息等所有核心API，CI每次push自动跑。"},
+  {"id": "test-l3", "text": "L3是全链路集成测试。Flutter客户端加真实im-server加真实数据库，用Playwright驱动浏览器，覆盖注册到登录到加好友到私聊的完整用户旅程。"},
+  {"id": "test-tools", "text": "测试工具链也很讲究。Flutter用InMemoryTokenStore注入，不依赖SharedPreferences。E2E清理用内部API而非docker exec，本地和CI环境统一。"},
+  {"id": "test-outro", "text": "总结一下：L1快速反馈，L2验证API契约，L3保障用户体验。三层递进，CI自动化，代码质量有保障。"}
+]

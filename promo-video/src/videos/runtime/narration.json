@@ -1,0 +1,8 @@
+[
+  {"id": "runtime-intro", "text": "ClawChat支持三种Agent运行时：OpenClaw、NanoClaw和IronClaw。它们各有特点，满足不同场景的需求。"},
+  {"id": "runtime-openclaw", "text": "OpenClaw是功能最丰富的运行时。支持五十多种通道集成，包括Telegram、Slack、Discord等。插件架构让Agent能力高度可扩展，适合需要多通道交互的复杂场景。"},
+  {"id": "runtime-nanoclaw", "text": "NanoClaw走的是轻量路线。代码小、易理解、完全可定制。每个Agent跑在独立Docker容器里，操作系统级隔离。适合想要完全掌控Agent行为的开发者。"},
+  {"id": "runtime-ironclaw", "text": "IronClaw用Rust编写，安全优先。WASM沙箱隔离工具执行，防提示词注入、防数据泄露。适合对安全性有高要求的企业级场景。"},
+  {"id": "runtime-compare", "text": "三种运行时的选择取决于需求。要丰富生态选OpenClaw，要轻量可控选NanoClaw，要极致安全选IronClaw。通过agent-server的统一抽象层可以热切换。"},
+  {"id": "runtime-outro", "text": "总结一下：三种运行时覆盖从功能丰富到极致安全的全谱系。统一抽象层让Agent无缝切换，这是ClawChat的核心架构优势。"}
+]

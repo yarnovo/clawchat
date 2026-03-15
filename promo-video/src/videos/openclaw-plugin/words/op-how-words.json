@@ -1,0 +1,157 @@
+[
+  {
+    "part": "插件",
+    "start": 9227,
+    "end": 9613
+  },
+  {
+    "part": "的",
+    "start": 9613,
+    "end": 9681
+  },
+  {
+    "part": "工作",
+    "start": 9693,
+    "end": 9965
+  },
+  {
+    "part": "原理",
+    "start": 9977,
+    "end": 10306
+  },
+  {
+    "part": "很",
+    "start": 10329,
+    "end": 10534
+  },
+  {
+    "part": "简单。",
+    "start": 10534,
+    "end": 10977
+  },
+  {
+    "part": "用户",
+    "start": 11488,
+    "end": 11840
+  },
+  {
+    "part": "在",
+    "start": 11852,
+    "end": 12034
+  },
+  {
+    "part": "ClawChat",
+    "start": 12056,
+    "end": 12602
+  },
+  {
+    "part": "发",
+    "start": 12602,
+    "end": 12749
+  },
+  {
+    "part": "消息，",
+    "start": 12761,
+    "end": 13227
+  },
+  {
+    "part": "im-server",
+    "start": 13488,
+    "end": 14113
+  },
+  {
+    "part": "转发",
+    "start": 14204,
+    "end": 14534
+  },
+  {
+    "part": "到",
+    "start": 14534,
+    "end": 14761
+  },
+  {
+    "part": "agent-server，",
+    "start": 14784,
+    "end": 15545
+  },
+  {
+    "part": "agent-server",
+    "start": 15750,
+    "end": 16556
+  },
+  {
+    "part": "通过",
+    "start": 16659,
+    "end": 17056
+  },
+  {
+    "part": "OpenClaw",
+    "start": 17079,
+    "end": 17556
+  },
+  {
+    "part": "的",
+    "start": 17556,
+    "end": 17647
+  },
+  {
+    "part": "Channel",
+    "start": 17670,
+    "end": 17988
+  },
+  {
+    "part": "接口",
+    "start": 18000,
+    "end": 18477
+  },
+  {
+    "part": "把",
+    "start": 18568,
+    "end": 18693
+  },
+  {
+    "part": "消息",
+    "start": 18704,
+    "end": 19034
+  },
+  {
+    "part": "传给",
+    "start": 19045,
+    "end": 19397
+  },
+  {
+    "part": "Agent。",
+    "start": 19420,
+    "end": 19852
+  },
+  {
+    "part": "Agent",
+    "start": 20375,
+    "end": 20772
+  },
+  {
+    "part": "处理",
+    "start": 20784,
+    "end": 21090
+  },
+  {
+    "part": "后",
+    "start": 21090,
+    "end": 21363
+  },
+  {
+    "part": "通过",
+    "start": 21454,
+    "end": 21840
+  },
+  {
+    "part": "callback",
+    "start": 21863,
+    "end": 22318
+  },
+  {
+    "part": "回传。",
+    "start": 22329,
+    "end": 22829
+  }
+]

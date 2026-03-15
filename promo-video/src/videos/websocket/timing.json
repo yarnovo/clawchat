@@ -1,0 +1,27 @@
+[
+  {
+    "id": "ws-intro",
+    "startMs": 95,
+    "endMs": 8329
+  },
+  {
+    "id": "ws-lifecycle",
+    "startMs": 8852,
+    "endMs": 24818
+  },
+  {
+    "id": "ws-messages",
+    "startMs": 25340,
+    "endMs": 40079
+  },
+  {
+    "id": "ws-agent",
+    "startMs": 40602,
+    "endMs": 56136
+  },
+  {
+    "id": "ws-outro",
+    "startMs": 56659,
+    "endMs": 67545
+  }
+]

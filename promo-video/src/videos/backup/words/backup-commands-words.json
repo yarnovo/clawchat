@@ -1,67 +1,67 @@
 [
   {
     "part": "日常",
-    "start": 57670,
-    "end": 58022
+    "start": 71125,
+    "end": 71477
   },
   {
     "part": "操作",
-    "start": 58034,
-    "end": 58488
+    "start": 71488,
+    "end": 71943
   },
   {
     "part": "就",
-    "start": 58511,
-    "end": 58636
+    "start": 71965,
+    "end": 72090
   },
   {
     "part": "三",
-    "start": 58647,
-    "end": 58863
+    "start": 72102,
+    "end": 72318
   },
   {
     "part": "个",
-    "start": 58863,
-    "end": 58931
+    "start": 72318,
+    "end": 72386
   },
   {
     "part": "命令：",
-    "start": 58943,
-    "end": 59363
+    "start": 72397,
+    "end": 72818
   },
   {
     "part": "make ",
-    "start": 59636,
-    "end": 59897
+    "start": 73090,
+    "end": 73352
   },
   {
     "part": "db-backup",
-    "start": 59909,
-    "end": 60636
+    "start": 73363,
+    "end": 74090
   },
   {
     "part": "备份，",
-    "start": 60647,
-    "end": 61090
+    "start": 74102,
+    "end": 74545
   },
   {
     "part": "db-backup-list",
-    "start": 61340,
-    "end": 62420
+    "start": 74795,
+    "end": 75874
   },
   {
     "part": "查看，",
-    "start": 62431,
-    "end": 62897
+    "start": 75886,
+    "end": 76352
   },
   {
     "part": "db-restore",
-    "start": 63159,
-    "end": 63886
+    "start": 76613,
+    "end": 77340
   },
   {
     "part": "恢复。",
-    "start": 63897,
-    "end": 64374
+    "start": 77352,
+    "end": 77829
   }
 ]

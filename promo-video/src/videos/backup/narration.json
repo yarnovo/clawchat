@@ -6,6 +6,7 @@
   {"id": "backup-daily", "text": "每日备份的流程：cron定时触发，pg_dumpall导出，gzip压缩，验证完整性，超过七天自动清理。"},
   {"id": "backup-deploy", "text": "每次部署前，CI流水线自动执行备份并打标签。万一Prisma迁移失败，可以立刻回滚。"},
   {"id": "backup-redis", "text": "Redis默认内存存储，容器重启数据全丢。我们开启了RDB持久化，每分钟有变更就自动存盘。"},
+  {"id": "backup-volume", "text": "Agent容器的数据通过Docker Volume持久化。每个Agent创建时自动创建专属Volume，挂载到运行时的数据目录。容器删了Volume还在，Agent不会失忆。"},
   {"id": "backup-commands", "text": "日常操作就三个命令：make db-backup备份，db-backup-list查看，db-restore恢复。"},
   {"id": "backup-restore", "text": "恢复流程四步：选备份，停服务，导入数据，验证重启。一行命令全自动完成。"},
   {"id": "backup-outro", "text": "以上就是备份方案。三条防线加三个命令，日常用起来很简单。"}

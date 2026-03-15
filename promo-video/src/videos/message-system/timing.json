@@ -1,0 +1,32 @@
+[
+  {
+    "id": "msg-intro",
+    "startMs": 95,
+    "endMs": 7181
+  },
+  {
+    "id": "msg-send",
+    "startMs": 7693,
+    "endMs": 22397
+  },
+  {
+    "id": "msg-agent",
+    "startMs": 22909,
+    "endMs": 37636
+  },
+  {
+    "id": "msg-push",
+    "startMs": 38159,
+    "endMs": 52886
+  },
+  {
+    "id": "msg-features",
+    "startMs": 53409,
+    "endMs": 66159
+  },
+  {
+    "id": "msg-outro",
+    "startMs": 66681,
+    "endMs": 76249
+  }
+]

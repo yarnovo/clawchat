@@ -1,0 +1,132 @@
+[
+  {
+    "part": "CI/",
+    "start": 8704,
+    "end": 9113
+  },
+  {
+    "part": "CD",
+    "start": 9125,
+    "end": 9590
+  },
+  {
+    "part": "用",
+    "start": 9681,
+    "end": 9886
+  },
+  {
+    "part": "GitHub ",
+    "start": 9886,
+    "end": 10295
+  },
+  {
+    "part": "Actions。",
+    "start": 10306,
+    "end": 10863
+  },
+  {
+    "part": "打",
+    "start": 11386,
+    "end": 11579
+  },
+  {
+    "part": "tag",
+    "start": 11579,
+    "end": 11840
+  },
+  {
+    "part": "触发",
+    "start": 11852,
+    "end": 12272
+  },
+  {
+    "part": "release ",
+    "start": 12295,
+    "end": 12636
+  },
+  {
+    "part": "workflow，",
+    "start": 12647,
+    "end": 13204
+  },
+  {
+    "part": "自动",
+    "start": 13465,
+    "end": 13761
+  },
+  {
+    "part": "构建",
+    "start": 13772,
+    "end": 14193
+  },
+  {
+    "part": "Docker",
+    "start": 14284,
+    "end": 14579
+  },
+  {
+    "part": "镜像，",
+    "start": 14590,
+    "end": 15045
+  },
+  {
+    "part": "rsync",
+    "start": 15306,
+    "end": 16431
+  },
+  {
+    "part": "同步",
+    "start": 16522,
+    "end": 16818
+  },
+  {
+    "part": "代码",
+    "start": 16829,
+    "end": 17113
+  },
+  {
+    "part": "到",
+    "start": 17125,
+    "end": 17284
+  },
+  {
+    "part": "阿里云",
+    "start": 17306,
+    "end": 17806
+  },
+  {
+    "part": "ECS，",
+    "start": 17897,
+    "end": 18613
+  },
+  {
+    "part": "然后",
+    "start": 18818,
+    "end": 19261
+  },
+  {
+    "part": "docker ",
+    "start": 19284,
+    "end": 19568
+  },
+  {
+    "part": "compose",
+    "start": 19579,
+    "end": 20170
+  },
+  {
+    "part": "启动",
+    "start": 20272,
+    "end": 20636
+  },
+  {
+    "part": "所有",
+    "start": 20659,
+    "end": 20965
+  },
+  {
+    "part": "服务。",
+    "start": 20977,
+    "end": 21386
+  }
+]

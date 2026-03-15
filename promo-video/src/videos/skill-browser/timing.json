@@ -1,0 +1,27 @@
+[
+  {
+    "id": "sb-intro",
+    "startMs": 95,
+    "endMs": 8999
+  },
+  {
+    "id": "sb-tech",
+    "startMs": 9522,
+    "endMs": 19761
+  },
+  {
+    "id": "sb-features",
+    "startMs": 20284,
+    "endMs": 32852
+  },
+  {
+    "id": "sb-integration",
+    "startMs": 33375,
+    "endMs": 46034
+  },
+  {
+    "id": "sb-outro",
+    "startMs": 46556,
+    "endMs": 56670
+  }
+]

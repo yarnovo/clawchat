@@ -1,0 +1,37 @@
+[
+  {
+    "id": "ss-intro",
+    "startMs": 95,
+    "endMs": 10295
+  },
+  {
+    "id": "ss-problem",
+    "startMs": 10818,
+    "endMs": 24954
+  },
+  {
+    "id": "ss-concept",
+    "startMs": 25477,
+    "endMs": 40374
+  },
+  {
+    "id": "ss-impl",
+    "startMs": 40897,
+    "endMs": 57261
+  },
+  {
+    "id": "ss-pitfalls",
+    "startMs": 57784,
+    "endMs": 72693
+  },
+  {
+    "id": "ss-when",
+    "startMs": 73215,
+    "endMs": 89454
+  },
+  {
+    "id": "ss-outro",
+    "startMs": 89965,
+    "endMs": 101568
+  }
+]

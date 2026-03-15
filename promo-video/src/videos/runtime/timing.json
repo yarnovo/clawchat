@@ -1,0 +1,32 @@
+[
+  {
+    "id": "runtime-intro",
+    "startMs": 95,
+    "endMs": 8624
+  },
+  {
+    "id": "runtime-openclaw",
+    "startMs": 9147,
+    "endMs": 23306
+  },
+  {
+    "id": "runtime-nanoclaw",
+    "startMs": 23829,
+    "endMs": 37204
+  },
+  {
+    "id": "runtime-ironclaw",
+    "startMs": 37727,
+    "endMs": 49681
+  },
+  {
+    "id": "runtime-compare",
+    "startMs": 50204,
+    "endMs": 62874
+  },
+  {
+    "id": "runtime-outro",
+    "startMs": 63386,
+    "endMs": 73840
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "id": "arch-intro",
+    "startMs": 95,
+    "endMs": 9397
+  },
+  {
+    "id": "arch-services",
+    "startMs": 9920,
+    "endMs": 24306
+  },
+  {
+    "id": "arch-data",
+    "startMs": 24818,
+    "endMs": 38125
+  },
+  {
+    "id": "arch-flow",
+    "startMs": 38636,
+    "endMs": 53534
+  },
+  {
+    "id": "arch-nginx",
+    "startMs": 54056,
+    "endMs": 66374
+  },
+  {
+    "id": "arch-outro",
+    "startMs": 66897,
+    "endMs": 76704
+  }
+]

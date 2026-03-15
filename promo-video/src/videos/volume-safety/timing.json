@@ -1,0 +1,37 @@
+[
+  {
+    "id": "vs-intro",
+    "startMs": 95,
+    "endMs": 9829
+  },
+  {
+    "id": "vs-problem",
+    "startMs": 10352,
+    "endMs": 22181
+  },
+  {
+    "id": "vs-solution",
+    "startMs": 22704,
+    "endMs": 38079
+  },
+  {
+    "id": "vs-coupling",
+    "startMs": 38590,
+    "endMs": 51954
+  },
+  {
+    "id": "vs-lifecycle",
+    "startMs": 52477,
+    "endMs": 66465
+  },
+  {
+    "id": "vs-backup",
+    "startMs": 66988,
+    "endMs": 82795
+  },
+  {
+    "id": "vs-outro",
+    "startMs": 83318,
+    "endMs": 98147
+  }
+]

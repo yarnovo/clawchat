@@ -1,0 +1,97 @@
+[
+  {
+    "part": "来看",
+    "start": 95,
+    "end": 584
+  },
+  {
+    "part": "ClawChat",
+    "start": 675,
+    "end": 1254
+  },
+  {
+    "part": "的",
+    "start": 1254,
+    "end": 1470
+  },
+  {
+    "part": "MCP",
+    "start": 1561,
+    "end": 2050
+  },
+  {
+    "part": "服务。",
+    "start": 2061,
+    "end": 2481
+  },
+  {
+    "part": "MCP",
+    "start": 3000,
+    "end": 3568
+  },
+  {
+    "part": "是",
+    "start": 3579,
+    "end": 3909
+  },
+  {
+    "part": "Model ",
+    "start": 4000,
+    "end": 4329
+  },
+  {
+    "part": "Context ",
+    "start": 4340,
+    "end": 4931
+  },
+  {
+    "part": "Protocol，",
+    "start": 4943,
+    "end": 5568
+  },
+  {
+    "part": "让",
+    "start": 5795,
+    "end": 5988
+  },
+  {
+    "part": "Agent",
+    "start": 6011,
+    "end": 6477
+  },
+  {
+    "part": "能",
+    "start": 6488,
+    "end": 6636
+  },
+  {
+    "part": "调用",
+    "start": 6647,
+    "end": 6931
+  },
+  {
+    "part": "外部",
+    "start": 6954,
+    "end": 7204
+  },
+  {
+    "part": "工具，",
+    "start": 7215,
+    "end": 7670
+  },
+  {
+    "part": "扩展",
+    "start": 7863,
+    "end": 8250
+  },
+  {
+    "part": "能力",
+    "start": 8272,
+    "end": 8522
+  },
+  {
+    "part": "边界。",
+    "start": 8534,
+    "end": 8977
+  }
+]

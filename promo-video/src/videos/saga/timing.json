@@ -1,0 +1,27 @@
+[
+  {
+    "id": "saga-intro",
+    "startMs": 95,
+    "endMs": 10147
+  },
+  {
+    "id": "saga-problem",
+    "startMs": 10670,
+    "endMs": 23988
+  },
+  {
+    "id": "saga-pattern",
+    "startMs": 24511,
+    "endMs": 38579
+  },
+  {
+    "id": "saga-impl",
+    "startMs": 39102,
+    "endMs": 53329
+  },
+  {
+    "id": "saga-outro",
+    "startMs": 53852,
+    "endMs": 63261
+  }
+]

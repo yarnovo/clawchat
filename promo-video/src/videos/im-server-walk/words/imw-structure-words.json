@@ -1,0 +1,157 @@
+[
+  {
+    "part": "项目",
+    "start": 12306,
+    "end": 12647
+  },
+  {
+    "part": "结构",
+    "start": 12659,
+    "end": 12977
+  },
+  {
+    "part": "很",
+    "start": 13000,
+    "end": 13170
+  },
+  {
+    "part": "清晰。",
+    "start": 13170,
+    "end": 13693
+  },
+  {
+    "part": "app.",
+    "start": 14204,
+    "end": 14409
+  },
+  {
+    "part": "ts",
+    "start": 14431,
+    "end": 14874
+  },
+  {
+    "part": "是",
+    "start": 14897,
+    "end": 15034
+  },
+  {
+    "part": "入口，",
+    "start": 15045,
+    "end": 15488
+  },
+  {
+    "part": "配置",
+    "start": 15704,
+    "end": 16102
+  },
+  {
+    "part": "CORS、",
+    "start": 16102,
+    "end": 16579
+  },
+  {
+    "part": "requestId、",
+    "start": 16761,
+    "end": 17647
+  },
+  {
+    "part": "metrics",
+    "start": 17840,
+    "end": 18340
+  },
+  {
+    "part": "中间件。",
+    "start": 18352,
+    "end": 18954
+  },
+  {
+    "part": "routes",
+    "start": 19477,
+    "end": 19818
+  },
+  {
+    "part": "目录",
+    "start": 19829,
+    "end": 20056
+  },
+  {
+    "part": "下",
+    "start": 20056,
+    "end": 20340
+  },
+  {
+    "part": "按",
+    "start": 20431,
+    "end": 20579
+  },
+  {
+    "part": "领域",
+    "start": 20590,
+    "end": 20852
+  },
+  {
+    "part": "分",
+    "start": 20875,
+    "end": 21000
+  },
+  {
+    "part": "文件：",
+    "start": 21011,
+    "end": 21465
+  },
+  {
+    "part": "auth、",
+    "start": 21738,
+    "end": 22125
+  },
+  {
+    "part": "accounts、",
+    "start": 22329,
+    "end": 22874
+  },
+  {
+    "part": "friends、",
+    "start": 23068,
+    "end": 23545
+  },
+  {
+    "part": "conversations、",
+    "start": 23738,
+    "end": 24579
+  },
+  {
+    "part": "messages，",
+    "start": 24772,
+    "end": 25409
+  },
+  {
+    "part": "每",
+    "start": 25670,
+    "end": 25818
+  },
+  {
+    "part": "个",
+    "start": 25818,
+    "end": 25897
+  },
+  {
+    "part": "文件",
+    "start": 25909,
+    "end": 26204
+  },
+  {
+    "part": "一个",
+    "start": 26215,
+    "end": 26556
+  },
+  {
+    "part": "Hono ",
+    "start": 26647,
+    "end": 26920
+  },
+  {
+    "part": "router。",
+    "start": 26931,
+    "end": 27329
+  }
+]

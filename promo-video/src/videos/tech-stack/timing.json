@@ -1,0 +1,32 @@
+[
+  {
+    "id": "ts-intro",
+    "startMs": 95,
+    "endMs": 9170
+  },
+  {
+    "id": "ts-frontend",
+    "startMs": 9693,
+    "endMs": 23727
+  },
+  {
+    "id": "ts-backend",
+    "startMs": 24250,
+    "endMs": 38136
+  },
+  {
+    "id": "ts-infra",
+    "startMs": 38659,
+    "endMs": 54272
+  },
+  {
+    "id": "ts-why",
+    "startMs": 54795,
+    "endMs": 66590
+  },
+  {
+    "id": "ts-outro",
+    "startMs": 67102,
+    "endMs": 77897
+  }
+]

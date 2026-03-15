@@ -1,0 +1,32 @@
+[
+  {
+    "id": "test-intro",
+    "startMs": 95,
+    "endMs": 10113
+  },
+  {
+    "id": "test-l1",
+    "startMs": 10625,
+    "endMs": 25670
+  },
+  {
+    "id": "test-l2",
+    "startMs": 26181,
+    "endMs": 41238
+  },
+  {
+    "id": "test-l3",
+    "startMs": 41750,
+    "endMs": 54011
+  },
+  {
+    "id": "test-tools",
+    "startMs": 54534,
+    "endMs": 67261
+  },
+  {
+    "id": "test-outro",
+    "startMs": 67784,
+    "endMs": 77909
+  }
+]

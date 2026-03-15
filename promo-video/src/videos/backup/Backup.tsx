@@ -6,6 +6,7 @@ import { SceneBackupOverview } from "./SceneBackupOverview";
 import { SceneBackupDaily } from "./SceneBackupDaily";
 import { SceneBackupDeploy } from "./SceneBackupDeploy";
 import { SceneBackupRedis } from "./SceneBackupRedis";
+import { SceneBackupVolume } from "./SceneBackupVolume";
 import { SceneBackupCommands } from "./SceneBackupCommands";
 import { SceneBackupRestore } from "./SceneBackupRestore";
 import { SceneBackupOutro } from "./SceneBackupOutro";
@@ -18,6 +19,7 @@ import overviewWords from "./words/backup-overview-words.json";
 import dailyWords from "./words/backup-daily-words.json";
 import deployWords from "./words/backup-deploy-words.json";
 import redisWords from "./words/backup-redis-words.json";
+import volumeWords from "./words/backup-volume-words.json";
 import commandsWords from "./words/backup-commands-words.json";
 import restoreWords from "./words/backup-restore-words.json";
 import outroWords from "./words/backup-outro-words.json";
@@ -31,11 +33,11 @@ const OUTRO_PAD = 30;
 const SCENE_COMPS = [
   SceneBackupCover, SceneBackupRisks, SceneBackupAnalogy,
   SceneBackupOverview, SceneBackupDaily, SceneBackupDeploy,
-  SceneBackupRedis, SceneBackupCommands, SceneBackupRestore, SceneBackupOutro,
+  SceneBackupRedis, SceneBackupVolume, SceneBackupCommands, SceneBackupRestore, SceneBackupOutro,
 ];
 const SCENE_WORDS = [
   coverWords, risksWords, analogyWords, overviewWords, dailyWords,
-  deployWords, redisWords, commandsWords, restoreWords, outroWords,
+  deployWords, redisWords, volumeWords, commandsWords, restoreWords, outroWords,
 ];
 
 const scenes = timingData.map((t, i) => {

@@ -1,0 +1,27 @@
+[
+  {
+    "id": "op-intro",
+    "startMs": 95,
+    "endMs": 8704
+  },
+  {
+    "id": "op-how",
+    "startMs": 9227,
+    "endMs": 22829
+  },
+  {
+    "id": "op-config",
+    "startMs": 23352,
+    "endMs": 36011
+  },
+  {
+    "id": "op-skills",
+    "startMs": 36534,
+    "endMs": 49136
+  },
+  {
+    "id": "op-outro",
+    "startMs": 49647,
+    "endMs": 59715
+  }
+]

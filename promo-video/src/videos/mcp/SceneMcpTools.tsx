@@ -1,0 +1,103 @@
+import {
+  AbsoluteFill,
+  interpolate,
+  spring,
+  useCurrentFrame,
+  useVideoConfig,
+} from "remotion";
+import { GradientBg } from "../../GradientBg";
+import { Particles } from "../../Particles";
+import { COLORS, FONT, FONT_SANS } from "../../constants";
+
+const items = [
+  "每个工具 = 一个 Python 函数",
+  "注册到 MCP 即可被 Agent 调用",
+  "添加工具不需要改 Agent 代码",
+  "能力没有天花板",
+];
+
+export const SceneMcpTools: React.FC = () => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  const titleProg = spring({ frame, fps, config: { damping: 14 } });
+
+  return (
+    <AbsoluteFill>
+      <GradientBg />
+      <Particles />
+      <AbsoluteFill
+        style={{
+          justifyContent: "center",
+          alignItems: "center",
+          flexDirection: "column",
+          gap: 40,
+          paddingBottom: 140,
+        }}
+      >
+        {/* Title */}
+        <div
+          style={{
+            fontFamily: FONT,
+            fontSize: 56,
+            fontWeight: 700,
+            color: COLORS.text,
+            opacity: interpolate(titleProg, [0, 1], [0, 1]),
+            transform: `translateY(${interpolate(titleProg, [0, 1], [30, 0])}px)`,
+          }}
+        >
+          工具扩展
+        </div>
+
+        {/* List */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 28,
+          }}
+        >
+          {items.map((text, i) => {
+            const prog = spring({
+              frame: frame - 12 - i * 10,
+              fps,
+              config: { damping: 14 },
+            });
+            return (
+              <div
+                key={text}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 20,
+                  opacity: interpolate(prog, [0, 1], [0, 1]),
+                  transform: `translateY(${interpolate(prog, [0, 1], [20, 0])}px)`,
+                }}
+              >
+                <div
+                  style={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: 6,
+                    background: COLORS.accent,
+                    flexShrink: 0,
+                  }}
+                />
+                <div
+                  style={{
+                    fontFamily: FONT_SANS,
+                    fontSize: 36,
+                    color: COLORS.text,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {text}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </AbsoluteFill>
+    </AbsoluteFill>
+  );
+};

@@ -1,0 +1,7 @@
+[
+  {"id": "op-intro", "text": "来看OpenClaw Channel插件。这是ClawChat和OpenClaw之间的桥梁，让Agent能通过聊天界面和用户对话。"},
+  {"id": "op-how", "text": "插件的工作原理很简单。用户在ClawChat发消息，im-server转发到agent-server，agent-server通过OpenClaw的Channel接口把消息传给Agent。Agent处理后通过callback回传。"},
+  {"id": "op-config", "text": "每个Agent启动时，openclaw-server会自动生成Channel配置。包括callback地址、gateway token、技能注册表地址。Agent容器通过环境变量接收这些配置。"},
+  {"id": "op-skills", "text": "技能注册表的注入是关键一步。环境变量CLAWHUB_REGISTRY指向skill-registry-server的地址。Agent启动后自动发现注册表，就能搜索和安装技能了。"},
+  {"id": "op-outro", "text": "总结一下：Channel插件桥接IM和Agent，自动生成配置，环境变量注入，技能注册表自动发现。一切都是自动化的。"}
+]

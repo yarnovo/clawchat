@@ -1,0 +1,137 @@
+[
+  {
+    "part": "这个",
+    "start": 95,
+    "end": 345
+  },
+  {
+    "part": "视频",
+    "start": 356,
+    "end": 856
+  },
+  {
+    "part": "给",
+    "start": 879,
+    "end": 1027
+  },
+  {
+    "part": "开发者",
+    "start": 1027,
+    "end": 1618
+  },
+  {
+    "part": "讲",
+    "start": 1629,
+    "end": 1890
+  },
+  {
+    "part": "OpenClaw",
+    "start": 1890,
+    "end": 2459
+  },
+  {
+    "part": "容器",
+    "start": 2470,
+    "end": 2811
+  },
+  {
+    "part": "内",
+    "start": 2811,
+    "end": 2947
+  },
+  {
+    "part": "的",
+    "start": 2947,
+    "end": 3027
+  },
+  {
+    "part": "数据",
+    "start": 3050,
+    "end": 3334
+  },
+  {
+    "part": "结构。",
+    "start": 3345,
+    "end": 3799
+  },
+  {
+    "part": "Volume",
+    "start": 4318,
+    "end": 4795
+  },
+  {
+    "part": "挂载",
+    "start": 4886,
+    "end": 5215
+  },
+  {
+    "part": "到",
+    "start": 5227,
+    "end": 5397
+  },
+  {
+    "part": "home/",
+    "start": 5420,
+    "end": 5670
+  },
+  {
+    "part": "node/.",
+    "start": 5681,
+    "end": 5988
+  },
+  {
+    "part": "openclaw",
+    "start": 6068,
+    "end": 6613
+  },
+  {
+    "part": "目录，",
+    "start": 6625,
+    "end": 7022
+  },
+  {
+    "part": "里面",
+    "start": 7284,
+    "end": 7522
+  },
+  {
+    "part": "存",
+    "start": 7534,
+    "end": 7681
+  },
+  {
+    "part": "了",
+    "start": 7681,
+    "end": 7829
+  },
+  {
+    "part": "Agent",
+    "start": 7852,
+    "end": 8215
+  },
+  {
+    "part": "的",
+    "start": 8215,
+    "end": 8306
+  },
+  {
+    "part": "所有",
+    "start": 8329,
+    "end": 8647
+  },
+  {
+    "part": "运行",
+    "start": 8659,
+    "end": 8999
+  },
+  {
+    "part": "时",
+    "start": 9000,
+    "end": 9125
+  },
+  {
+    "part": "数据。",
+    "start": 9136,
+    "end": 9579
+  }
+]

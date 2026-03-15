@@ -1,0 +1,117 @@
+[
+  {
+    "part": "来看",
+    "start": 95,
+    "end": 561
+  },
+  {
+    "part": "container-server，",
+    "start": 584,
+    "end": 1447
+  },
+  {
+    "part": "ClawChat",
+    "start": 1663,
+    "end": 2209
+  },
+  {
+    "part": "的",
+    "start": 2209,
+    "end": 2311
+  },
+  {
+    "part": "Docker",
+    "start": 2334,
+    "end": 2674
+  },
+  {
+    "part": "容器",
+    "start": 2686,
+    "end": 2993
+  },
+  {
+    "part": "管理层。",
+    "start": 3004,
+    "end": 3629
+  },
+  {
+    "part": "它",
+    "start": 4147,
+    "end": 4318
+  },
+  {
+    "part": "是",
+    "start": 4318,
+    "end": 4522
+  },
+  {
+    "part": "Agent",
+    "start": 4545,
+    "end": 4965
+  },
+  {
+    "part": "运行",
+    "start": 4988,
+    "end": 5375
+  },
+  {
+    "part": "时",
+    "start": 5375,
+    "end": 5522
+  },
+  {
+    "part": "的",
+    "start": 5522,
+    "end": 5624
+  },
+  {
+    "part": "基础",
+    "start": 5647,
+    "end": 5943
+  },
+  {
+    "part": "设施，",
+    "start": 5954,
+    "end": 6431
+  },
+  {
+    "part": "负责",
+    "start": 6715,
+    "end": 6999
+  },
+  {
+    "part": "容器",
+    "start": 7022,
+    "end": 7329
+  },
+  {
+    "part": "的",
+    "start": 7329,
+    "end": 7397
+  },
+  {
+    "part": "创建、",
+    "start": 7409,
+    "end": 7897
+  },
+  {
+    "part": "启动、",
+    "start": 8079,
+    "end": 8556
+  },
+  {
+    "part": "停止",
+    "start": 8727,
+    "end": 9159
+  },
+  {
+    "part": "和",
+    "start": 9181,
+    "end": 9295
+  },
+  {
+    "part": "删除。",
+    "start": 9306,
+    "end": 9852
+  }
+]
