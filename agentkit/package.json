@@ -1,0 +1,11 @@
+{
+  "name": "agentkit",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Model-agnostic Agent Runtime",
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test"
+  },
+  "packageManager": "pnpm@10.32.0"
+}
