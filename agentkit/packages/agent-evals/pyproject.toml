@@ -1,0 +1,13 @@
+[project]
+name = "agent-evals"
+version = "0.1.0"
+description = "Agent evaluation suite using DeepEval — L1/L2/L3 coverage"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "deepeval>=3.8.9",
+    "pytest>=8.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
