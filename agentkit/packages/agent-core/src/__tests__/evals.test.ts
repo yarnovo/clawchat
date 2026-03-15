@@ -53,7 +53,7 @@ function makeTask(fakeResponses: LLMResponse[]) {
       systemPrompt: 'You are helpful.',
       onToolCall: (name, args) => collected.push({ name, arguments: args, result: undefined }),
       onToolResult: (name, res) => {
-        const last = collected.findLast(c => c.name === name);
+        const last = collected.findLast((c: { name: string }) => c.name === name);
         if (last) last.result = res.content;
       },
     });
