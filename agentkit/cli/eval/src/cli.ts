@@ -82,21 +82,22 @@ program
     console.log(`\n${'─'.repeat(50)}`);
     console.log(`  ✅ Passed: ${passed}  ❌ Failed: ${failed}  📊 Rate: ${passRate}%  ⏱ ${duration}ms\n`);
 
-    // 输出报告
-    if (opts.report) {
-      const fullReport: EvalReport = {
-        agent: agentName,
-        workspace: abs,
-        timestamp: new Date().toISOString(),
-        duration,
-        summary: { total, passed, failed, passRate: parseFloat(passRate) },
-        cases: report,
-      };
-      const reportPath = path.resolve(opts.report);
-      fs.mkdirSync(path.dirname(reportPath), { recursive: true });
-      fs.writeFileSync(reportPath, JSON.stringify(fullReport, null, 2));
-      console.log(`  📄 Report: ${reportPath}\n`);
-    }
+    // 输出报告（默认到 workspace/evals/report.json）
+    const reportPath = opts.report
+      ? path.resolve(opts.report)
+      : path.join(abs, 'evals', 'report.json');
+
+    const fullReport: EvalReport = {
+      agent: agentName,
+      workspace: abs,
+      timestamp: new Date().toISOString(),
+      duration,
+      summary: { total, passed, failed, passRate: parseFloat(passRate) },
+      cases: report,
+    };
+    fs.mkdirSync(path.dirname(reportPath), { recursive: true });
+    fs.writeFileSync(reportPath, JSON.stringify(fullReport, null, 2));
+    console.log(`  📄 Report: ${reportPath}\n`);
 
     process.exit(failed > 0 ? 1 : 0);
   });
