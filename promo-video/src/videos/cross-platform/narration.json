@@ -1,0 +1,8 @@
+[
+  {"id": "cp-intro", "text": "ClawChat用Flutter构建，一套代码覆盖六个平台。Web、iOS、Android、macOS、Windows、Linux，哪里都能用。"},
+  {"id": "cp-flutter", "text": "Flutter是Google的跨平台框架。Dart语言编写，编译为原生代码，性能接近原生应用。ClawChat选择Flutter是因为它能用最少的代码覆盖最多的平台。"},
+  {"id": "cp-web", "text": "Web版是当前的主要入口。通过nginx提供静态文件，和后端API同域部署，没有跨域问题。用户打开浏览器就能用，不需要安装任何东西。"},
+  {"id": "cp-mobile", "text": "移动端同步支持iOS和Android。Flutter编译出的原生应用流畅度接近原生开发。推送通知、离线缓存、手势交互，移动端体验一样丝滑。"},
+  {"id": "cp-desktop", "text": "桌面端覆盖macOS、Windows和Linux。同样的聊天体验，更大的屏幕空间。适合需要长时间和Agent协作的工作场景。"},
+  {"id": "cp-outro", "text": "总结一下：Flutter一套代码六个平台，Web优先部署，移动端原生体验，桌面端生产力场景。真正的全平台覆盖。"}
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "id": "cp-intro",
+    "startMs": 95,
+    "endMs": 9738
+  },
+  {
+    "id": "cp-flutter",
+    "startMs": 10250,
+    "endMs": 22556
+  },
+  {
+    "id": "cp-web",
+    "startMs": 23079,
+    "endMs": 34704
+  },
+  {
+    "id": "cp-mobile",
+    "startMs": 35227,
+    "endMs": 47443
+  },
+  {
+    "id": "cp-desktop",
+    "startMs": 47965,
+    "endMs": 58170
+  },
+  {
+    "id": "cp-outro",
+    "startMs": 58693,
+    "endMs": 68318
+  }
+]

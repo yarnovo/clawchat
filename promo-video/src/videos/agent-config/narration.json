@@ -1,0 +1,8 @@
+[
+  {"id": "ac-intro", "text": "这个教程详解Agent的配置选项。模型选择、运行时切换、提示词调优，帮你打造最适合的Agent。"},
+  {"id": "ac-model", "text": "模型选择决定了Agent的智力上限。支持Claude、GPT-4o、Ollama等主流模型。填入对应的API Key和Base URL，就能让Agent接入你选择的大模型。"},
+  {"id": "ac-runtime", "text": "运行时决定Agent的运行方式。OpenClaw功能最丰富，支持五十多种通道。NanoClaw轻量可控，适合定制开发。IronClaw用Rust写的，安全性最高。"},
+  {"id": "ac-prompt", "text": "系统提示词是Agent的灵魂。它定义了Agent的人设、能力范围和回复风格。好的提示词让Agent更专业、更有个性。写提示词就像写岗位说明书。"},
+  {"id": "ac-lifecycle", "text": "Agent有完整的生命周期。创建后状态是created，启动后变running，可以随时stop暂停。出错会变error，API Key用完变exhausted。状态一目了然。"},
+  {"id": "ac-outro", "text": "总结一下：模型决定智力，运行时决定能力，提示词决定人设，状态追踪全生命周期。配置好这些，你的Agent就能发挥最大价值。"}
+]

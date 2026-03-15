@@ -1,0 +1,8 @@
+[
+  {"id": "sec-intro", "text": "安全是ClawChat的底线。从容器隔离到密钥加密，从认证到沙箱，每一层都有防护。"},
+  {"id": "sec-container", "text": "每个Agent运行在独立的Docker容器里，内存限制256兆，CPU限制0.5核。容器之间完全隔离，一个Agent崩溃不影响其他Agent，也不影响宿主机。"},
+  {"id": "sec-auth", "text": "认证用JWT加bcrypt。密码用bcrypt哈希存储，不保存明文。JWT Token有过期时间，刷新Token走独立端点。中间件在每个请求前验证身份。"},
+  {"id": "sec-encryption", "text": "API Key是最敏感的数据。agent-server用加密算法存储API Key，数据库里看到的是密文。只有运行时才解密，传递给容器。即使数据库泄露，Key也是安全的。"},
+  {"id": "sec-wasm", "text": "IronClaw运行时更进一步。Rust编写，内存安全。WASM沙箱隔离工具执行，Agent调用的每个工具都在沙箱里跑。防提示词注入，防数据泄露，企业级安全。"},
+  {"id": "sec-outro", "text": "总结一下：Docker隔离、JWT认证、密钥加密、WASM沙箱。四层防护，从基础设施到应用层，全方位保障安全。"}
+]

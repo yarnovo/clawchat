@@ -1,0 +1,37 @@
+[
+  {
+    "id": "pp-intro",
+    "startMs": 95,
+    "endMs": 9170
+  },
+  {
+    "id": "pp-install",
+    "startMs": 9681,
+    "endMs": 25636
+  },
+  {
+    "id": "pp-uninstall",
+    "startMs": 26159,
+    "endMs": 40727
+  },
+  {
+    "id": "pp-maintain",
+    "startMs": 41250,
+    "endMs": 54409
+  },
+  {
+    "id": "pp-solution",
+    "startMs": 54920,
+    "endMs": 68738
+  },
+  {
+    "id": "pp-compare",
+    "startMs": 69261,
+    "endMs": 81965
+  },
+  {
+    "id": "pp-outro",
+    "startMs": 82488,
+    "endMs": 95215
+  }
+]
