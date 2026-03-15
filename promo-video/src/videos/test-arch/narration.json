@@ -1,0 +1,8 @@
+[
+  {"id": "ta-intro", "text": "agent-core怎么测试？一个Agent引擎，核心是while循环加工具调用加LLM交互。我们用vitest做单元测试，mock掉LLM，验证每一层的行为。"},
+  {"id": "ta-layers", "text": "测试分三层。第一层单元测试：每个模块独立测，session存取、persona加载、工具执行。第二层集成测试：mock LLM，验证Agent的while循环和工具调用流程。第三层端到端测试：真实调百炼API，验证完整对话。"},
+  {"id": "ta-mock", "text": "Mock LLM是关键。创建一个FakeLLM，按预设脚本返回响应。第一次调用返回工具调用，第二次调用返回文本。这样不花API费用，毫秒级完成，还能测边界情况。"},
+  {"id": "ta-cases", "text": "核心测试用例。Session：存取消息、SQLite持久化、多会话隔离。Persona：加载四个文件、截断策略、受保护文件。Agent：简单对话、单工具调用、多工具调用、工具报错、最大轮数限制。"},
+  {"id": "ta-ci", "text": "CI流程。每次push自动跑vitest。单元测试和集成测试秒级完成，不依赖外部API。端到端测试单独跑，需要百炼API Key。测试覆盖率作为合并门槛。"},
+  {"id": "ta-outro", "text": "总结。三层测试，Mock LLM是核心技巧。单元测试保证模块正确，集成测试保证流程正确，端到端测试保证真实可用。代码量少所以测试覆盖率容易拉满。"}
+]

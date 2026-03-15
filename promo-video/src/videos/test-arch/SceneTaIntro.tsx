@@ -9,17 +9,9 @@ import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
 import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
-const files = [
-  "agent.ts",
-  "llm.ts",
-  "openai-provider.ts",
-  "persona.ts",
-  "types.ts",
-  "session.ts",
-  "schema.ts",
-];
+const tags = ["vitest", "Mock LLM", "agent-core"];
 
-export const SceneAcwIntro: React.FC = () => {
+export const SceneTaIntro: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -51,7 +43,7 @@ export const SceneAcwIntro: React.FC = () => {
             transform: `translateY(${interpolate(titleProg, [0, 1], [30, 0])}px)`,
           }}
         >
-          agent-core 走读
+          测试架构
         </div>
 
         <div
@@ -64,7 +56,7 @@ export const SceneAcwIntro: React.FC = () => {
             transform: `translateY(${interpolate(subProg, [0, 1], [20, 0])}px)`,
           }}
         >
-          7 个文件 · 300 行代码
+          vitest + Mock LLM
         </div>
 
         <div
@@ -72,20 +64,18 @@ export const SceneAcwIntro: React.FC = () => {
             display: "flex",
             gap: 14,
             marginTop: 12,
-            flexWrap: "wrap",
-            justifyContent: "center",
             opacity: interpolate(tagsProg, [0, 1], [0, 1]),
             transform: `translateY(${interpolate(tagsProg, [0, 1], [20, 0])}px)`,
           }}
         >
-          {files.map((f, i) => {
-            const delay = 35 + i * 6;
+          {tags.map((t, i) => {
+            const delay = 35 + i * 8;
             const prog = spring({ frame: frame - delay, fps, config: { damping: 14, mass: 0.6 } });
             return (
               <div
-                key={f}
+                key={t}
                 style={{
-                  fontFamily: MONO,
+                  fontFamily: t === "vitest" ? MONO : FONT_SANS,
                   fontSize: 26,
                   color: COLORS.accent,
                   padding: "10px 22px",
@@ -97,7 +87,7 @@ export const SceneAcwIntro: React.FC = () => {
                   transform: `translateY(${interpolate(prog, [0, 1], [16, 0])}px)`,
                 }}
               >
-                {f}
+                {t}
               </div>
             );
           })}

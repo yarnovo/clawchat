@@ -16,14 +16,21 @@ const toolFields = [
   { field: "execute", type: "(args) => Promise" },
 ];
 
+const sessionItems = [
+  { label: "ChatSession", desc: "接口", highlight: true },
+  { label: "InMemorySession", desc: "测试用" },
+  { label: "SQLiteSession", desc: "生产 / Drizzle ORM" },
+];
+
 export const SceneAcwTools: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
   const labelProg = spring({ frame, fps, config: { damping: 14 } });
   const titleProg = spring({ frame: frame - 8, fps, config: { damping: 14 } });
-  const memProg = spring({ frame: frame - 55, fps, config: { damping: 14 } });
-  const footerProg = spring({ frame: frame - 70, fps, config: { damping: 14 } });
+  const sessionProg = spring({ frame: frame - 55, fps, config: { damping: 14 } });
+  const schemaProg = spring({ frame: frame - 75, fps, config: { damping: 14 } });
+  const footerProg = spring({ frame: frame - 90, fps, config: { damping: 14 } });
 
   return (
     <AbsoluteFill>
@@ -48,7 +55,7 @@ export const SceneAcwTools: React.FC = () => {
             opacity: interpolate(labelProg, [0, 1], [0, 1]),
           }}
         >
-          types.ts + memory.ts
+          types.ts + session.ts + schema.ts
         </div>
 
         <div
@@ -62,7 +69,7 @@ export const SceneAcwTools: React.FC = () => {
             marginBottom: 8,
           }}
         >
-          工具接口 + 聊天历史
+          Tool + ChatSession + Schema
         </div>
 
         <div style={{ display: "flex", gap: 40, alignItems: "flex-start" }}>
@@ -129,21 +136,80 @@ export const SceneAcwTools: React.FC = () => {
             })}
           </div>
 
-          {/* Memory card */}
+          {/* Session card */}
           <div
             style={{
               background: COLORS.card,
               border: `1px solid ${COLORS.border}`,
               borderRadius: 16,
               boxShadow: COLORS.cardShadow,
-              padding: "28px 40px",
+              padding: "28px 36px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+              minWidth: 300,
+              opacity: interpolate(sessionProg, [0, 1], [0, 1]),
+              transform: `translateX(${interpolate(sessionProg, [0, 1], [30, 0])}px)`,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: MONO,
+                fontSize: 28,
+                fontWeight: 700,
+                color: COLORS.text,
+                marginBottom: 4,
+              }}
+            >
+              session.ts
+            </div>
+            {sessionItems.map((item, i) => {
+              const delay = 60 + i * 8;
+              const prog = spring({ frame: frame - delay, fps, config: { damping: 14, mass: 0.5 } });
+              return (
+                <div
+                  key={item.label}
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    alignItems: "baseline",
+                    opacity: interpolate(prog, [0, 1], [0, 1]),
+                    transform: `translateX(${interpolate(prog, [0, 1], [-12, 0])}px)`,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontFamily: MONO,
+                      fontSize: 25,
+                      fontWeight: 600,
+                      color: item.highlight ? COLORS.accent : COLORS.text,
+                    }}
+                  >
+                    {item.label}
+                  </div>
+                  <div style={{ fontFamily: FONT_SANS, fontSize: 24, color: COLORS.muted }}>
+                    {item.desc}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Schema card */}
+          <div
+            style={{
+              background: COLORS.card,
+              border: `1px solid ${COLORS.border}`,
+              borderRadius: 16,
+              boxShadow: COLORS.cardShadow,
+              padding: "28px 36px",
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: 16,
-              minWidth: 320,
-              opacity: interpolate(memProg, [0, 1], [0, 1]),
-              transform: `translateX(${interpolate(memProg, [0, 1], [30, 0])}px)`,
+              gap: 12,
+              minWidth: 240,
+              opacity: interpolate(schemaProg, [0, 1], [0, 1]),
+              transform: `translateX(${interpolate(schemaProg, [0, 1], [30, 0])}px)`,
             }}
           >
             <div
@@ -154,19 +220,19 @@ export const SceneAcwTools: React.FC = () => {
                 color: COLORS.text,
               }}
             >
-              memory.ts
+              schema.ts
             </div>
             <div
               style={{
                 fontFamily: MONO,
-                fontSize: 26,
+                fontSize: 24,
                 color: COLORS.muted,
                 background: `rgba(218, 119, 86, 0.06)`,
-                padding: "12px 20px",
+                padding: "10px 18px",
                 borderRadius: 10,
               }}
             >
-              messages: Message[]
+              Drizzle ORM
             </div>
             <div
               style={{
@@ -175,7 +241,7 @@ export const SceneAcwTools: React.FC = () => {
                 color: COLORS.muted,
               }}
             >
-              InMemory 数组存聊天历史
+              类型安全表定义
             </div>
           </div>
         </div>
@@ -190,7 +256,7 @@ export const SceneAcwTools: React.FC = () => {
             transform: `translateY(${interpolate(footerProg, [0, 1], [16, 0])}px)`,
           }}
         >
-          六个文件，职责清晰，没有一行多余代码
+          七个文件，职责清晰，没有一行多余代码
         </div>
       </AbsoluteFill>
     </AbsoluteFill>

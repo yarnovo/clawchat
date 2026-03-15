@@ -61,6 +61,7 @@ import { AiTrends2026, TOTAL_FRAMES as AITRENDS_FRAMES } from "./videos/ai-trend
 import { PersonaDesign, TOTAL_FRAMES as PD_FRAMES } from "./videos/persona-design/PersonaDesign";
 import { LoadStrategy, TOTAL_FRAMES as LS_FRAMES } from "./videos/load-strategy/LoadStrategy";
 import { AgentCoreWalk, TOTAL_FRAMES as ACW_FRAMES } from "./videos/agent-core-walk/AgentCoreWalk";
+import { TestArch, TOTAL_FRAMES as TA_FRAMES } from "./videos/test-arch/TestArch";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -574,6 +575,14 @@ export const RemotionRoot: React.FC = () => {
             id="AgentCoreWalk"
             component={AgentCoreWalk}
             durationInFrames={ACW_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
+          <Composition
+            id="TestArch"
+            component={TestArch}
+            durationInFrames={TA_FRAMES}
             fps={30}
             width={1920}
             height={1080}

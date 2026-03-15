@@ -9,17 +9,13 @@ import { GradientBg } from "../../GradientBg";
 import { Particles } from "../../Particles";
 import { COLORS, FONT, FONT_SANS, MONO } from "../../constants";
 
-const modules = [
-  { name: "agent.ts", role: "while 循环" },
-  { name: "llm.ts", role: "模型接口" },
-  { name: "openai-provider.ts", role: "百炼适配" },
-  { name: "persona.ts", role: "人格加载" },
-  { name: "types.ts", role: "工具定义" },
-  { name: "session.ts", role: "聊天历史" },
-  { name: "schema.ts", role: "Drizzle 表定义" },
+const summary = [
+  { layer: "L1 单元", guarantee: "模块正确", color: COLORS.muted },
+  { layer: "L2 集成", guarantee: "流程正确", color: "#C4956A" },
+  { layer: "L3 E2E", guarantee: "真实可用", color: COLORS.accent },
 ];
 
-export const SceneAcwOutro: React.FC = () => {
+export const SceneTaOutro: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
@@ -50,43 +46,34 @@ export const SceneAcwOutro: React.FC = () => {
             transform: `translateY(${interpolate(titleProg, [0, 1], [-30, 0])}px)`,
           }}
         >
-          七文件架构总览
+          三层测试总结
         </div>
 
-        {/* 3x2 grid */}
         <div
           style={{
             display: "flex",
-            flexWrap: "wrap",
-            gap: 20,
-            justifyContent: "center",
-            maxWidth: 1200,
+            gap: 28,
             opacity: interpolate(gridProg, [0, 1], [0, 1]),
             transform: `translateY(${interpolate(gridProg, [0, 1], [30, 0])}px)`,
           }}
         >
-          {modules.map((m, i) => {
-            const delay = 15 + i * 8;
+          {summary.map((s, i) => {
+            const delay = 18 + i * 10;
             const prog = spring({ frame: frame - delay, fps, config: { damping: 14, mass: 0.6 } });
-            const isCore = i === 0; // agent.ts highlighted
             return (
               <div
-                key={m.name}
+                key={s.layer}
                 style={{
-                  padding: "24px 36px",
+                  padding: "28px 44px",
                   borderRadius: 14,
-                  background: isCore
-                    ? `linear-gradient(135deg, ${COLORS.card}, rgba(218, 119, 86, 0.06))`
-                    : COLORS.card,
-                  border: isCore
-                    ? `2px solid ${COLORS.accent}`
-                    : `1px solid ${COLORS.border}`,
+                  background: COLORS.card,
+                  border: `2px solid ${s.color}`,
                   boxShadow: COLORS.cardShadow,
                   display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
-                  gap: 8,
-                  minWidth: 260,
+                  gap: 12,
+                  minWidth: 240,
                   opacity: interpolate(prog, [0, 1], [0, 1]),
                   transform: `scale(${interpolate(prog, [0, 1], [0.8, 1])})`,
                 }}
@@ -94,21 +81,22 @@ export const SceneAcwOutro: React.FC = () => {
                 <div
                   style={{
                     fontFamily: MONO,
-                    fontSize: 26,
+                    fontSize: 28,
                     fontWeight: 700,
-                    color: isCore ? COLORS.accent : COLORS.text,
+                    color: s.color,
                   }}
                 >
-                  {m.name}
+                  {s.layer}
                 </div>
                 <div
                   style={{
                     fontFamily: FONT_SANS,
-                    fontSize: 24,
-                    color: COLORS.muted,
+                    fontSize: 26,
+                    color: COLORS.text,
+                    fontWeight: 600,
                   }}
                 >
-                  {m.role}
+                  {s.guarantee}
                 </div>
               </div>
             );
@@ -122,12 +110,11 @@ export const SceneAcwOutro: React.FC = () => {
             color: COLORS.accent,
             fontWeight: 600,
             textAlign: "center",
-            lineHeight: 1.8,
             opacity: interpolate(footerProg, [0, 1], [0, 1]),
             transform: `translateY(${interpolate(footerProg, [0, 1], [16, 0])}px)`,
           }}
         >
-          300 行代码 · 模型无关 · 百炼 qwen-plus 验证通过
+          代码量少 · Mock LLM 核心技巧 · 覆盖率容易拉满
         </div>
       </AbsoluteFill>
     </AbsoluteFill>
