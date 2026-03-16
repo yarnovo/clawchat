@@ -22,20 +22,20 @@ interface AgentListProps {
 }
 
 const AVATAR_COLORS = [
-  { id: "blue", bg: "bg-blue-500" },
-  { id: "emerald", bg: "bg-emerald-500" },
-  { id: "orange", bg: "bg-orange-500" },
-  { id: "purple", bg: "bg-purple-500" },
-  { id: "pink", bg: "bg-pink-500" },
-  { id: "cyan", bg: "bg-cyan-500" },
-  { id: "amber", bg: "bg-amber-600" },
-  { id: "red", bg: "bg-red-500" },
+  "bg-blue-500",
+  "bg-emerald-500",
+  "bg-orange-500",
+  "bg-purple-500",
+  "bg-pink-500",
+  "bg-cyan-500",
+  "bg-amber-600",
+  "bg-red-500",
 ]
 
 function getAvatarColor(id: string) {
   let hash = 0
   for (const ch of id) hash = ((hash << 5) - hash + ch.charCodeAt(0)) | 0
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length].bg
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
 }
 
 export function AgentList({
@@ -51,8 +51,12 @@ export function AgentList({
   const searchRef = useRef<HTMLInputElement>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [newName, setNewName] = useState("")
-  const [newColor, setNewColor] = useState(AVATAR_COLORS[0].bg)
+  const [avatarSeed, setAvatarSeed] = useState(() => String(Date.now()))
   const [newDesc, setNewDesc] = useState("")
+
+  const avatarUrl = `https://api.dicebear.com/9.x/bottts/svg?seed=${encodeURIComponent(avatarSeed)}`
+
+  const randomizeAvatar = () => setAvatarSeed(String(Date.now()))
 
   // Fetch agents from API
   useEffect(() => {
@@ -103,7 +107,7 @@ export function AgentList({
     }
 
     setNewName("")
-    setNewColor(AVATAR_COLORS[0].bg)
+    setAvatarSeed(String(Date.now()))
     setNewDesc("")
     setDialogOpen(false)
   }
@@ -205,27 +209,22 @@ export function AgentList({
 
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium">
-                头像颜色 <span className="text-destructive">*</span>
+                头像 <span className="text-destructive">*</span>
               </label>
-              <div className="flex gap-2 flex-wrap">
-                {AVATAR_COLORS.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setNewColor(c.bg)}
-                    className={cn(
-                      "flex size-8 items-center justify-center rounded-lg text-white text-xs font-medium transition-all",
-                      c.bg,
-                      newColor === c.bg
-                        ? "ring-2 ring-primary ring-offset-2"
-                        : "opacity-60 hover:opacity-100",
-                    )}
-                  >
-                    {newName.trim()
-                      ? newName.trim().charAt(0).toUpperCase()
-                      : "A"}
-                  </button>
-                ))}
+              <div className="flex items-center gap-3">
+                <img
+                  src={avatarUrl}
+                  alt="avatar preview"
+                  className="size-14 rounded-xl bg-muted"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={randomizeAvatar}
+                >
+                  随机换一个
+                </Button>
               </div>
             </div>
 

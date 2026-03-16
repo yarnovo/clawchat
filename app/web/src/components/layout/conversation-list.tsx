@@ -31,6 +31,43 @@ function getAvatarColor(id: string) {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
 }
 
+function formatRelativeTime(timestamp: number): string {
+  const today = new Date()
+  const date = new Date(timestamp)
+
+  if (date.toDateString() === today.toDateString()) {
+    return date.toLocaleTimeString("zh-CN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    })
+  }
+
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+  if (date.toDateString() === yesterday.toDateString()) return "昨天"
+
+  const diffDays = Math.floor((today.getTime() - date.getTime()) / 86_400_000)
+  if (diffDays < 7)
+    return ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][date.getDay()]
+
+  if (date.getFullYear() === today.getFullYear())
+    return `${date.getMonth() + 1}/${date.getDate()}`
+
+  return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`
+}
+
+function getPlainPreview(content: string): string {
+  return content
+    .replace(/```[\s\S]*?```/g, "[代码]")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/#{1,6}\s/g, "")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .replace(/\n/g, " ")
+    .trim()
+}
+
 export function ConversationList({
   className,
   activeAgentId,
@@ -45,6 +82,13 @@ export function ConversationList({
       .then((data) => setAgents(data.agents))
       .catch(() => {})
   }, [setAgents])
+
+  // Sort by last message time, most recent first
+  const sortedAgents = [...agents].sort((a, b) => {
+    const aTime = a.lastMessage?.timestamp ?? 0
+    const bTime = b.lastMessage?.timestamp ?? 0
+    return bTime - aTime
+  })
 
   return (
     <div
@@ -75,13 +119,14 @@ export function ConversationList({
       {/* Conversation list */}
       <ScrollArea className="flex-1">
         <div className="flex flex-col">
-          {agents.length === 0 ? (
+          {sortedAgents.length === 0 ? (
             <p className="px-4 py-8 text-center text-xs text-muted-foreground">
               暂无会话
             </p>
           ) : (
-            agents.map((agent) => {
+            sortedAgents.map((agent) => {
               const isActive = activeAgentId === agent.id
+              const last = agent.lastMessage
 
               return (
                 <button
@@ -111,14 +156,21 @@ export function ConversationList({
                   )}
 
                   <div className="flex-1 min-w-0">
-                    <span className="truncate text-sm font-medium text-sidebar-foreground block">
-                      {agent.name}
-                    </span>
-                    {agent.description && (
-                      <p className="truncate text-xs text-muted-foreground mt-0.5">
-                        {agent.description}
-                      </p>
-                    )}
+                    <div className="flex items-center justify-between">
+                      <span className="truncate text-sm font-medium text-sidebar-foreground">
+                        {agent.name}
+                      </span>
+                      {last && (
+                        <span className="text-[11px] text-muted-foreground shrink-0 ml-2">
+                          {formatRelativeTime(last.timestamp)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="truncate text-xs text-muted-foreground mt-0.5">
+                      {last
+                        ? getPlainPreview(last.content)
+                        : agent.description}
+                    </p>
                   </div>
                 </button>
               )

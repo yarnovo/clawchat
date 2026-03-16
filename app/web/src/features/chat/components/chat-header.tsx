@@ -6,9 +6,10 @@ import { useMediaQuery } from '@/hooks/use-media-query'
 interface ChatHeaderProps {
   name: string
   avatar?: string
+  isTyping?: boolean
 }
 
-export function ChatHeader({ name }: ChatHeaderProps) {
+export function ChatHeader({ name, isTyping }: ChatHeaderProps) {
   const isDesktop = useMediaQuery('(min-width: 768px)')
   const navigate = useNavigate()
 
@@ -24,7 +25,12 @@ export function ChatHeader({ name }: ChatHeaderProps) {
           <ChevronLeft className="size-5" />
         </Button>
       )}
-      <h2 className="text-sm font-semibold text-foreground">{name}</h2>
+      <div>
+        <h2 className="text-sm font-semibold text-foreground">{name}</h2>
+        {isTyping && (
+          <p className="text-[11px] text-muted-foreground">正在输入...</p>
+        )}
+      </div>
     </header>
   )
 }

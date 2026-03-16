@@ -9,6 +9,7 @@ export function useAgentChat(agentId: string | null) {
   const currentSessionId = useAgentStore((s) => s.currentSessionId)
   const addMessage = useAgentStore((s) => s.addMessage)
   const updateMessage = useAgentStore((s) => s.updateMessage)
+  const updateAgent = useAgentStore((s) => s.updateAgent)
   const setTyping = useAgentStore((s) => s.setTyping)
   const setCurrentSessionId = useAgentStore((s) => s.setCurrentSessionId)
   const clearMessages = useAgentStore((s) => s.clearMessages)
@@ -24,37 +25,45 @@ export function useAgentChat(agentId: string | null) {
         sessionId: currentSessionId,
         role: 'user',
         content: text,
-        status: 'sending',
+        status: 'sent',
         timestamp: Date.now(),
       }
 
       addMessage(userMessage)
+      updateAgent(agentId, {
+        lastMessage: { content: text, timestamp: userMessage.timestamp },
+      })
       setTyping(true)
 
       try {
         const data = await sendMessage(agentId, text)
-        updateMessage(messageId, { status: 'sent' })
+
+        const replyContent =
+          (data as Record<string, string>).reply ??
+          (data as Record<string, string>).error ??
+          'No response'
+        const replyTimestamp = Date.now()
 
         const assistantMessage: Message = {
           id: crypto.randomUUID(),
           agentId,
           sessionId: currentSessionId,
           role: 'assistant',
-          content:
-            (data as Record<string, string>).reply ??
-            (data as Record<string, string>).error ??
-            'No response',
+          content: replyContent,
           status: 'complete',
-          timestamp: Date.now(),
+          timestamp: replyTimestamp,
         }
         addMessage(assistantMessage)
+        updateAgent(agentId, {
+          lastMessage: { content: replyContent, timestamp: replyTimestamp },
+        })
       } catch {
         updateMessage(messageId, { status: 'error' })
       } finally {
         setTyping(false)
       }
     },
-    [agentId, currentSessionId, addMessage, updateMessage, setTyping],
+    [agentId, currentSessionId, addMessage, updateMessage, updateAgent, setTyping],
   )
 
   const startNewSession = useCallback(async () => {

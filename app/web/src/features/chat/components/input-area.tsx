@@ -1,4 +1,4 @@
-import { useCallback, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useRef, type KeyboardEvent } from 'react'
 import TextareaAutosize from 'react-textarea-autosize'
 import { Smile, Paperclip, Send, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -21,7 +21,15 @@ export function InputArea({
   loading = false,
   disabled = false,
 }: InputAreaProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const canSend = value.trim().length > 0 && !loading && !disabled
+
+  // Auto-focus when component mounts (entering a chat)
+  useEffect(() => {
+    if (!disabled) {
+      textareaRef.current?.focus()
+    }
+  }, [disabled])
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -50,6 +58,7 @@ export function InputArea({
       {/* Input + Send */}
       <div className="flex items-end gap-2 px-4 pb-3 pt-1">
         <TextareaAutosize
+          ref={textareaRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}

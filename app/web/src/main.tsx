@@ -5,8 +5,7 @@ import { router } from './router'
 import './index.css'
 
 async function boot() {
-  // Start MSW in development
-  if (import.meta.env.DEV) {
+  if (import.meta.env.VITE_MOCK === 'true') {
     const { worker } = await import('./mocks/browser')
     await worker.start({ onUnhandledRequest: 'bypass' })
   }

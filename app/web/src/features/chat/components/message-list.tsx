@@ -7,10 +7,11 @@ import type { Message } from '@/types'
 
 interface MessageListProps {
   messages: Message[]
+  agentAvatar?: string
   onRetry?: (messageId: string) => void
 }
 
-export function MessageList({ messages, onRetry }: MessageListProps) {
+export function MessageList({ messages, agentAvatar, onRetry }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const [isAtBottom, setIsAtBottom] = useState(true)
@@ -62,6 +63,7 @@ export function MessageList({ messages, onRetry }: MessageListProps) {
                 {showDivider && <SessionDivider />}
                 <MessageBubble
                   message={message}
+                  agentAvatar={agentAvatar}
                   onRetry={onRetry}
                 />
               </div>

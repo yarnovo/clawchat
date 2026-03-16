@@ -12,12 +12,38 @@ export const handlers = [
 
   http.get('/api/agents', async () => {
     await delay(200)
-    return HttpResponse.json({ agents })
+    // Attach lastMessage to each agent
+    const agentsWithLast = agents.map((agent) => {
+      const msgs = messagesMap[agent.id]
+      const last = msgs?.at(-1)
+      return {
+        ...agent,
+        lastMessage: last
+          ? { content: last.content, timestamp: last.timestamp }
+          : undefined,
+      }
+    })
+    return HttpResponse.json({ agents: agentsWithLast })
   }),
 
   http.get('/api/agents/:agentId', async ({ params }) => {
     await delay(150)
-    const agent = agents.find((a) => a.id === params.agentId)
+    let agent = agents.find((a) => a.id === params.agentId)
+    // Auto-create self agent if requested
+    if (!agent && params.agentId === 'self') {
+      agent = {
+        id: 'self',
+        name: '自己',
+        description: '给自己发消息',
+        avatar: 'https://api.dicebear.com/9.x/notionists/svg?seed=self',
+        status: 'running' as const,
+        currentSessionId: 1,
+        resourceProfile: 'standard',
+        skills: [],
+        createdAt: new Date().toISOString(),
+      }
+      agents = [...agents, agent]
+    }
     if (!agent) return HttpResponse.json({ error: 'Not found' }, { status: 404 })
     return HttpResponse.json({ agent })
   }),

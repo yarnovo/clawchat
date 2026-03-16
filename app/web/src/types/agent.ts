@@ -9,5 +9,6 @@ export interface Agent {
   resourceProfile: string
   skills: string[]
   category?: string
+  lastMessage?: { content: string; timestamp: number }
   createdAt: string
 }
