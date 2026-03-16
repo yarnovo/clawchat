@@ -1,4 +1,6 @@
 screenshots/
+tts/
+.DS_Store
 .env
 .playwright-mcp/
 backups/
