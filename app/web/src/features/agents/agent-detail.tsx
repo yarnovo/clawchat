@@ -129,6 +129,7 @@ export function AgentDetail({ agent, onBack }: AgentDetailProps) {
             </span>
           </div>
 
+          {agent.skills?.length > 0 && (
           <div className="flex items-start">
             <span className="w-16 shrink-0 text-sm text-muted-foreground pt-0.5">
               技能
@@ -144,7 +145,9 @@ export function AgentDetail({ agent, onBack }: AgentDetailProps) {
               ))}
             </div>
           </div>
+          )}
 
+          {agent.resourceProfile && (
           <div className="flex items-center">
             <span className="w-16 shrink-0 text-sm text-muted-foreground">
               配置
@@ -153,6 +156,7 @@ export function AgentDetail({ agent, onBack }: AgentDetailProps) {
               {agent.resourceProfile}
             </span>
           </div>
+          )}
         </div>
 
         {/* Divider */}

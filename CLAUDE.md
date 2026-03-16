@@ -74,25 +74,25 @@ React SPA (Vite :5173) ── /api proxy ──→ server (Hono :3000) ── Po
 
 ## 文档导航
 
-产品设计文档位于 `docs/`（注意：部分文档可能与实际实现有偏差，以代码为准）：
+产品设计文档位于 `docs/`。标注 ✅ 的与当前实现一致，⚠️ 为历史设计文档（仅供参考，以代码为准）：
 
-| 文件 | 内容 |
-|------|------|
-| 01-product-overview.md | 产品概述、愿景 |
-| 02-account-system.md | 账号体系设计 |
-| 03-feature-design.md | 功能设计 |
-| 04-architecture.md | 系统架构 |
-| 05-database-schema.md | 数据库表设计 |
-| 06-relay-protocol.md | Relay WebSocket 协议 |
-| 07-rest-api.md | REST API 规范 |
-| 08-offline-sync.md | 离线同步 |
-| 09-infrastructure.md | 基础设施与部署 |
-| 10-openclaw-plugin.md | OpenClaw Channel 插件 |
-| 11-agent-hosting.md | Agent 容器托管 |
-| 12-business-model.md | 商业模式 |
-| 13-launch-strategy.md | 上线策略 |
-| 14-blockchain.md | 区块链相关 |
-| 15-error-handling.md | 错误处理 |
+| 文件 | 内容 | 状态 |
+|------|------|------|
+| 01-product-overview.md | 产品概述、愿景 | ✅ |
+| 02-account-system.md | 账号体系设计 | ⚠️ 字段与当前 schema 有出入 |
+| 03-feature-design.md | 功能设计 | ✅ |
+| 04-architecture.md | 系统架构 | ✅ |
+| 05-database-schema.md | 数据库表设计 | ✅ |
+| 06-relay-protocol.md | 消息协议 | ✅ |
+| 07-rest-api.md | REST API 规范 | ✅ |
+| 08-offline-sync.md | 离线同步 | ⚠️ 历史设计 |
+| 09-infrastructure.md | 基础设施与部署 | ⚠️ 部分过时 |
+| 10-openclaw-plugin.md | OpenClaw Channel 插件 | ⚠️ 历史设计 |
+| 11-agent-hosting.md | Agent 容器托管 | ⚠️ 架构已简化 |
+| 12-business-model.md | 商业模式 | ✅ |
+| 13-launch-strategy.md | 上线策略 | ✅ |
+| 14-blockchain.md | 区块链相关 | ✅ |
+| 15-error-handling.md | 错误处理 | ⚠️ 历史设计 |
 
 项目路线图：`ROADMAP.md`
 

@@ -1,12 +1,17 @@
 import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
 import { AgentList } from "@/components/layout/agent-list"
 import { AgentDetail } from "@/features/agents/agent-detail"
-import { useAgentStore } from "@/stores/agent-store"
+import { listAgents } from "@/services/api-client"
 import { useMediaQuery } from "@/hooks/use-media-query"
 
 export default function AgentsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const agents = useAgentStore((s) => s.agents)
+  const { data } = useQuery({
+    queryKey: ["agents"],
+    queryFn: () => listAgents(),
+  })
+  const agents = data?.agents ?? []
   const selectedAgent = agents.find((a) => a.id === selectedId) ?? null
   const isDesktop = useMediaQuery("(min-width: 768px)")
 
