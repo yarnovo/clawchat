@@ -85,7 +85,6 @@ import { SvOverview, SV_OVERVIEW_FRAMES } from "./videos/sv-overview/SvOverview"
 import { SvAgents, SV_AGENTS_FRAMES } from "./videos/sv-agents/SvAgents";
 import { SvProxy, SV_PROXY_FRAMES } from "./videos/sv-proxy/SvProxy";
 import { SvMarket, SV_MARKET_FRAMES } from "./videos/sv-market/SvMarket";
-import { SvBilling, SV_BILLING_FRAMES } from "./videos/sv-billing/SvBilling";
 import { SvSkills, SV_SKILLS_FRAMES } from "./videos/sv-skills/SvSkills";
 import { SvOrchestrator, SV_ORCHESTRATOR_FRAMES } from "./videos/sv-orchestrator/SvOrchestrator";
 import { SvAuth, SV_AUTH_FRAMES } from "./videos/sv-auth/SvAuth";
@@ -105,6 +104,7 @@ import { WkCli, WK_CLI_FRAMES } from "./videos/wk-cli/WkCli";
 import { AkChScheduler, AK_CH_SCHEDULER_FRAMES } from "./videos/ak-ch-scheduler/AkChScheduler";
 import { AkExtMemory, AK_EXT_MEMORY_FRAMES } from "./videos/ak-ext-memory/AkExtMemory";
 import { AkChHttp, AK_CH_HTTP_FRAMES } from "./videos/ak-ch-http/AkChHttp";
+import { AkInject, AK_INJECT_FRAMES } from "./videos/ak-inject/AkInject";
 import { AkExtSkills, AK_EXT_SKILLS_FRAMES } from "./videos/ak-ext-skills/AkExtSkills";
 import { AkSessionSqlite, AK_SESSION_SQLITE_FRAMES } from "./videos/ak-session-sqlite/AkSessionSqlite";
 import { Hono2026, TOTAL_FRAMES as HONO2026_FRAMES } from "./videos/hono-2026/Hono2026";
@@ -702,6 +702,14 @@ export const RemotionRoot: React.FC = () => {
             width={1920}
             height={1080}
           />
+          <Composition
+            id="AkInject"
+            component={AkInject}
+            durationInFrames={AK_INJECT_FRAMES}
+            fps={30}
+            width={1920}
+            height={1080}
+          />
         </Folder>
       </Folder>
       <Folder name="Industry">
@@ -787,7 +795,6 @@ export const RemotionRoot: React.FC = () => {
         <Composition id="SvAgents" component={SvAgents} durationInFrames={SV_AGENTS_FRAMES} fps={30} width={1920} height={1080} />
         <Composition id="SvProxy" component={SvProxy} durationInFrames={SV_PROXY_FRAMES} fps={30} width={1920} height={1080} />
         <Composition id="SvMarket" component={SvMarket} durationInFrames={SV_MARKET_FRAMES} fps={30} width={1920} height={1080} />
-        <Composition id="SvBilling" component={SvBilling} durationInFrames={SV_BILLING_FRAMES} fps={30} width={1920} height={1080} />
         <Composition id="SvSkills" component={SvSkills} durationInFrames={SV_SKILLS_FRAMES} fps={30} width={1920} height={1080} />
         <Composition id="SvOrchestrator" component={SvOrchestrator} durationInFrames={SV_ORCHESTRATOR_FRAMES} fps={30} width={1920} height={1080} />
         <Composition id="SvAuth" component={SvAuth} durationInFrames={SV_AUTH_FRAMES} fps={30} width={1920} height={1080} />

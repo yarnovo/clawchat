@@ -6,4 +6,5 @@ export {
   InputArea,
   ChatHeader,
   EmptyState,
+  SessionDivider,
 } from './components'

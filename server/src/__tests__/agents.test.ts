@@ -63,6 +63,8 @@ function fakeAgent(overrides: Record<string, unknown> = {}) {
     channelUrl: null,
     containerName: null,
     config: {},
+    currentSessionId: 1,
+    resourceProfile: 'default',
     createdAt: new Date(),
     updatedAt: new Date(),
     deletedAt: null,

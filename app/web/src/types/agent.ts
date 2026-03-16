@@ -3,8 +3,10 @@ export interface Agent {
   name: string
   description: string
   avatar?: string
-  status: 'running' | 'stopped' | 'starting' | 'error'
-  channelUrl: string
+  status: 'created' | 'starting' | 'running' | 'stopped' | 'error'
+  channelUrl?: string
+  currentSessionId: number
+  resourceProfile: string
   skills: string[]
-  createdAt: number
+  createdAt: string
 }

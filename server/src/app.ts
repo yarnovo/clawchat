@@ -1,5 +1,5 @@
 /**
- * AgentKit Server — 容器编排 + 市场
+ * AgentKit Server — 容器编排
  * 管资源，不管对话
  */
 import { Hono } from 'hono';
@@ -7,9 +7,7 @@ import { serve } from '@hono/node-server';
 import { cors } from 'hono/cors';
 import { authMiddleware, type AuthEnv } from './middleware/auth.js';
 import { agentsRoutes } from './routes/agents.js';
-import { proxyRoutes } from './routes/proxy.js';
-import { marketRoutes } from './routes/market.js';
-import { billingRoutes } from './routes/billing.js';
+import { messagesRoutes } from './routes/messages.js';
 import { skillsRoutes } from './routes/skills.js';
 
 const app = new Hono<AuthEnv>();
@@ -25,9 +23,7 @@ app.use('*', authMiddleware());
 
 // ---------- Routes ----------
 app.route('/api/agents', agentsRoutes);
-app.route('/api/proxy', proxyRoutes);
-app.route('/api/market', marketRoutes);
-app.route('/api/billing', billingRoutes);
+app.route('/api/agents', messagesRoutes);  // :agentId/messages, :agentId/sessions, :agentId/info
 app.route('/api/skills', skillsRoutes);
 
 // ---------- Start ----------

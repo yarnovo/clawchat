@@ -15,6 +15,7 @@ const createAgentSchema = z.object({
   description: z.string().max(1000).optional(),
   persona: z.string().max(5000).optional(),
   skills: z.array(z.string()).optional(),
+  resourceProfile: z.string().max(100).optional(),
 });
 
 // ---------- Routes ----------
@@ -38,7 +39,7 @@ app.post('/', async (c) => {
     return c.json({ error: 'Validation failed', details: parsed.error.flatten() }, 400);
   }
 
-  const { name, description, persona, skills: skillList } = parsed.data;
+  const { name, description, persona, skills: skillList, resourceProfile } = parsed.data;
 
   const [agent] = await db
     .insert(agents)
@@ -47,6 +48,7 @@ app.post('/', async (c) => {
       name,
       description: description ?? '',
       config: { persona: persona ?? '', skills: skillList ?? [] },
+      resourceProfile: resourceProfile ?? 'default',
     })
     .returning();
 

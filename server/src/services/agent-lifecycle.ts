@@ -20,10 +20,12 @@ const orchestrator = createOrchestrator();
 
 const DEFAULT_IMAGE = process.env.AGENTKIT_IMAGE || 'agentkit-base:latest';
 const DEFAULT_NETWORK = process.env.CONTAINER_NETWORK || 'clawchat-net';
-const DEFAULT_MEMORY_MB = 512;
-const DEFAULT_CPUS = 0.5;
-const DEFAULT_PIDS_LIMIT = 256;
 const HEALTH_TIMEOUT_MS = 60_000;
+
+const PROFILES: Record<string, { memoryMB: number; cpus: number; pidsLimit: number }> = {
+  default: { memoryMB: 512, cpus: 0.5, pidsLimit: 256 },
+  large: { memoryMB: 1024, cpus: 1.0, pidsLimit: 512 },
+};
 
 // ── Start ──
 
@@ -60,7 +62,9 @@ export async function startAgent(agentId: string): Promise<{ channelUrl: string 
     if (config.llmBaseUrl) env.LLM_BASE_URL = String(config.llmBaseUrl);
     if (config.llmModel) env.LLM_MODEL = String(config.llmModel);
 
-    // 启动容器
+    // 启动容器（根据 resourceProfile 选择资源配置）
+    const profile = PROFILES[agent.resourceProfile ?? 'default'] ?? PROFILES.default;
+
     const containerInfo = await orchestrator.run({
       name: containerName,
       image: agent.imageTag || DEFAULT_IMAGE,
@@ -68,9 +72,9 @@ export async function startAgent(agentId: string): Promise<{ channelUrl: string 
       volumes: [{ host: wsPath, container: '/workspace' }],
       network: DEFAULT_NETWORK,
       resources: {
-        memoryMB: DEFAULT_MEMORY_MB,
-        cpus: DEFAULT_CPUS,
-        pidsLimit: DEFAULT_PIDS_LIMIT,
+        memoryMB: profile.memoryMB,
+        cpus: profile.cpus,
+        pidsLimit: profile.pidsLimit,
       },
     });
 

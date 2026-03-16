@@ -46,6 +46,7 @@ export class Agent {
   private onBeforeBash?: AgentOptions['onBeforeBash'];
   private onAfterBash?: AgentOptions['onAfterBash'];
   private onText?: AgentOptions['onText'];
+  private inbox: ChatMessage[] = [];
 
   constructor(options: AgentOptions) {
     this.llm = options.llm;
@@ -57,12 +58,29 @@ export class Agent {
     this.onText = options.onText;
   }
 
+  /**
+   * 在工具调用循环中注入用户消息。
+   * 消息会在下一轮 LLM 调用前被排入 session。
+   * JS 单线程保证 inject() 在 await 间隙执行，无竞态。
+   */
+  inject(content: string): void {
+    this.inbox.push({ role: 'user', content });
+  }
+
+  /** 排空 inbox → session */
+  private drainInbox(): void {
+    while (this.inbox.length > 0) {
+      this.session.addMessage(this.inbox.shift()!);
+    }
+  }
+
   async run(userMessage: string): Promise<string> {
     this.session.addMessage({ role: 'user', content: userMessage });
     let round = 0;
 
     while (round < this.maxRounds) {
       round++;
+      this.drainInbox();
       const messages: ChatMessage[] = [
         { role: 'system', content: this.systemPrompt },
         ...this.session.getMessages(),

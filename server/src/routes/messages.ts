@@ -24,8 +24,8 @@ async function getRunningAgent(agentId: string, userId: string) {
   return { agent };
 }
 
-/** Forward chat message to agent's channel */
-app.post('/:agentId/chat', async (c) => {
+/** Send message to agent container (pure proxy, no DB persistence) */
+app.post('/:agentId/messages', async (c) => {
   const userId = c.get('userId');
   const agentId = c.req.param('agentId');
   const result = await getRunningAgent(agentId, userId);
@@ -45,8 +45,8 @@ app.post('/:agentId/chat', async (c) => {
   return c.json(data, upstream.status as any);
 });
 
-/** SSE proxy — pipe agent's event stream to client */
-app.get('/:agentId/events', async (c) => {
+/** SSE stream proxy — pipe agent's event stream to client */
+app.get('/:agentId/messages/stream', async (c) => {
   const userId = c.get('userId');
   const agentId = c.req.param('agentId');
   const result = await getRunningAgent(agentId, userId);
@@ -74,23 +74,44 @@ app.get('/:agentId/events', async (c) => {
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
-        // Keep the last potentially incomplete line in the buffer
         buffer = lines.pop() ?? '';
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             await stream.writeSSE({ data: line.slice(6) });
-          } else if (line.startsWith('event: ')) {
-            // Events are handled inline with data
           }
         }
       }
-    } catch (err) {
-      // Stream closed or upstream error — just let it end
+    } catch {
+      // Stream closed or upstream error
     } finally {
       reader.releaseLock();
     }
   });
+});
+
+/** Start new session — increment currentSessionId */
+app.post('/:agentId/sessions/new', async (c) => {
+  const userId = c.get('userId');
+  const agentId = c.req.param('agentId');
+
+  const [agent] = await db
+    .select()
+    .from(agents)
+    .where(and(eq(agents.id, agentId), eq(agents.ownerId, userId), isNull(agents.deletedAt)));
+
+  if (!agent) {
+    return c.json({ error: 'Agent not found' }, 404);
+  }
+
+  const newSessionId = (agent.currentSessionId ?? 1) + 1;
+
+  await db
+    .update(agents)
+    .set({ currentSessionId: newSessionId, updatedAt: new Date() })
+    .where(eq(agents.id, agentId));
+
+  return c.json({ sessionId: newSessionId });
 });
 
 /** Forward info request to agent's channel */
@@ -108,4 +129,4 @@ app.get('/:agentId/info', async (c) => {
   return c.json(data, upstream.status as any);
 });
 
-export { app as proxyRoutes };
+export { app as messagesRoutes };

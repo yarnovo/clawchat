@@ -1,0 +1,17 @@
+[
+  {
+    "id": "akinj-intro",
+    "startMs": 95,
+    "endMs": 12977
+  },
+  {
+    "id": "akinj-design",
+    "startMs": 13500,
+    "endMs": 29204
+  },
+  {
+    "id": "akinj-summary",
+    "startMs": 29715,
+    "endMs": 45420
+  }
+]

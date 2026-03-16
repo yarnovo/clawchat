@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowDown } from 'lucide-react'
 import { MessageBubble } from './message-bubble'
+import { SessionDivider } from './session-divider'
 import { cn } from '@/lib/utils'
 import type { Message } from '@/types'
 
@@ -55,13 +56,20 @@ export function MessageList({ messages, onRetry }: MessageListProps) {
         className="h-full overflow-y-auto px-4 py-4 sm:px-6"
       >
         <div className="mx-auto flex max-w-3xl flex-col gap-4">
-          {messages.map((message) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              onRetry={onRetry}
-            />
-          ))}
+          {messages.map((message, index) => {
+            const prev = messages[index - 1]
+            const showDivider = prev && prev.sessionId !== message.sessionId
+
+            return (
+              <div key={message.id}>
+                {showDivider && <SessionDivider />}
+                <MessageBubble
+                  message={message}
+                  onRetry={onRetry}
+                />
+              </div>
+            )
+          })}
           <div ref={bottomRef} />
         </div>
       </div>

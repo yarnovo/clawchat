@@ -1,4 +1,7 @@
+import { RotateCcw } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 
 type ConnectionStatus = 'connected' | 'connecting' | 'disconnected'
@@ -7,15 +10,16 @@ interface ChatHeaderProps {
   name: string
   avatar?: string
   status: ConnectionStatus
+  onNewSession?: () => void
 }
 
 const statusConfig: Record<ConnectionStatus, { color: string; label: string }> = {
-  connected: { color: 'bg-emerald-500', label: 'Connected' },
-  connecting: { color: 'bg-amber-500', label: 'Connecting...' },
-  disconnected: { color: 'bg-red-500', label: 'Disconnected' },
+  connected: { color: 'bg-emerald-500', label: 'Running' },
+  connecting: { color: 'bg-amber-500', label: 'Starting...' },
+  disconnected: { color: 'bg-red-500', label: 'Stopped' },
 }
 
-export function ChatHeader({ name, avatar, status }: ChatHeaderProps) {
+export function ChatHeader({ name, avatar, status, onNewSession }: ChatHeaderProps) {
   const { color, label } = statusConfig[status]
 
   return (
@@ -39,6 +43,19 @@ export function ChatHeader({ name, avatar, status }: ChatHeaderProps) {
           <span className="text-[11px] text-muted-foreground">{label}</span>
         </div>
       </div>
+
+      {onNewSession && (
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button variant="ghost" size="icon-sm" onClick={onNewSession}>
+                <RotateCcw className="size-4" />
+              </Button>
+            }
+          />
+          <TooltipContent>New Session</TooltipContent>
+        </Tooltip>
+      )}
     </header>
   )
 }

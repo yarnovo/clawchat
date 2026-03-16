@@ -1,4 +1,0 @@
-[
-  {"id":"svb-intro","text":"Billing路由追踪Agent的使用量。每次聊天、每次技能安装都记录一条用量事件，按用户和Agent分组统计。"},
-  {"id":"svb-usage","text":"用量记录存在usage_records表，字段包括用户ID、Agent ID、类型和数量。查询接口按月汇总，支持日期范围过滤。MVP阶段只做追踪，不接支付。"}
-]

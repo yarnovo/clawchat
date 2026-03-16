@@ -23,16 +23,16 @@ export function AppShell({ children }: AppShellProps) {
     setSheetOpen(false)
   }
 
-  const handleConversationSelect = (id: string) => {
-    navigate({ to: "/chat/$conversationId", params: { conversationId: id } })
+  const handleAgentSelect = (agentId: string) => {
+    navigate({ to: "/chat/$agentId", params: { agentId } })
     setSheetOpen(false)
   }
 
-  // Determine active conversation from route
-  const chatMatch = matchRoute({ to: "/chat/$conversationId", fuzzy: true })
-  const activeConversationId =
-    chatMatch && typeof chatMatch === "object" && "conversationId" in chatMatch
-      ? (chatMatch as { conversationId: string }).conversationId
+  // Determine active agent from route
+  const chatMatch = matchRoute({ to: "/chat/$agentId", fuzzy: true })
+  const activeAgentId =
+    chatMatch && typeof chatMatch === "object" && "agentId" in chatMatch
+      ? (chatMatch as { agentId: string }).agentId
       : undefined
 
   if (isDesktop) {
@@ -40,9 +40,9 @@ export function AppShell({ children }: AppShellProps) {
       <div className="flex h-screen bg-background">
         {sidebarOpen && (
           <Sidebar
-            activeConversationId={activeConversationId}
+            activeAgentId={activeAgentId}
             onNavigate={handleNavigate}
-            onConversationSelect={handleConversationSelect}
+            onAgentSelect={handleAgentSelect}
           />
         )}
         <main className="flex-1 flex flex-col overflow-hidden border-l border-border">
@@ -60,9 +60,9 @@ export function AppShell({ children }: AppShellProps) {
         <SheetContent side="left" showCloseButton={false} className="w-72 p-0">
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           <Sidebar
-            activeConversationId={activeConversationId}
+            activeAgentId={activeAgentId}
             onNavigate={handleNavigate}
-            onConversationSelect={handleConversationSelect}
+            onAgentSelect={handleAgentSelect}
           />
         </SheetContent>
       </Sheet>

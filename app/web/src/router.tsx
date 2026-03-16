@@ -54,10 +54,10 @@ const chatRoute = createRoute({
   component: lazyRouteComponent(() => import('./pages/chat')),
 })
 
-const conversationRoute = createRoute({
+const agentChatRoute = createRoute({
   getParentRoute: () => chatRoute,
-  path: '/$conversationId',
-  component: lazyRouteComponent(() => import('./pages/chat/conversation')),
+  path: '/$agentId',
+  component: lazyRouteComponent(() => import('./pages/chat/agent')),
 })
 
 // Agents route (lazy)
@@ -77,7 +77,7 @@ const settingsRoute = createRoute({
 // Build route tree
 const routeTree = rootRoute.addChildren([
   indexRoute,
-  chatRoute.addChildren([conversationRoute]),
+  chatRoute.addChildren([agentChatRoute]),
   agentsRoute,
   settingsRoute,
 ])

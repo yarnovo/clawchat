@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
 import { connectSSE } from '@/services/sse-client'
-import { useChatStore } from '@/stores/chat-store'
+import { useAgentStore } from '@/stores/agent-store'
 import type { SSEEvent } from '@/types'
 
 type SSEStatus = 'connecting' | 'connected' | 'disconnected'
@@ -14,9 +14,10 @@ export function useSSE(url: string | null) {
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const connectionRef = useRef<{ close: () => void } | null>(null)
 
-  const addMessage = useChatStore((s) => s.addMessage)
-  const setTyping = useChatStore((s) => s.setTyping)
-  const activeConversationId = useChatStore((s) => s.activeConversationId)
+  const addMessage = useAgentStore((s) => s.addMessage)
+  const setTyping = useAgentStore((s) => s.setTyping)
+  const activeAgentId = useAgentStore((s) => s.activeAgentId)
+  const currentSessionId = useAgentStore((s) => s.currentSessionId)
 
   const connect = useCallback(() => {
     if (!url) return
@@ -37,10 +38,11 @@ export function useSSE(url: string | null) {
             break
           case 'assistant':
             setTyping(false)
-            if (activeConversationId) {
-              addMessage(activeConversationId, {
+            if (activeAgentId) {
+              addMessage({
                 id: crypto.randomUUID(),
-                conversationId: activeConversationId,
+                agentId: activeAgentId,
+                sessionId: currentSessionId,
                 role: 'assistant',
                 content: event.content,
                 status: 'complete',
@@ -59,7 +61,7 @@ export function useSSE(url: string | null) {
     )
 
     connectionRef.current = conn
-  }, [url, activeConversationId, addMessage, setTyping])
+  }, [url, activeAgentId, currentSessionId, addMessage, setTyping])
 
   const scheduleReconnect = useCallback(() => {
     clearTimeout(reconnectTimerRef.current)

@@ -74,7 +74,9 @@
     "tts:fe-sse": "npx tsx scripts/generate-tts.ts fe-sse --force",
     "render:fe-sse": "remotion render FeSse out/fe-sse.mp4",
     "tts:wk-fe-sse": "npx tsx scripts/generate-tts.ts wk-fe-sse --force",
-    "render:wk-fe-sse": "remotion render WkFeSse out/wk-fe-sse.mp4"
+    "render:wk-fe-sse": "remotion render WkFeSse out/wk-fe-sse.mp4",
+    "tts:ak-inject": "npx tsx scripts/generate-tts.ts ak-inject --force",
+    "render:ak-inject": "remotion render AkInject out/ak-inject.mp4"
   },
   "keywords": [],
   "author": "",

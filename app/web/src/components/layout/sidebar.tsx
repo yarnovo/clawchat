@@ -1,3 +1,4 @@
+import { useEffect } from "react"
 import {
   MessageSquarePlus,
   Search,
@@ -9,76 +10,46 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
-
-// Dummy conversation data — will be replaced by store data
-const DUMMY_CONVERSATIONS = [
-  {
-    id: "1",
-    title: "Code Assistant",
-    lastMessage: "Sure, I can help you refactor that function...",
-    timestamp: "2m ago",
-    avatarUrl: "",
-    isAgent: true,
-    unread: 2,
-  },
-  {
-    id: "2",
-    title: "Alice",
-    lastMessage: "See you tomorrow!",
-    timestamp: "1h ago",
-    avatarUrl: "",
-    isAgent: false,
-    unread: 0,
-  },
-  {
-    id: "3",
-    title: "Translation Bot",
-    lastMessage: "The French translation is: Bonjour le monde",
-    timestamp: "3h ago",
-    avatarUrl: "",
-    isAgent: true,
-    unread: 0,
-  },
-  {
-    id: "4",
-    title: "Bob",
-    lastMessage: "Did you check the deployment?",
-    timestamp: "Yesterday",
-    avatarUrl: "",
-    isAgent: false,
-    unread: 0,
-  },
-  {
-    id: "5",
-    title: "Writing Helper",
-    lastMessage: "Here's a revised version of your paragraph...",
-    timestamp: "Yesterday",
-    avatarUrl: "",
-    isAgent: true,
-    unread: 1,
-  },
-]
+import { useAgentStore } from "@/stores/agent-store"
+import { listAgents } from "@/services/api-client"
 
 interface SidebarProps {
   className?: string
-  activeConversationId?: string
-  onConversationSelect?: (id: string) => void
+  activeAgentId?: string
+  onAgentSelect?: (agentId: string) => void
   onNavigate?: (page: "agents" | "settings") => void
+}
+
+const statusColors: Record<string, string> = {
+  running: "bg-emerald-500",
+  starting: "bg-amber-500",
+  stopped: "bg-gray-400",
+  error: "bg-red-500",
+  created: "bg-gray-400",
 }
 
 export function Sidebar({
   className,
-  activeConversationId = "1",
-  onConversationSelect,
+  activeAgentId,
+  onAgentSelect,
   onNavigate,
 }: SidebarProps) {
+  const agents = useAgentStore((s) => s.agents)
+  const setAgents = useAgentStore((s) => s.setAgents)
+
+  useEffect(() => {
+    listAgents()
+      .then((data) => setAgents(data.agents))
+      .catch(() => {})
+  }, [setAgents])
+
   return (
     <div
       className={cn(
@@ -97,12 +68,16 @@ export function Sidebar({
         <Tooltip>
           <TooltipTrigger
             render={
-              <Button variant="ghost" size="icon-sm">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => onNavigate?.("agents")}
+              >
                 <MessageSquarePlus className="size-4" />
               </Button>
             }
           />
-          <TooltipContent side="bottom">New Chat</TooltipContent>
+          <TooltipContent side="bottom">New Agent</TooltipContent>
         </Tooltip>
       </div>
 
@@ -111,7 +86,7 @@ export function Sidebar({
         <div className="relative">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search conversations..."
+            placeholder="Search agents..."
             className="h-8 pl-8 text-xs"
           />
         </div>
@@ -119,50 +94,51 @@ export function Sidebar({
 
       <Separator />
 
-      {/* Conversation list */}
+      {/* Agent list */}
       <ScrollArea className="flex-1">
         <div className="flex flex-col gap-0.5 p-2">
-          {DUMMY_CONVERSATIONS.map((conv) => (
-            <button
-              key={conv.id}
-              onClick={() => onConversationSelect?.(conv.id)}
-              className={cn(
-                "flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
-                "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                activeConversationId === conv.id &&
-                  "bg-sidebar-accent text-sidebar-accent-foreground"
-              )}
-            >
-              <Avatar size="default">
-                {conv.avatarUrl && <AvatarImage src={conv.avatarUrl} />}
-                <AvatarFallback>
-                  {conv.isAgent ? (
-                    <Bot className="size-4" />
-                  ) : (
-                    conv.title[0]
-                  )}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 overflow-hidden">
-                <div className="flex items-center justify-between">
-                  <span className="truncate text-sm font-medium">
-                    {conv.title}
-                  </span>
-                  <span className="shrink-0 text-[10px] text-muted-foreground">
-                    {conv.timestamp}
-                  </span>
+          {agents.length === 0 ? (
+            <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+              No agents yet
+            </p>
+          ) : (
+            agents.map((agent) => (
+              <button
+                key={agent.id}
+                onClick={() => onAgentSelect?.(agent.id)}
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left transition-colors",
+                  "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  activeAgentId === agent.id &&
+                    "bg-sidebar-accent text-sidebar-accent-foreground"
+                )}
+              >
+                <div className="relative">
+                  <Avatar size="default">
+                    <AvatarFallback>
+                      <Bot className="size-4" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <span
+                    className={cn(
+                      "absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-sidebar",
+                      statusColors[agent.status] ?? "bg-gray-400"
+                    )}
+                  />
                 </div>
-                <p className="truncate text-xs text-muted-foreground mt-0.5">
-                  {conv.lastMessage}
-                </p>
-              </div>
-              {conv.unread > 0 && (
-                <span className="mt-1 flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
-                  {conv.unread}
-                </span>
-              )}
-            </button>
-          ))}
+                <div className="flex-1 overflow-hidden">
+                  <span className="truncate text-sm font-medium block">
+                    {agent.name}
+                  </span>
+                  {agent.description && (
+                    <p className="truncate text-xs text-muted-foreground mt-0.5">
+                      {agent.description}
+                    </p>
+                  )}
+                </div>
+              </button>
+            ))
+          )}
         </div>
       </ScrollArea>
 
@@ -183,7 +159,7 @@ export function Sidebar({
                 </Button>
               }
             />
-            <TooltipContent>Agent Marketplace</TooltipContent>
+            <TooltipContent>Manage Agents</TooltipContent>
           </Tooltip>
           <Tooltip>
             <TooltipTrigger

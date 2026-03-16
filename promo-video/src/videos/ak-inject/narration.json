@@ -1,0 +1,5 @@
+[
+  {"id": "akinj-intro", "text": "Agent在工具调用循环中跑着，用户又发了新消息怎么办？之前的run方法是封闭的，消息进不去。现在加了inject方法，外部随时往inbox队列塞消息。"},
+  {"id": "akinj-design", "text": "关键在时序。每轮循环开头调用drainInbox，把inbox里的消息排入session。这时候上一轮的tool results已经全部写完，消息顺序完全合法。LLM下一次调用就能看到用户的新指令。"},
+  {"id": "akinj-summary", "text": "用法很简单。agent.run启动循环，WebSocket收到用户新消息时调用agent.inject。JS单线程保证inject只在await间隙执行，天然无竞态。像Claude Code一样，边跑边听。"}
+]

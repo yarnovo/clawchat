@@ -1,10 +1,12 @@
 import { AbsoluteFill, Audio, interpolate, Sequence, staticFile, useCurrentFrame } from "remotion";
-import { SceneSvbIntro } from "./SceneSvbIntro";
-import { SceneSvbUsage } from "./SceneSvbUsage";
+import { SceneAkinjIntro } from "./SceneAkinjIntro";
+import { SceneAkinjDesign } from "./SceneAkinjDesign";
+import { SceneAkinjSummary } from "./SceneAkinjSummary";
 import { Subtitle } from "../../Subtitle";
 
-import svbIntroWords from "./words/svb-intro-words.json";
-import svbUsageWords from "./words/svb-usage-words.json";
+import akinjIntroWords from "./words/akinj-intro-words.json";
+import akinjDesignWords from "./words/akinj-design-words.json";
+import akinjSummaryWords from "./words/akinj-summary-words.json";
 import timingData from "./timing.json";
 
 const FPS = 30;
@@ -12,13 +14,12 @@ const FADE = 15;
 const INTRO_PAD = 10;
 const OUTRO_PAD = 30;
 
-const SCENE_COMPS = [SceneSvbIntro, SceneSvbUsage];
-const SCENE_WORDS = [svbIntroWords, svbUsageWords];
+const SCENE_COMPS = [SceneAkinjIntro, SceneAkinjDesign, SceneAkinjSummary];
+const SCENE_WORDS = [akinjIntroWords, akinjDesignWords, akinjSummaryWords];
 
 const scenes = timingData.map((t, i) => {
   const startFrame = Math.max(0, Math.round((t.startMs / 1000) * FPS) - INTRO_PAD);
   const isLast = i === timingData.length - 1;
-
   let endFrame: number;
   if (isLast) {
     endFrame = Math.round((t.endMs / 1000) * FPS) + OUTRO_PAD;
@@ -26,42 +27,25 @@ const scenes = timingData.map((t, i) => {
     const nextStart = Math.round((timingData[i + 1].startMs / 1000) * FPS) - INTRO_PAD;
     endFrame = nextStart;
   }
-
-  return {
-    from: startFrame,
-    dur: endFrame - startFrame,
-    words: SCENE_WORDS[i],
-    Comp: SCENE_COMPS[i],
-    startMs: t.startMs,
-  };
+  return { from: startFrame, dur: endFrame - startFrame, words: SCENE_WORDS[i], Comp: SCENE_COMPS[i], startMs: t.startMs };
 });
 
-export const SV_BILLING_FRAMES = scenes[scenes.length - 1].from + scenes[scenes.length - 1].dur;
+export const AK_INJECT_FRAMES = scenes[scenes.length - 1].from + scenes[scenes.length - 1].dur;
 
-const Scene: React.FC<{ children: React.ReactNode; dur: number; isLast?: boolean }> = ({
-  children,
-  dur,
-  isLast,
-}) => {
+const Scene: React.FC<{ children: React.ReactNode; dur: number; isLast?: boolean }> = ({ children, dur, isLast }) => {
   const frame = useCurrentFrame();
-  const opacity = isLast
-    ? 1
-    : interpolate(frame, [dur - FADE, dur], [1, 0], {
-        extrapolateLeft: "clamp",
-        extrapolateRight: "clamp",
-      });
+  const opacity = isLast ? 1 : interpolate(frame, [dur - FADE, dur], [1, 0], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   return <AbsoluteFill style={{ opacity }}>{children}</AbsoluteFill>;
 };
 
-export const SvBilling: React.FC = () => {
+export const AkInject: React.FC = () => {
   return (
     <AbsoluteFill style={{ backgroundColor: "#FAF9F6" }}>
-      <Audio src={staticFile("audio/sv-billing/sv-billing.mp3")} volume={0.9} />
+      <Audio src={staticFile("audio/ak-inject/ak-inject.mp3")} volume={0.9} />
       {scenes.map((s, i) => {
         const isLast = i === scenes.length - 1;
         const seqDur = isLast ? s.dur : s.dur + FADE;
         const sceneStartMs = (s.from / FPS) * 1000;
-
         return (
           <Sequence key={i} from={s.from} durationInFrames={seqDur}>
             <Scene dur={seqDur} isLast={isLast}>

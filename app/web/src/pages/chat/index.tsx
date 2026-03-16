@@ -2,9 +2,9 @@ import { Outlet, useMatches } from '@tanstack/react-router'
 import { MessageSquare } from 'lucide-react'
 
 export default function ChatPage() {
-  // Check if any child route is active (e.g., /chat/$conversationId)
+  // Check if any child route is active (e.g., /chat/$agentId)
   const matches = useMatches()
-  const hasChildRoute = matches.some((m) => m.routeId === '/chat/$conversationId')
+  const hasChildRoute = matches.some((m) => m.routeId === '/chat/$agentId')
 
   return (
     <>
@@ -17,7 +17,7 @@ export default function ChatPage() {
             <h2 className="text-lg font-medium text-foreground">
               Welcome to ClawChat
             </h2>
-            <p className="text-sm">Select a conversation to start chatting</p>
+            <p className="text-sm">Select an agent to start chatting</p>
           </div>
         </div>
       )}
