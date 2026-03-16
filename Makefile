@@ -5,13 +5,15 @@ VERSION := $(shell cat VERSION)
 
 dev:
 	docker compose up -d --build
-	cd promo-video && npx remotion studio --port 3200 &
-	@echo "Server: http://localhost:3000"
-	@echo "Remotion: http://localhost:3200"
+	cd app && pnpm dev &
+	@echo ""
+	@echo "  Server:   http://localhost:3000 (Docker)"
+	@echo "  Frontend: http://localhost:5173 (Vite)"
+	@echo ""
 
 dev-stop:
 	docker compose down
-	-pkill -f "remotion studio" 2>/dev/null
+	-pkill -f "vite" 2>/dev/null
 	@echo "Stopped"
 
 logs:
