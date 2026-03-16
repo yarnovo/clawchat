@@ -1,5 +1,5 @@
 /**
- * AgentRunner — 管理两个 Loop，集成 Channel + Extension
+ * AgentRunner — 组装 Agent + EventLoop + Channel + Extension
  *
  * Provider（构造注入）: LLM, Session
  * Channel（.use()）: 外部世界 ↔ EventLoop
@@ -9,7 +9,6 @@ import path from 'path';
 import { Agent } from '@agentkit/core';
 import type { LLMProvider, ChatSession } from '@agentkit/core';
 import { EventLoop } from '@agentkit/event-loop';
-import type { AgentEvent, QueueStrategy } from '@agentkit/event-loop';
 import type { Channel, Extension, AgenticContext } from './interfaces.js';
 
 export interface AgentRunnerOptions {
@@ -18,9 +17,6 @@ export interface AgentRunnerOptions {
   llm: LLMProvider;
   /** Provider: Session（默认 InMemorySession） */
   session?: ChatSession;
-  /** EventLoop 策略 */
-  strategy?: QueueStrategy;
-  batchWindow?: number;
 }
 
 function isExtension(x: Channel | Extension): x is Extension {
@@ -38,10 +34,7 @@ export class AgentRunner {
   constructor(opts: AgentRunnerOptions) {
     this.workspace = path.resolve(opts.workspace);
     this.opts = opts;
-    this.loop = new EventLoop({
-      strategy: opts.strategy || 'sequential',
-      batchWindow: opts.batchWindow,
-    });
+    this.loop = new EventLoop();
   }
 
   use(plugin: Channel | Extension): this {
@@ -84,27 +77,15 @@ export class AgentRunner {
       },
     });
 
-    // 4. 桥接：EventLoop → Agent
-    this.loop.onProcess(async (events: AgentEvent[]) => {
-      const parts = events.map(e => {
-        if (e.type === 'message') return e.payload.text as string;
-        if (e.type === 'timer') return `[定时任务: ${e.payload.taskName}] ${e.payload.prompt}`;
-        return `[${e.type}:${e.source}] ${JSON.stringify(e.payload)}`;
-      });
-      return this.agent.run(parts.join('\n'));
-    });
-
-    // 5. 启动
-    this.loop.start();
+    // 4. 桥接：EventLoop ↔ Agent
+    this.loop.bind(this.agent);
 
     console.log(`🚀 ${path.basename(abs)} started`);
     console.log(`   Extensions: ${this.extensions.map(e => e.name).join(', ') || 'none'}`);
-    console.log(`   Channels: ${this.channels.map(c => c.name).join(', ') || 'none'}`);
-    console.log(`   Strategy: ${this.opts.strategy || 'sequential'}\n`);
+    console.log(`   Channels: ${this.channels.map(c => c.name).join(', ') || 'none'}\n`);
   }
 
   async stop(): Promise<void> {
-    this.loop.stop();
     for (const ch of [...this.channels].reverse()) await ch.teardown?.();
     for (const ext of [...this.extensions].reverse()) await ext.teardown?.();
   }
@@ -118,7 +99,7 @@ export class AgentRunner {
       workspace: path.basename(this.workspace),
       extensions: this.extensions.map(e => e.name),
       channels: this.channels.map(c => c.name),
-      queue: { pending: this.loop.pending, processing: this.loop.isProcessing },
+      processing: this.loop.isProcessing,
     };
     for (const p of [...this.extensions, ...this.channels]) {
       const i = p.info?.();

@@ -5,4 +5,4 @@ export type { Channel, Extension, AgenticContext, HookResult } from './interface
 export { AgentRunner, type AgentRunnerOptions } from './runner.js';
 
 // re-export event-loop
-export { EventLoop, createEvent, type AgentEvent, type QueueStrategy, type EventLoopOptions } from '@agentkit/event-loop';
+export { EventLoop, createEvent, formatEvent, type AgentEvent, type Runnable } from '@agentkit/event-loop';

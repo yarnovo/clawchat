@@ -6,7 +6,6 @@ import { fileURLToPath } from 'url';
 import readline from 'readline';
 // core 不暴露 Tool 接口，bash 内置在 Agent 里
 import { AgentRunner } from '@agentkit/agentic';
-import type { QueueStrategy } from '@agentkit/agentic';
 import { OpenAIProvider } from '@agentkit/provider-llm-openai';
 import { SQLiteSession } from '@agentkit/provider-session-sqlite';
 import { skillsExtension } from '@agentkit/extension-skills';
@@ -165,8 +164,6 @@ program
   .command('serve <workspace>')
   .description('Start agent with all plugins')
   .option('-p, --port <port>', 'HTTP port', '4000')
-  .option('--strategy <strategy>', 'Queue strategy', 'sequential')
-  .option('--batch-window <ms>', 'Batch debounce window', '1500')
   .action(async (workspace, opts) => {
     const abs = resolveWorkspace(workspace);
 
@@ -174,8 +171,6 @@ program
       workspace: abs,
       llm: createLLM(),
       session: new SQLiteSession(path.join(abs, '.agent-session.db')),
-      strategy: opts.strategy as QueueStrategy,
-      batchWindow: parseInt(opts.batchWindow),
     })
       .use(skillsExtension({ builtinDir: BUILTIN_SKILLS_DIR }))
       .use(memoryExtension())

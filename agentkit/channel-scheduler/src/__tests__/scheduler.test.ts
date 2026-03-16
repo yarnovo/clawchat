@@ -25,12 +25,7 @@ function mockEventLoop(): EventLoop {
   return {
     push: vi.fn().mockResolvedValue(''),
     fire: vi.fn(),
-    on: vi.fn(),
-    emit: vi.fn(),
-    onProcess: vi.fn(),
-    start: vi.fn(),
-    stop: vi.fn(),
-    get pending() { return 0; },
+    bind: vi.fn(),
     get isProcessing() { return false; },
   } as unknown as EventLoop;
 }

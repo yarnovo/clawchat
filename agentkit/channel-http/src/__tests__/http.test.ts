@@ -9,8 +9,10 @@ import { EventLoop } from '@agentkit/event-loop';
 /** Create a mock EventLoop whose push() resolves to a fixed reply. */
 function mockEventLoop(reply = 'mock-reply'): EventLoop {
   const loop = new EventLoop();
-  loop.start();
-  loop.onProcess(async () => reply);
+  loop.bind({
+    run: async () => reply,
+    inject: () => {},
+  });
   return loop;
 }
 
@@ -87,7 +89,6 @@ describe('httpChannel', () => {
   let loop: EventLoop;
 
   afterEach(async () => {
-    loop?.stop();
     await channel?.teardown?.();
   });
 
