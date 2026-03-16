@@ -1,4 +1,5 @@
-import { RotateCw } from 'lucide-react'
+import { Bot, RotateCw, User } from 'lucide-react'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { MarkdownRenderer } from '@/components/markdown-renderer'
 import { cn } from '@/lib/utils'
 import type { Message } from '@/types'
@@ -22,17 +23,25 @@ export function MessageBubble({ message, onRetry }: MessageBubbleProps) {
 
   return (
     <div
-      className={cn('flex', isUser ? 'justify-end' : 'justify-start')}
+      className={cn('flex gap-2.5', isUser ? 'flex-row-reverse' : 'flex-row')}
     >
-      <div className="flex max-w-[75%] flex-col gap-1">
+      {/* Avatar */}
+      <Avatar size="default" className="shrink-0 mt-0.5">
+        <AvatarFallback className={isUser ? 'bg-primary/10' : 'bg-muted'}>
+          {isUser ? <User className="size-4" /> : <Bot className="size-4" />}
+        </AvatarFallback>
+      </Avatar>
+
+      {/* Bubble + meta */}
+      <div className={cn('flex max-w-[70%] flex-col gap-1', isUser ? 'items-end' : 'items-start')}>
         <div
           className={cn(
-            'rounded-2xl px-4 py-3',
+            'relative rounded-lg px-3 py-2.5',
             isUser
-              ? 'bg-primary text-primary-foreground'
-              : 'border border-border bg-card text-card-foreground',
+              ? 'bg-chat-user text-chat-user-foreground'
+              : 'bg-card text-card-foreground shadow-sm',
             isSending && 'opacity-50',
-            isError && !isUser && 'border-destructive/30 bg-destructive/5',
+            isError && !isUser && 'border border-destructive/30 bg-destructive/5',
             isError && isUser && 'bg-destructive/80',
           )}
         >

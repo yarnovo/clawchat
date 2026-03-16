@@ -65,13 +65,9 @@ const agentsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/agents',
   component: lazyRouteComponent(() => import('./pages/agents')),
-})
-
-// Settings route (lazy)
-const settingsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/settings',
-  component: lazyRouteComponent(() => import('./pages/settings')),
+  validateSearch: (search: Record<string, unknown>) => ({
+    focus: (search.focus as string) || undefined,
+  }),
 })
 
 // Build route tree
@@ -79,7 +75,6 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   chatRoute.addChildren([agentChatRoute]),
   agentsRoute,
-  settingsRoute,
 ])
 
 // Create and export router

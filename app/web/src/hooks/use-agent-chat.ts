@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { useAgentStore } from '@/stores/agent-store'
-import { sendMessage, newSession } from '@/services/api-client'
+import { MOCK_RESPONSES } from '@/data/mock-data'
 import type { Message } from '@/types'
 
 export function useAgentChat(agentId: string | null) {
@@ -8,63 +8,53 @@ export function useAgentChat(agentId: string | null) {
   const isTyping = useAgentStore((s) => s.isTyping)
   const currentSessionId = useAgentStore((s) => s.currentSessionId)
   const addMessage = useAgentStore((s) => s.addMessage)
-  const updateMessage = useAgentStore((s) => s.updateMessage)
   const setTyping = useAgentStore((s) => s.setTyping)
+  const clearMessages = useAgentStore((s) => s.clearMessages)
   const setCurrentSessionId = useAgentStore((s) => s.setCurrentSessionId)
 
   const send = useCallback(
     async (text: string) => {
       if (!agentId) return
 
-      const messageId = crypto.randomUUID()
       const userMessage: Message = {
-        id: messageId,
+        id: crypto.randomUUID(),
         agentId,
         sessionId: currentSessionId,
         role: 'user',
         content: text,
-        status: 'sending',
+        status: 'sent',
         timestamp: Date.now(),
       }
 
       addMessage(userMessage)
       setTyping(true)
 
-      try {
-        const data = await sendMessage(agentId, text)
-        updateMessage(messageId, { status: 'sent' })
+      // Simulate response delay
+      await new Promise((r) => setTimeout(r, 800 + Math.random() * 1200))
 
-        const assistantMessage: Message = {
-          id: crypto.randomUUID(),
-          agentId,
-          sessionId: currentSessionId,
-          role: 'assistant',
-          content:
-            (data as Record<string, string>).reply ??
-            (data as Record<string, string>).error ??
-            'No response',
-          status: 'complete',
-          timestamp: Date.now(),
-        }
-        addMessage(assistantMessage)
-      } catch {
-        updateMessage(messageId, { status: 'error' })
-      } finally {
-        setTyping(false)
+      const reply =
+        MOCK_RESPONSES[Math.floor(Math.random() * MOCK_RESPONSES.length)]
+
+      const assistantMessage: Message = {
+        id: crypto.randomUUID(),
+        agentId,
+        sessionId: currentSessionId,
+        role: 'assistant',
+        content: reply,
+        status: 'complete',
+        timestamp: Date.now(),
       }
+
+      addMessage(assistantMessage)
+      setTyping(false)
     },
-    [agentId, currentSessionId, addMessage, updateMessage, setTyping],
+    [agentId, currentSessionId, addMessage, setTyping],
   )
 
-  const startNewSession = useCallback(async () => {
-    if (!agentId) return
-    try {
-      const { sessionId } = await newSession(agentId)
-      setCurrentSessionId(sessionId)
-    } catch {
-      // ignore
-    }
-  }, [agentId, setCurrentSessionId])
+  const startNewSession = useCallback(() => {
+    clearMessages()
+    setCurrentSessionId(currentSessionId + 1)
+  }, [currentSessionId, clearMessages, setCurrentSessionId])
 
   return { messages, isTyping, currentSessionId, send, startNewSession }
 }

@@ -19,14 +19,12 @@ export function MessageList({ messages, onRetry }: MessageListProps) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
 
-  // Track whether user has scrolled up
   useEffect(() => {
     const container = containerRef.current
     if (!container) return
 
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = container
-      // Consider "at bottom" if within 60px of the bottom
       setIsAtBottom(scrollHeight - scrollTop - clientHeight < 60)
     }
 
@@ -34,7 +32,6 @@ export function MessageList({ messages, onRetry }: MessageListProps) {
     return () => container.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // Auto-scroll when new messages arrive (only if user is at bottom)
   useEffect(() => {
     if (isAtBottom) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -53,9 +50,9 @@ export function MessageList({ messages, onRetry }: MessageListProps) {
     <div className="relative flex-1 overflow-hidden">
       <div
         ref={containerRef}
-        className="h-full overflow-y-auto px-4 py-4 sm:px-6"
+        className="h-full overflow-y-auto px-5 py-4"
       >
-        <div className="mx-auto flex max-w-3xl flex-col gap-4">
+        <div className="flex flex-col gap-4">
           {messages.map((message, index) => {
             const prev = messages[index - 1]
             const showDivider = prev && prev.sessionId !== message.sessionId
@@ -74,7 +71,6 @@ export function MessageList({ messages, onRetry }: MessageListProps) {
         </div>
       </div>
 
-      {/* Scroll to bottom button */}
       <button
         type="button"
         onClick={scrollToBottom}

@@ -1,6 +1,6 @@
 import { useCallback, type KeyboardEvent } from 'react'
 import TextareaAutosize from 'react-textarea-autosize'
-import { ArrowUp, Square } from 'lucide-react'
+import { Smile, Paperclip, Send, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -36,34 +36,43 @@ export function InputArea({
   )
 
   return (
-    <div className="border-t border-border bg-background px-4 py-3 sm:px-6">
-      <div className="mx-auto flex max-w-3xl items-end gap-2">
-        <div className="relative flex-1">
-          <TextareaAutosize
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Type a message..."
-            minRows={1}
-            maxRows={6}
-            disabled={disabled}
-            className={cn(
-              'w-full resize-none rounded-xl border border-input bg-background px-4 py-3 text-sm leading-relaxed text-foreground',
-              'placeholder:text-muted-foreground',
-              'focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring',
-              'disabled:cursor-not-allowed disabled:opacity-50',
-              'transition-colors',
-            )}
-          />
-        </div>
+    <div className="border-t border-border bg-background">
+      {/* Toolbar */}
+      <div className="flex items-center gap-1 px-4 pt-2">
+        <Button variant="ghost" size="icon-sm" disabled={disabled} className="text-muted-foreground">
+          <Smile className="size-5" />
+        </Button>
+        <Button variant="ghost" size="icon-sm" disabled={disabled} className="text-muted-foreground">
+          <Paperclip className="size-5" />
+        </Button>
+      </div>
+
+      {/* Input + Send */}
+      <div className="flex items-end gap-2 px-4 pb-3 pt-1">
+        <TextareaAutosize
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={disabled ? "Agent is not running" : "Type a message..."}
+          minRows={1}
+          maxRows={6}
+          disabled={disabled}
+          className={cn(
+            'w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed text-foreground',
+            'placeholder:text-muted-foreground',
+            'focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring',
+            'disabled:cursor-not-allowed disabled:opacity-50',
+            'transition-colors',
+          )}
+        />
 
         {loading && onStop ? (
           <Button
             variant="outline"
             size="icon"
             onClick={onStop}
-            className="mb-0.5 shrink-0 rounded-xl"
-            aria-label="Stop generating"
+            className="shrink-0 rounded-md"
+            aria-label="Stop"
           >
             <Square className="size-4" />
           </Button>
@@ -72,10 +81,10 @@ export function InputArea({
             size="icon"
             onClick={onSend}
             disabled={!canSend}
-            className="mb-0.5 shrink-0 rounded-xl"
-            aria-label="Send message"
+            className="shrink-0 rounded-md"
+            aria-label="Send"
           >
-            <ArrowUp className="size-4" />
+            <Send className="size-4" />
           </Button>
         )}
       </div>

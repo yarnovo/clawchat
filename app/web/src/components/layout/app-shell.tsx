@@ -1,10 +1,10 @@
-import { useState, type ReactNode } from "react"
+import { type ReactNode } from "react"
 import { useNavigate, useMatchRoute } from "@tanstack/react-router"
 import { useMediaQuery } from "@/hooks/use-media-query"
-import { useUIStore } from "@/stores/ui-store"
-import { Sidebar } from "@/components/layout/sidebar"
-import { MobileHeader } from "@/components/layout/mobile-header"
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet"
+import { NavRail } from "@/components/layout/nav-rail"
+import { ConversationList } from "@/components/layout/conversation-list"
+import { TabBar } from "@/components/layout/tab-bar"
+import { SettingsDialog } from "@/features/settings/settings-dialog"
 
 interface AppShellProps {
   children: ReactNode
@@ -12,61 +12,81 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const isDesktop = useMediaQuery("(min-width: 768px)")
-  const [sheetOpen, setSheetOpen] = useState(false)
   const navigate = useNavigate()
   const matchRoute = useMatchRoute()
 
-  const sidebarOpen = useUIStore((s) => s.sidebarOpen)
-
-  const handleNavigate = (page: "agents" | "settings") => {
-    navigate({ to: `/${page}` })
-    setSheetOpen(false)
+  const handleNavigate = (page: "chat" | "agents") => {
+    if (page === "chat") navigate({ to: "/chat" })
+    else navigate({ to: "/agents" })
   }
 
   const handleAgentSelect = (agentId: string) => {
     navigate({ to: "/chat/$agentId", params: { agentId } })
-    setSheetOpen(false)
   }
 
-  // Determine active agent from route
+  // Determine active route
   const chatMatch = matchRoute({ to: "/chat/$agentId", fuzzy: true })
   const activeAgentId =
     chatMatch && typeof chatMatch === "object" && "agentId" in chatMatch
       ? (chatMatch as { agentId: string }).agentId
       : undefined
 
+  const isInChat = !!activeAgentId
+  const isChatPage = !!matchRoute({ to: "/chat", fuzzy: true })
+  const isAgentsPage = !!matchRoute({ to: "/agents" })
+
+  const activeTab: "chat" | "agents" = isAgentsPage ? "agents" : "chat"
+
+  // Desktop
   if (isDesktop) {
     return (
       <div className="flex h-screen bg-background">
-        {sidebarOpen && (
-          <Sidebar
+        <NavRail activePage={activeTab} onNavigate={handleNavigate} />
+        {activeTab === "chat" && (
+          <ConversationList
             activeAgentId={activeAgentId}
-            onNavigate={handleNavigate}
             onAgentSelect={handleAgentSelect}
+            onNavigate={handleNavigate}
           />
         )}
-        <main className="flex-1 flex flex-col overflow-hidden border-l border-border">
+        <main className="flex-1 flex flex-col overflow-hidden">
           {children}
         </main>
+        <SettingsDialog />
       </div>
     )
   }
 
-  // Mobile layout
+  // Mobile: full-screen chat
+  if (isInChat) {
+    return (
+      <div className="flex h-screen flex-col bg-background">
+        <main className="flex-1 flex flex-col overflow-hidden">{children}</main>
+        <SettingsDialog />
+      </div>
+    )
+  }
+
+  // Mobile: tab pages
   return (
     <div className="flex h-screen flex-col bg-background">
-      <MobileHeader onMenuClick={() => setSheetOpen(true)} />
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="left" showCloseButton={false} className="w-72 p-0">
-          <SheetTitle className="sr-only">Navigation</SheetTitle>
-          <Sidebar
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {isChatPage ? (
+          <ConversationList
             activeAgentId={activeAgentId}
-            onNavigate={handleNavigate}
             onAgentSelect={handleAgentSelect}
+            onNavigate={handleNavigate}
+            className="w-full border-r-0"
           />
-        </SheetContent>
-      </Sheet>
-      <main className="flex-1 flex flex-col overflow-hidden">{children}</main>
+        ) : (
+          children
+        )}
+      </main>
+      <TabBar
+        active={activeTab}
+        onTabChange={(tab) => handleNavigate(tab)}
+      />
+      <SettingsDialog />
     </div>
   )
 }
