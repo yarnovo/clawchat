@@ -1,7 +1,7 @@
 VERSION := $(shell cat VERSION)
 
 # ---- 开发 ----
-.PHONY: dev dev-mock dev-web dev-stop logs
+.PHONY: dev dev-web dev-stop logs
 
 # 全链路：Docker 后端 + Vite 前端（真实 API）
 dev:
@@ -10,13 +10,6 @@ dev:
 	@echo ""
 	@echo "  Server:   http://localhost:3000 (Docker)"
 	@echo "  Frontend: http://localhost:5173 (Vite)"
-	@echo ""
-
-# 纯前端：Vite + MSW mock（不需要后端）
-dev-mock:
-	cd app && VITE_MOCK=true pnpm dev &
-	@echo ""
-	@echo "  Frontend: http://localhost:5173 (Vite + MSW Mock)"
 	@echo ""
 
 # 仅前端：Vite（需要后端已启动）
