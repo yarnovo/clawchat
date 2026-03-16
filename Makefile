@@ -1,21 +1,16 @@
 VERSION := $(shell cat VERSION)
 
 # ---- 开发 ----
-.PHONY: dev dev-web dev-stop logs
+.PHONY: dev dev-stop logs
 
-# 全链路：Docker 后端 + Vite 前端（真实 API）
+# 本地开发：Docker DB + 本地后端 + Vite 前端
 dev:
-	docker compose up -d --build
+	docker compose up -d
+	cd server && pnpm dev &
 	cd app && pnpm dev &
 	@echo ""
-	@echo "  Server:   http://localhost:3000 (Docker)"
-	@echo "  Frontend: http://localhost:5173 (Vite)"
-	@echo ""
-
-# 仅前端：Vite（需要后端已启动）
-dev-web:
-	cd app && pnpm dev &
-	@echo ""
+	@echo "  Database: postgres://clawchat:clawchat@localhost:5432/clawchat"
+	@echo "  Server:   http://localhost:3000 (local)"
 	@echo "  Frontend: http://localhost:5173 (Vite)"
 	@echo ""
 
@@ -32,6 +27,18 @@ logs-server:
 
 restart-server:
 	docker compose restart server
+
+# ---- 部署 ----
+.PHONY: deploy-up deploy-down deploy-logs
+
+deploy-up:
+	docker compose --profile deploy up -d --build
+
+deploy-down:
+	docker compose --profile deploy down
+
+deploy-logs:
+	docker compose --profile deploy logs -f
 
 # ---- AgentKit ----
 .PHONY: agentkit-build agentkit-test agentkit-run agentkit-eval
@@ -81,18 +88,6 @@ db-backup:
 db-restore:
 	@test -n "$(FILE)" || (echo "Usage: make db-restore FILE=backups/xxx.sql.gz" && exit 1)
 	bash scripts/db-restore.sh $(FILE)
-
-# ---- Deploy ----
-.PHONY: deploy-up deploy-down deploy-logs
-
-deploy-up:
-	docker compose -f docker-compose.deploy.yml up -d --build
-
-deploy-down:
-	docker compose -f docker-compose.deploy.yml down
-
-deploy-logs:
-	docker compose -f docker-compose.deploy.yml logs -f
 
 # ---- Common ----
 .PHONY: setup version clean
