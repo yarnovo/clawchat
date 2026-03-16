@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react"
+import { useRef, useEffect, useState, useMemo } from "react"
 import { Search, Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
 import { useAgentStore } from "@/stores/agent-store"
-import { AGENT_CATEGORIES } from "@/data/mock-data"
+import { listAgents, createAgent } from "@/services/api-client"
 
 interface AgentListProps {
   className?: string
@@ -22,14 +22,14 @@ interface AgentListProps {
 }
 
 const AVATAR_COLORS = [
-  { id: "blue", bg: "bg-blue-500", label: "蓝" },
-  { id: "emerald", bg: "bg-emerald-500", label: "绿" },
-  { id: "orange", bg: "bg-orange-500", label: "橙" },
-  { id: "purple", bg: "bg-purple-500", label: "紫" },
-  { id: "pink", bg: "bg-pink-500", label: "粉" },
-  { id: "cyan", bg: "bg-cyan-500", label: "青" },
-  { id: "amber", bg: "bg-amber-600", label: "琥" },
-  { id: "red", bg: "bg-red-500", label: "红" },
+  { id: "blue", bg: "bg-blue-500" },
+  { id: "emerald", bg: "bg-emerald-500" },
+  { id: "orange", bg: "bg-orange-500" },
+  { id: "purple", bg: "bg-purple-500" },
+  { id: "pink", bg: "bg-pink-500" },
+  { id: "cyan", bg: "bg-cyan-500" },
+  { id: "amber", bg: "bg-amber-600" },
+  { id: "red", bg: "bg-red-500" },
 ]
 
 function getAvatarColor(id: string) {
@@ -45,8 +45,8 @@ export function AgentList({
   autoFocusSearch = false,
 }: AgentListProps) {
   const agents = useAgentStore((s) => s.agents)
-  const addAgent = useAgentStore((s) => s.addAgent)
-  const agentMap = new Map(agents.map((a) => [a.id, a]))
+  const setAgents = useAgentStore((s) => s.setAgents)
+  const addAgentToStore = useAgentStore((s) => s.addAgent)
 
   const searchRef = useRef<HTMLInputElement>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -54,26 +54,53 @@ export function AgentList({
   const [newColor, setNewColor] = useState(AVATAR_COLORS[0].bg)
   const [newDesc, setNewDesc] = useState("")
 
+  // Fetch agents from API
+  useEffect(() => {
+    listAgents()
+      .then((data) => setAgents(data.agents))
+      .catch(() => {})
+  }, [setAgents])
+
   useEffect(() => {
     if (autoFocusSearch) {
       searchRef.current?.focus()
     }
   }, [autoFocusSearch])
 
-  const handleCreate = () => {
+  // Group agents by category (derived from data)
+  const grouped = useMemo(() => {
+    const map = new Map<string, typeof agents>()
+    for (const agent of agents) {
+      const cat = agent.category ?? "其他"
+      if (!map.has(cat)) map.set(cat, [])
+      map.get(cat)!.push(agent)
+    }
+    return [...map.entries()]
+  }, [agents])
+
+  const handleCreate = async () => {
     const name = newName.trim()
     if (!name) return
 
-    addAgent({
-      id: `agent-${name.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}`,
-      name,
-      description: newDesc.trim(),
-      status: "running",
-      currentSessionId: 1,
-      resourceProfile: "standard",
-      skills: [],
-      createdAt: new Date().toISOString(),
-    })
+    try {
+      const { agent } = await createAgent({
+        name,
+        description: newDesc.trim(),
+      })
+      addAgentToStore(agent)
+    } catch {
+      // fallback: add locally
+      addAgentToStore({
+        id: `agent-${Date.now()}`,
+        name,
+        description: newDesc.trim(),
+        status: "running",
+        currentSessionId: 1,
+        resourceProfile: "standard",
+        skills: [],
+        createdAt: new Date().toISOString(),
+      })
+    }
 
     setNewName("")
     setNewColor(AVATAR_COLORS[0].bg)
@@ -106,38 +133,36 @@ export function AgentList({
         </button>
       </div>
 
-      {/* Categorized agent list */}
+      {/* Categorized agent list — categories derived from data */}
       <ScrollArea className="flex-1">
         <div className="flex flex-col">
-          {AGENT_CATEGORIES.map((category) => {
-            const categoryAgents = category.agentIds
-              .map((id) => agentMap.get(id))
-              .filter(Boolean)
+          {grouped.map(([category, categoryAgents]) => (
+            <div key={category}>
+              <div className="px-3 py-1.5">
+                <span className="text-[11px] font-medium text-muted-foreground">
+                  {category}
+                </span>
+              </div>
 
-            return (
-              <div key={category.name}>
-                {/* Category header */}
-                <div className="px-3 py-1.5">
-                  <span className="text-[11px] font-medium text-muted-foreground">
-                    {category.name}
-                  </span>
-                </div>
-
-                {/* Agent items */}
-                {categoryAgents.map((agent) => {
-                  if (!agent) return null
-                  const isSelected = selectedAgentId === agent.id
-
-                  return (
-                    <button
-                      key={agent.id}
-                      onClick={() => onAgentSelect?.(agent.id)}
-                      className={cn(
-                        "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
-                        "hover:bg-sidebar-accent/60",
-                        isSelected && "bg-sidebar-accent",
-                      )}
-                    >
+              {categoryAgents.map((agent) => {
+                const isSelected = selectedAgentId === agent.id
+                return (
+                  <button
+                    key={agent.id}
+                    onClick={() => onAgentSelect?.(agent.id)}
+                    className={cn(
+                      "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
+                      "hover:bg-sidebar-accent/60",
+                      isSelected && "bg-sidebar-accent",
+                    )}
+                  >
+                    {agent.avatar ? (
+                      <img
+                        src={agent.avatar}
+                        alt={agent.name}
+                        className="size-9 shrink-0 rounded-lg bg-muted object-cover"
+                      />
+                    ) : (
                       <div
                         className={cn(
                           "flex size-9 shrink-0 items-center justify-center rounded-lg text-white text-sm font-medium",
@@ -146,15 +171,15 @@ export function AgentList({
                       >
                         {agent.name.charAt(0)}
                       </div>
-                      <span className="truncate text-sm text-sidebar-foreground">
-                        {agent.name}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            )
-          })}
+                    )}
+                    <span className="truncate text-sm text-sidebar-foreground">
+                      {agent.name}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          ))}
         </div>
       </ScrollArea>
 
@@ -166,7 +191,6 @@ export function AgentList({
           </DialogHeader>
 
           <div className="flex flex-col gap-4 py-2">
-            {/* Name */}
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium">
                 名称 <span className="text-destructive">*</span>
@@ -179,7 +203,6 @@ export function AgentList({
               />
             </div>
 
-            {/* Avatar color */}
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium">
                 头像颜色 <span className="text-destructive">*</span>
@@ -198,13 +221,14 @@ export function AgentList({
                         : "opacity-60 hover:opacity-100",
                     )}
                   >
-                    {newName.trim() ? newName.trim().charAt(0).toUpperCase() : "A"}
+                    {newName.trim()
+                      ? newName.trim().charAt(0).toUpperCase()
+                      : "A"}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Description */}
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium">描述</label>
               <textarea

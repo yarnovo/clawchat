@@ -8,5 +8,6 @@ export interface Agent {
   currentSessionId: number
   resourceProfile: string
   skills: string[]
+  category?: string
   createdAt: string
 }

@@ -77,14 +77,22 @@ export function AgentDetail({ agent, onBack }: AgentDetailProps) {
       <div className="w-full max-w-md">
         {/* Header: Avatar + Name */}
         <div className="flex items-center gap-4">
-          <div
-            className={cn(
-              "flex size-16 shrink-0 items-center justify-center rounded-xl text-white text-2xl font-semibold",
-              getAvatarColor(agent.id),
-            )}
-          >
-            {agent.name.charAt(0)}
-          </div>
+          {agent.avatar ? (
+            <img
+              src={agent.avatar}
+              alt={agent.name}
+              className="size-16 shrink-0 rounded-xl bg-muted object-cover"
+            />
+          ) : (
+            <div
+              className={cn(
+                "flex size-16 shrink-0 items-center justify-center rounded-xl text-white text-2xl font-semibold",
+                getAvatarColor(agent.id),
+              )}
+            >
+              {agent.name.charAt(0)}
+            </div>
+          )}
           <div className="min-w-0">
             <h2 className="text-lg font-semibold text-foreground">
               {agent.name}

@@ -8,23 +8,41 @@ import {
 } from './components'
 import { useAgentChat } from '@/hooks/use-agent-chat'
 import { useAgentStore } from '@/stores/agent-store'
+import { getAgent } from '@/services/api-client'
+import type { Agent } from '@/types'
 
 interface ChatPageProps {
   agentId: string
 }
 
 export function ChatPage({ agentId }: ChatPageProps) {
+  const [agent, setAgent] = useState<Agent | null>(null)
   const [input, setInput] = useState('')
-  const agents = useAgentStore((s) => s.agents)
+  const { messages, isTyping, send } = useAgentChat(agentId)
   const setActiveAgent = useAgentStore((s) => s.setActiveAgent)
-  const { messages, isTyping, send, startNewSession } = useAgentChat(agentId)
-
-  const agent = agents.find((a) => a.id === agentId) ?? null
+  const setCurrentSessionId = useAgentStore((s) => s.setCurrentSessionId)
 
   useEffect(() => {
     setActiveAgent(agentId)
+    getAgent(agentId)
+      .then((data) => {
+        setAgent(data.agent)
+        setCurrentSessionId(data.agent.currentSessionId ?? 1)
+      })
+      .catch(() => {})
     return () => setActiveAgent(null)
-  }, [agentId, setActiveAgent])
+  }, [agentId, setActiveAgent, setCurrentSessionId])
+
+  // Fetch message history
+  const setMessages = useAgentStore((s) => s.setMessages)
+  useEffect(() => {
+    fetch(`/api/agents/${agentId}/messages`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.messages?.length) setMessages(data.messages)
+      })
+      .catch(() => {})
+  }, [agentId, setMessages])
 
   const handleSend = useCallback(async () => {
     const text = input.trim()
