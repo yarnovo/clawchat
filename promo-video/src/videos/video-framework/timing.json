@@ -1,0 +1,37 @@
+[
+  {
+    "id": "intro",
+    "startMs": 95,
+    "endMs": 5272
+  },
+  {
+    "id": "pipeline",
+    "startMs": 5795,
+    "endMs": 12352
+  },
+  {
+    "id": "tts",
+    "startMs": 12875,
+    "endMs": 19045
+  },
+  {
+    "id": "subtitle",
+    "startMs": 19556,
+    "endMs": 25886
+  },
+  {
+    "id": "design",
+    "startMs": 26409,
+    "endMs": 32397
+  },
+  {
+    "id": "scale",
+    "startMs": 32920,
+    "endMs": 39386
+  },
+  {
+    "id": "outro",
+    "startMs": 39909,
+    "endMs": 44193
+  }
+]

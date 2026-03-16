@@ -1,0 +1,4 @@
+[
+  {"id":"wkfes-shell","text":"app-shell点tsx用useMediaQuery检测768像素断点。桌面渲染flex布局，移动渲染shadcn的Sheet组件。Sidebar作为children传入，两种模式共用同一个Sidebar组件。"},
+  {"id":"wkfes-code","text":"sidebar点tsx用shadcn的ScrollArea做可滚动列表。会话项显示头像、标题、最后消息摘要和时间。当前选中项用bg-sidebar-accent高亮。底部用Tooltip包裹图标按钮。"}
+]

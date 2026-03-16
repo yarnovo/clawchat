@@ -1,0 +1,4 @@
+[
+  {"id":"wkfest-chat","text":"chat-store用Zustand的create定义。messagesByConversation是Record类型，key是conversationId。addMessage往对应数组push，updateMessage通过id查找替换。"},
+  {"id":"wkfest-ui","text":"ui-store更简单。sidebarOpen控制侧边栏展开收起，theme存三个值light、dark、system。setTheme同时写localStorage持久化，页面刷新后恢复。"}
+]

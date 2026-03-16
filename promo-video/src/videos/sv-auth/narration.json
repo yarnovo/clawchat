@@ -1,0 +1,4 @@
+[
+  {"id":"svau-intro","text":"JWT认证中间件保护所有API端点。与im-server共享同一个JWT密钥，用户登录一次全平台通用。健康检查端点跳过认证。"},
+  {"id":"svau-flow","text":"每个请求的Authorization头携带Bearer token。中间件用HS256算法验证签名，解码出accountId、type、name三个字段，注入到Hono的请求上下文供路由使用。"}
+]

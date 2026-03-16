@@ -1,0 +1,5 @@
+[
+  {"id":"fesse-intro","text":"前端用fetch加ReadableStream做SSE，不用原生EventSource。这样可以自定义header带JWT，也能在WebView里正常工作。"},
+  {"id":"fesse-reconnect","text":"useSSE hook管理连接生命周期。断线后指数退避重连：1秒、2秒、4秒、8秒，最大30秒。监听visibilitychange，页面切回前台时主动重连。"},
+  {"id":"fesse-flow","text":"消息流分两路。POST发消息拿回复是主路径，SSE只驱动typing指示器。未来加流式输出后SSE升级为主通道，架构已预留requestId做去重。"}
+]

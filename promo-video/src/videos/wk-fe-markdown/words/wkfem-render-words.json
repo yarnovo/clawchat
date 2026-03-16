@@ -1,0 +1,147 @@
+[
+  {
+    "part": "markdown-renderer",
+    "start": 95,
+    "end": 947
+  },
+  {
+    "part": "点",
+    "start": 947,
+    "end": 1197
+  },
+  {
+    "part": "tsx",
+    "start": 1209,
+    "end": 2004
+  },
+  {
+    "part": "用",
+    "start": 2015,
+    "end": 2243
+  },
+  {
+    "part": "ReactMarkdown",
+    "start": 2265,
+    "end": 3129
+  },
+  {
+    "part": "组件，",
+    "start": 3140,
+    "end": 3561
+  },
+  {
+    "part": "传入",
+    "start": 3811,
+    "end": 4220
+  },
+  {
+    "part": "remarkPlugins",
+    "start": 4243,
+    "end": 5163
+  },
+  {
+    "part": "和",
+    "start": 5254,
+    "end": 5424
+  },
+  {
+    "part": "rehypePlugins。",
+    "start": 5436,
+    "end": 6356
+  },
+  {
+    "part": "components",
+    "start": 6875,
+    "end": 7522
+  },
+  {
+    "part": "属性",
+    "start": 7534,
+    "end": 7988
+  },
+  {
+    "part": "覆盖",
+    "start": 8000,
+    "end": 8318
+  },
+  {
+    "part": "默认",
+    "start": 8340,
+    "end": 8624
+  },
+  {
+    "part": "渲染，",
+    "start": 8636,
+    "end": 9102
+  },
+  {
+    "part": "code",
+    "start": 9420,
+    "end": 9738
+  },
+  {
+    "part": "元素",
+    "start": 9738,
+    "end": 10056
+  },
+  {
+    "part": "检测",
+    "start": 10068,
+    "end": 10556
+  },
+  {
+    "part": "是否",
+    "start": 10636,
+    "end": 10965
+  },
+  {
+    "part": "有",
+    "start": 10977,
+    "end": 11136
+  },
+  {
+    "part": "语言",
+    "start": 11136,
+    "end": 11431
+  },
+  {
+    "part": "类名",
+    "start": 11443,
+    "end": 11749
+  },
+  {
+    "part": "来",
+    "start": 11750,
+    "end": 11954
+  },
+  {
+    "part": "区分",
+    "start": 11965,
+    "end": 12272
+  },
+  {
+    "part": "行",
+    "start": 12295,
+    "end": 12499
+  },
+  {
+    "part": "内",
+    "start": 12500,
+    "end": 12738
+  },
+  {
+    "part": "和",
+    "start": 12761,
+    "end": 12931
+  },
+  {
+    "part": "块级",
+    "start": 12943,
+    "end": 13272
+  },
+  {
+    "part": "代码。",
+    "start": 13284,
+    "end": 13670
+  }
+]

@@ -1,0 +1,4 @@
+[
+  {"id":"wkfer-routes","text":"router点tsx用createRootRoute定义根布局，挂载QueryClientProvider。五条子路由：斜杠重定向到chat，chat嵌套conversationId动态段，agents和settings懒加载。"},
+  {"id":"wkfer-code","text":"路由定义用createRoute链式调用。根路由的component渲染AppShell加Outlet。chat路由内嵌conversation子路由，参数自动推断到useParams。"}
+]

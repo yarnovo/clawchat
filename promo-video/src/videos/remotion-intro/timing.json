@@ -1,0 +1,37 @@
+[
+  {
+    "id": "intro",
+    "startMs": 95,
+    "endMs": 7715
+  },
+  {
+    "id": "concept",
+    "startMs": 8238,
+    "endMs": 14727
+  },
+  {
+    "id": "features",
+    "startMs": 15250,
+    "endMs": 20977
+  },
+  {
+    "id": "compare",
+    "startMs": 21500,
+    "endMs": 28193
+  },
+  {
+    "id": "scale",
+    "startMs": 28715,
+    "endMs": 35613
+  },
+  {
+    "id": "ecosystem",
+    "startMs": 36113,
+    "endMs": 42329
+  },
+  {
+    "id": "outro",
+    "startMs": 42852,
+    "endMs": 46795
+  }
+]

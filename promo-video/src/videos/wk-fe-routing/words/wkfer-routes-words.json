@@ -1,0 +1,132 @@
+[
+  {
+    "part": "router",
+    "start": 95,
+    "end": 436
+  },
+  {
+    "part": "点",
+    "start": 436,
+    "end": 675
+  },
+  {
+    "part": "tsx",
+    "start": 686,
+    "end": 1481
+  },
+  {
+    "part": "用",
+    "start": 1572,
+    "end": 1799
+  },
+  {
+    "part": "createRootRoute",
+    "start": 1811,
+    "end": 2811
+  },
+  {
+    "part": "定义",
+    "start": 2902,
+    "end": 3163
+  },
+  {
+    "part": "根布局，",
+    "start": 3163,
+    "end": 3709
+  },
+  {
+    "part": "挂载",
+    "start": 3959,
+    "end": 4311
+  },
+  {
+    "part": "QueryClientProvider。",
+    "start": 4311,
+    "end": 5527
+  },
+  {
+    "part": "五条子路",
+    "start": 6034,
+    "end": 6602
+  },
+  {
+    "part": "由：",
+    "start": 6613,
+    "end": 6897
+  },
+  {
+    "part": "斜杠",
+    "start": 7147,
+    "end": 7534
+  },
+  {
+    "part": "重",
+    "start": 7545,
+    "end": 7749
+  },
+  {
+    "part": "定向",
+    "start": 7750,
+    "end": 8079
+  },
+  {
+    "part": "到",
+    "start": 8090,
+    "end": 8261
+  },
+  {
+    "part": "chat，",
+    "start": 8261,
+    "end": 8693
+  },
+  {
+    "part": "chat",
+    "start": 8954,
+    "end": 9238
+  },
+  {
+    "part": "嵌套",
+    "start": 9250,
+    "end": 9761
+  },
+  {
+    "part": "conversationId",
+    "start": 9852,
+    "end": 10840
+  },
+  {
+    "part": "动态",
+    "start": 10852,
+    "end": 11193
+  },
+  {
+    "part": "段，",
+    "start": 11193,
+    "end": 11431
+  },
+  {
+    "part": "agents",
+    "start": 11704,
+    "end": 12249
+  },
+  {
+    "part": "和",
+    "start": 12340,
+    "end": 12511
+  },
+  {
+    "part": "settings",
+    "start": 12522,
+    "end": 12988
+  },
+  {
+    "part": "懒",
+    "start": 13000,
+    "end": 13193
+  },
+  {
+    "part": "加载。",
+    "start": 13193,
+    "end": 13624
+  }
+]

@@ -1,0 +1,17 @@
+[
+  {
+    "id": "fec-intro",
+    "startMs": 95,
+    "endMs": 12272
+  },
+  {
+    "id": "fec-bubble",
+    "startMs": 12795,
+    "endMs": 24931
+  },
+  {
+    "id": "fec-input",
+    "startMs": 25443,
+    "endMs": 36579
+  }
+]

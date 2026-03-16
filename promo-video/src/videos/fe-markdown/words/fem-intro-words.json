@@ -1,0 +1,127 @@
+[
+  {
+    "part": "Agent",
+    "start": 95,
+    "end": 515
+  },
+  {
+    "part": "回复",
+    "start": 527,
+    "end": 845
+  },
+  {
+    "part": "用",
+    "start": 845,
+    "end": 1106
+  },
+  {
+    "part": "react-markdown",
+    "start": 1197,
+    "end": 2140
+  },
+  {
+    "part": "渲染。",
+    "start": 2152,
+    "end": 2606
+  },
+  {
+    "part": "remark-gfm",
+    "start": 3125,
+    "end": 4306
+  },
+  {
+    "part": "支持",
+    "start": 4329,
+    "end": 4624
+  },
+  {
+    "part": "表格",
+    "start": 4636,
+    "end": 5079
+  },
+  {
+    "part": "和",
+    "start": 5102,
+    "end": 5238
+  },
+  {
+    "part": "任务",
+    "start": 5250,
+    "end": 5477
+  },
+  {
+    "part": "列表，",
+    "start": 5488,
+    "end": 5954
+  },
+  {
+    "part": "rehype-highlight",
+    "start": 6204,
+    "end": 7159
+  },
+  {
+    "part": "做",
+    "start": 7170,
+    "end": 7374
+  },
+  {
+    "part": "代码",
+    "start": 7375,
+    "end": 7704
+  },
+  {
+    "part": "语法",
+    "start": 7727,
+    "end": 8045
+  },
+  {
+    "part": "高亮。",
+    "start": 8056,
+    "end": 8499
+  },
+  {
+    "part": "代码",
+    "start": 9022,
+    "end": 9306
+  },
+  {
+    "part": "块",
+    "start": 9306,
+    "end": 9556
+  },
+  {
+    "part": "右上角",
+    "start": 9579,
+    "end": 10136
+  },
+  {
+    "part": "有",
+    "start": 10136,
+    "end": 10306
+  },
+  {
+    "part": "复制",
+    "start": 10318,
+    "end": 10568
+  },
+  {
+    "part": "按钮",
+    "start": 10579,
+    "end": 11056
+  },
+  {
+    "part": "和",
+    "start": 11147,
+    "end": 11295
+  },
+  {
+    "part": "语言",
+    "start": 11306,
+    "end": 11624
+  },
+  {
+    "part": "标签。",
+    "start": 11636,
+    "end": 12136
+  }
+]

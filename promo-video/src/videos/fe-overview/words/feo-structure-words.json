@@ -1,0 +1,97 @@
+[
+  {
+    "part": "Feature-first",
+    "start": 21659,
+    "end": 22499
+  },
+  {
+    "part": "目录",
+    "start": 22522,
+    "end": 22749
+  },
+  {
+    "part": "结构。",
+    "start": 22761,
+    "end": 23215
+  },
+  {
+    "part": "chat、",
+    "start": 23738,
+    "end": 24147
+  },
+  {
+    "part": "conversations、",
+    "start": 24340,
+    "end": 25204
+  },
+  {
+    "part": "agents、",
+    "start": 25409,
+    "end": 25931
+  },
+  {
+    "part": "settings",
+    "start": 26159,
+    "end": 26670
+  },
+  {
+    "part": "各自",
+    "start": 26750,
+    "end": 27034
+  },
+  {
+    "part": "独立，",
+    "start": 27045,
+    "end": 27420
+  },
+  {
+    "part": "共享",
+    "start": 27670,
+    "end": 28045
+  },
+  {
+    "part": "的",
+    "start": 28045,
+    "end": 28249
+  },
+  {
+    "part": "UI",
+    "start": 28340,
+    "end": 28636
+  },
+  {
+    "part": "组件、",
+    "start": 28647,
+    "end": 29079
+  },
+  {
+    "part": "hooks、",
+    "start": 29306,
+    "end": 29738
+  },
+  {
+    "part": "services、",
+    "start": 29954,
+    "end": 30624
+  },
+  {
+    "part": "stores",
+    "start": 30829,
+    "end": 31340
+  },
+  {
+    "part": "放",
+    "start": 31420,
+    "end": 31590
+  },
+  {
+    "part": "在",
+    "start": 31590,
+    "end": 31704
+  },
+  {
+    "part": "全局层。",
+    "start": 31727,
+    "end": 32340
+  }
+]

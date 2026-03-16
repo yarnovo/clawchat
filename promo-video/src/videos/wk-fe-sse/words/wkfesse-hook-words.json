@@ -1,0 +1,112 @@
+[
+  {
+    "part": "use-sse",
+    "start": 16568,
+    "end": 17409
+  },
+  {
+    "part": "点",
+    "start": 17409,
+    "end": 17704
+  },
+  {
+    "part": "ts",
+    "start": 17795,
+    "end": 18215
+  },
+  {
+    "part": "包装",
+    "start": 18227,
+    "end": 18670
+  },
+  {
+    "part": "sse-client，",
+    "start": 18693,
+    "end": 19670
+  },
+  {
+    "part": "管理",
+    "start": 19943,
+    "end": 20306
+  },
+  {
+    "part": "status",
+    "start": 20329,
+    "end": 20749
+  },
+  {
+    "part": "状态：",
+    "start": 20761,
+    "end": 21204
+  },
+  {
+    "part": "connecting、",
+    "start": 21454,
+    "end": 22045
+  },
+  {
+    "part": "connected、",
+    "start": 22227,
+    "end": 22852
+  },
+  {
+    "part": "disconnected。",
+    "start": 23045,
+    "end": 23772
+  },
+  {
+    "part": "收到",
+    "start": 24295,
+    "end": 24738
+  },
+  {
+    "part": "connected",
+    "start": 24761,
+    "end": 25295
+  },
+  {
+    "part": "事件",
+    "start": 25306,
+    "end": 25749
+  },
+  {
+    "part": "重置",
+    "start": 25840,
+    "end": 26215
+  },
+  {
+    "part": "退避",
+    "start": 26238,
+    "end": 26613
+  },
+  {
+    "part": "计时器。",
+    "start": 26625,
+    "end": 27238
+  },
+  {
+    "part": "组件",
+    "start": 27761,
+    "end": 28204
+  },
+  {
+    "part": "unmount",
+    "start": 28227,
+    "end": 28647
+  },
+  {
+    "part": "时",
+    "start": 28647,
+    "end": 28977
+  },
+  {
+    "part": "自动",
+    "start": 29068,
+    "end": 29397
+  },
+  {
+    "part": "close。",
+    "start": 29397,
+    "end": 29897
+  }
+]

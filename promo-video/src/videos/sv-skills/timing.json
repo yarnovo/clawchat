@@ -1,0 +1,12 @@
+[
+  {
+    "id": "svs-intro",
+    "startMs": 95,
+    "endMs": 10034
+  },
+  {
+    "id": "svs-install",
+    "startMs": 10556,
+    "endMs": 23784
+  }
+]

@@ -1,0 +1,5 @@
+[
+  {"id":"wkfeo-pkg","text":"package点json定义了所有依赖。React 19、Vite 8、Tailwind 4是基础，shadcn UI提供组件。TanStack Router和Query管路由和缓存，Zustand管状态。"},
+  {"id":"wkfeo-vite","text":"vite点config做三件事。加载React和Tailwind插件，配置路径别名让at符号指向src目录，设置proxy把api请求转发到后端4000端口。"},
+  {"id":"wkfeo-entry","text":"入口文件main点tsx挂载RouterProvider，App点tsx只渲染Outlet。所有页面通过路由懒加载，首屏只加载聊天页代码。"}
+]

@@ -1,0 +1,9 @@
+[
+  {"id": "intro", "text": "用React写代码，直接输出MP4视频。这就是Remotion，一个改变视频制作方式的框架。"},
+  {"id": "concept", "text": "每一帧都是一个React组件。给你一个帧号，你用代码渲染画面，动画自然产生。"},
+  {"id": "features", "text": "Composition管理多个视频，Studio实时预览编辑，Lambda云端分布式渲染。"},
+  {"id": "compare", "text": "告别手动剪辑，告别命令行拼接。Remotion让视频制作像写React组件一样简单。"},
+  {"id": "scale", "text": "一个模板加上不同数据，就能批量生成上千个个性化视频。GitHub Wrapped就是这样做的。"},
+  {"id": "ecosystem", "text": "近四万GitHub Stars，月下载九十万次，超过五十家企业在生产环境中使用。"},
+  {"id": "outro", "text": "Write React, Render MP4。这就是Remotion。"}
+]

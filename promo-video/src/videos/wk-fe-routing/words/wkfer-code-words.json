@@ -1,0 +1,132 @@
+[
+  {
+    "part": "路由",
+    "start": 14136,
+    "end": 14420
+  },
+  {
+    "part": "定义",
+    "start": 14431,
+    "end": 14863
+  },
+  {
+    "part": "用",
+    "start": 14954,
+    "end": 15159
+  },
+  {
+    "part": "createRoute",
+    "start": 15170,
+    "end": 15920
+  },
+  {
+    "part": "链式",
+    "start": 15920,
+    "end": 16204
+  },
+  {
+    "part": "调用。",
+    "start": 16215,
+    "end": 16636
+  },
+  {
+    "part": "根路",
+    "start": 17159,
+    "end": 17443
+  },
+  {
+    "part": "由",
+    "start": 17443,
+    "end": 17613
+  },
+  {
+    "part": "的",
+    "start": 17613,
+    "end": 17727
+  },
+  {
+    "part": "component",
+    "start": 17750,
+    "end": 18431
+  },
+  {
+    "part": "渲染",
+    "start": 18511,
+    "end": 18931
+  },
+  {
+    "part": "AppShell",
+    "start": 18954,
+    "end": 19454
+  },
+  {
+    "part": "加",
+    "start": 19454,
+    "end": 19670
+  },
+  {
+    "part": "Outlet。",
+    "start": 19681,
+    "end": 20249
+  },
+  {
+    "part": "chat",
+    "start": 20772,
+    "end": 21113
+  },
+  {
+    "part": "路",
+    "start": 21113,
+    "end": 21238
+  },
+  {
+    "part": "由内",
+    "start": 21250,
+    "end": 21556
+  },
+  {
+    "part": "嵌",
+    "start": 21556,
+    "end": 21863
+  },
+  {
+    "part": "conversation",
+    "start": 21954,
+    "end": 22659
+  },
+  {
+    "part": "子路",
+    "start": 22670,
+    "end": 22931
+  },
+  {
+    "part": "由，",
+    "start": 22943,
+    "end": 23227
+  },
+  {
+    "part": "参数",
+    "start": 23465,
+    "end": 23863
+  },
+  {
+    "part": "自动",
+    "start": 23886,
+    "end": 24159
+  },
+  {
+    "part": "推断",
+    "start": 24170,
+    "end": 24534
+  },
+  {
+    "part": "到",
+    "start": 24534,
+    "end": 24784
+  },
+  {
+    "part": "useParams。",
+    "start": 24875,
+    "end": 25534
+  }
+]

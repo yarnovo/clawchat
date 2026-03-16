@@ -1,0 +1,162 @@
+[
+  {
+    "part": "app-shell",
+    "start": 95,
+    "end": 572
+  },
+  {
+    "part": "点",
+    "start": 572,
+    "end": 822
+  },
+  {
+    "part": "tsx",
+    "start": 834,
+    "end": 1652
+  },
+  {
+    "part": "用",
+    "start": 1743,
+    "end": 1970
+  },
+  {
+    "part": "useMediaQuery",
+    "start": 1981,
+    "end": 3027
+  },
+  {
+    "part": "检测",
+    "start": 3118,
+    "end": 3561
+  },
+  {
+    "part": "768",
+    "start": 3584,
+    "end": 4265
+  },
+  {
+    "part": "像",
+    "start": 4265,
+    "end": 4447
+  },
+  {
+    "part": "素断",
+    "start": 4459,
+    "end": 4765
+  },
+  {
+    "part": "点。",
+    "start": 4765,
+    "end": 5004
+  },
+  {
+    "part": "桌面",
+    "start": 5511,
+    "end": 5852
+  },
+  {
+    "part": "渲染",
+    "start": 5863,
+    "end": 6261
+  },
+  {
+    "part": "flex",
+    "start": 6284,
+    "end": 6681
+  },
+  {
+    "part": "布局，",
+    "start": 6693,
+    "end": 7147
+  },
+  {
+    "part": "移动",
+    "start": 7329,
+    "end": 7613
+  },
+  {
+    "part": "渲染",
+    "start": 7625,
+    "end": 8034
+  },
+  {
+    "part": "shadcn",
+    "start": 8034,
+    "end": 8465
+  },
+  {
+    "part": "的",
+    "start": 8465,
+    "end": 8545
+  },
+  {
+    "part": "Sheet",
+    "start": 8568,
+    "end": 8852
+  },
+  {
+    "part": "组件。",
+    "start": 8852,
+    "end": 9318
+  },
+  {
+    "part": "Sidebar",
+    "start": 9829,
+    "end": 10397
+  },
+  {
+    "part": "作为",
+    "start": 10488,
+    "end": 10795
+  },
+  {
+    "part": "children",
+    "start": 10818,
+    "end": 11181
+  },
+  {
+    "part": "传入，",
+    "start": 11193,
+    "end": 11647
+  },
+  {
+    "part": "两种",
+    "start": 11897,
+    "end": 12193
+  },
+  {
+    "part": "模式",
+    "start": 12204,
+    "end": 12636
+  },
+  {
+    "part": "共",
+    "start": 12659,
+    "end": 12784
+  },
+  {
+    "part": "用",
+    "start": 12784,
+    "end": 12909
+  },
+  {
+    "part": "同",
+    "start": 12920,
+    "end": 13124
+  },
+  {
+    "part": "一个",
+    "start": 13125,
+    "end": 13477
+  },
+  {
+    "part": "Sidebar",
+    "start": 13556,
+    "end": 13999
+  },
+  {
+    "part": "组件。",
+    "start": 14011,
+    "end": 14454
+  }
+]

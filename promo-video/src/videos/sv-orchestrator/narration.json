@@ -1,0 +1,5 @@
+[
+  {"id":"svc-intro","text":"ContainerOrchestrator是容器管理的抽象层。定义统一接口，Docker和K8s各自实现。Server代码只依赖接口，不关心底层运行时。"},
+  {"id":"svc-docker","text":"Docker实现用dockerode操作容器。创建时设置内存256兆、CPU半核、进程数100的资源限制。通过Docker内网DNS寻址，容器名即域名。"},
+  {"id":"svc-workspace","text":"WorkspaceManager管理Agent的文件系统。创建时生成AGENT点MD和skills目录。Fork时复制整个工作区。删除时移到回收站，30天后清理。"}
+]

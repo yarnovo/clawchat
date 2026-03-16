@@ -1,0 +1,17 @@
+[
+  {
+    "id": "svc-intro",
+    "startMs": 95,
+    "endMs": 11318
+  },
+  {
+    "id": "svc-docker",
+    "startMs": 11829,
+    "endMs": 24704
+  },
+  {
+    "id": "svc-workspace",
+    "startMs": 25227,
+    "endMs": 37852
+  }
+]

@@ -1,0 +1,5 @@
+[
+  {"id":"wkfec-page","text":"chat-page点tsx是组装层。用useState管理消息数组和加载状态。handleSend做三件事：添加用户消息、调fetch发到api chat、收到回复后添加Agent消息。"},
+  {"id":"wkfec-bubble","text":"message-bubble点tsx根据role渲染不同样式。用户消息直接显示文本，Agent消息通过MarkdownRenderer渲染。status为sending时半透明，error时红色底加重试按钮。"},
+  {"id":"wkfec-list","text":"message-list点tsx管理自动滚动。useRef跟踪底部元素，新消息时scrollIntoView。用户上滑超过阈值暂停自动滚动，显示浮动的回到底部按钮。"}
+]

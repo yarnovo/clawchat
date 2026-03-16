@@ -65,6 +65,31 @@ import { AkEval, AK_EVAL_FRAMES } from "./videos/ak-eval/AkEval";
 import { AkCli, AK_CLI_FRAMES } from "./videos/ak-cli/AkCli";
 import { AkExtensionGuide, AK_EXTENSION_GUIDE_FRAMES } from "./videos/ak-extension-guide/AkExtensionGuide";
 import { AkDevGuide, AK_DEV_GUIDE_FRAMES } from "./videos/ak-dev-guide/AkDevGuide";
+// Frontend videos
+import { FeOverview, FE_OVERVIEW_FRAMES } from "./videos/fe-overview/FeOverview";
+import { FeRouting, FE_ROUTING_FRAMES } from "./videos/fe-routing/FeRouting";
+import { FeChat, FE_CHAT_FRAMES } from "./videos/fe-chat/FeChat";
+import { FeSidebar, FE_SIDEBAR_FRAMES } from "./videos/fe-sidebar/FeSidebar";
+import { FeStores, FE_STORES_FRAMES } from "./videos/fe-stores/FeStores";
+import { FeSse, FE_SSE_FRAMES } from "./videos/fe-sse/FeSse";
+import { FeMarkdown, FE_MARKDOWN_FRAMES } from "./videos/fe-markdown/FeMarkdown";
+import { WkFeOverview, WK_FE_OVERVIEW_FRAMES } from "./videos/wk-fe-overview/WkFeOverview";
+import { WkFeRouting, WK_FE_ROUTING_FRAMES } from "./videos/wk-fe-routing/WkFeRouting";
+import { WkFeChat, WK_FE_CHAT_FRAMES } from "./videos/wk-fe-chat/WkFeChat";
+import { WkFeSidebar, WK_FE_SIDEBAR_FRAMES } from "./videos/wk-fe-sidebar/WkFeSidebar";
+import { WkFeStores, WK_FE_STORES_FRAMES } from "./videos/wk-fe-stores/WkFeStores";
+import { WkFeSse, WK_FE_SSE_FRAMES } from "./videos/wk-fe-sse/WkFeSse";
+import { WkFeMarkdown, WK_FE_MARKDOWN_FRAMES } from "./videos/wk-fe-markdown/WkFeMarkdown";
+// Server videos
+import { SvOverview, SV_OVERVIEW_FRAMES } from "./videos/sv-overview/SvOverview";
+import { SvAgents, SV_AGENTS_FRAMES } from "./videos/sv-agents/SvAgents";
+import { SvProxy, SV_PROXY_FRAMES } from "./videos/sv-proxy/SvProxy";
+import { SvMarket, SV_MARKET_FRAMES } from "./videos/sv-market/SvMarket";
+import { SvBilling, SV_BILLING_FRAMES } from "./videos/sv-billing/SvBilling";
+import { SvSkills, SV_SKILLS_FRAMES } from "./videos/sv-skills/SvSkills";
+import { SvOrchestrator, SV_ORCHESTRATOR_FRAMES } from "./videos/sv-orchestrator/SvOrchestrator";
+import { SvAuth, SV_AUTH_FRAMES } from "./videos/sv-auth/SvAuth";
+import { SvSchema, SV_SCHEMA_FRAMES } from "./videos/sv-schema/SvSchema";
 // Walkthrough videos
 import { WkCore, WK_CORE_FRAMES } from "./videos/wk-core/WkCore";
 import { WkEventLoop, WK_EVENT_LOOP_FRAMES } from "./videos/wk-event-loop/WkEventLoop";
@@ -85,6 +110,9 @@ import { AkSessionSqlite, AK_SESSION_SQLITE_FRAMES } from "./videos/ak-session-s
 import { Hono2026, TOTAL_FRAMES as HONO2026_FRAMES } from "./videos/hono-2026/Hono2026";
 import { LegalAssistant, TOTAL_FRAMES as LEGAL_FRAMES } from "./videos/legal-assistant/LegalAssistant";
 import { LegalCases, TOTAL_FRAMES as LEGAL_CASES_FRAMES } from "./videos/legal-cases/LegalCases";
+import { VideoFramework, TOTAL_FRAMES as VF_FRAMES } from "./videos/video-framework/VideoFramework";
+import { RemotionIntro, TOTAL_FRAMES as RI_FRAMES } from "./videos/remotion-intro/RemotionIntro";
+import { RemotionGuide, TOTAL_FRAMES as RG_FRAMES } from "./videos/remotion-guide/RemotionGuide";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -711,6 +739,59 @@ export const RemotionRoot: React.FC = () => {
           width={1920}
           height={1080}
         />
+      </Folder>
+      <Folder name="Meta">
+        <Composition
+          id="VideoFramework"
+          component={VideoFramework}
+          durationInFrames={VF_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="RemotionIntro"
+          component={RemotionIntro}
+          durationInFrames={RI_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+        <Composition
+          id="RemotionGuide"
+          component={RemotionGuide}
+          durationInFrames={RG_FRAMES}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
+      </Folder>
+      <Folder name="Frontend">
+        <Composition id="FeOverview" component={FeOverview} durationInFrames={FE_OVERVIEW_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="FeRouting" component={FeRouting} durationInFrames={FE_ROUTING_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="FeChat" component={FeChat} durationInFrames={FE_CHAT_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="FeSidebar" component={FeSidebar} durationInFrames={FE_SIDEBAR_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="FeStores" component={FeStores} durationInFrames={FE_STORES_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="FeSse" component={FeSse} durationInFrames={FE_SSE_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="FeMarkdown" component={FeMarkdown} durationInFrames={FE_MARKDOWN_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="WkFeOverview" component={WkFeOverview} durationInFrames={WK_FE_OVERVIEW_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="WkFeRouting" component={WkFeRouting} durationInFrames={WK_FE_ROUTING_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="WkFeChat" component={WkFeChat} durationInFrames={WK_FE_CHAT_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="WkFeSidebar" component={WkFeSidebar} durationInFrames={WK_FE_SIDEBAR_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="WkFeStores" component={WkFeStores} durationInFrames={WK_FE_STORES_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="WkFeSse" component={WkFeSse} durationInFrames={WK_FE_SSE_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="WkFeMarkdown" component={WkFeMarkdown} durationInFrames={WK_FE_MARKDOWN_FRAMES} fps={30} width={1920} height={1080} />
+      </Folder>
+      <Folder name="Server">
+        <Composition id="SvOverview" component={SvOverview} durationInFrames={SV_OVERVIEW_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="SvAgents" component={SvAgents} durationInFrames={SV_AGENTS_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="SvProxy" component={SvProxy} durationInFrames={SV_PROXY_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="SvMarket" component={SvMarket} durationInFrames={SV_MARKET_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="SvBilling" component={SvBilling} durationInFrames={SV_BILLING_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="SvSkills" component={SvSkills} durationInFrames={SV_SKILLS_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="SvOrchestrator" component={SvOrchestrator} durationInFrames={SV_ORCHESTRATOR_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="SvAuth" component={SvAuth} durationInFrames={SV_AUTH_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="SvSchema" component={SvSchema} durationInFrames={SV_SCHEMA_FRAMES} fps={30} width={1920} height={1080} />
       </Folder>
       <Folder name="Walkthrough">
         <Composition id="WkCore" component={WkCore} durationInFrames={WK_CORE_FRAMES} fps={30} width={1920} height={1080} />

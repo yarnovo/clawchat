@@ -1,0 +1,5 @@
+[
+  {"id":"fec-intro","text":"Chat是前端的核心功能。ChatPage组装四个组件：header显示Agent状态，消息列表渲染对话，输入区发送消息，打字指示器显示Agent在思考。"},
+  {"id":"fec-bubble","text":"消息气泡分两种。用户消息右对齐深色背景，Agent消息左对齐卡片式。Agent回复用react-markdown渲染，支持代码高亮、表格、列表。"},
+  {"id":"fec-input","text":"输入区用自动伸缩的textarea，最多6行。Enter发送，Shift加Enter换行。发送时乐观更新，消息立即显示，不等服务器确认。"}
+]

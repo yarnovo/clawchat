@@ -1,0 +1,117 @@
+[
+  {
+    "part": "chat-store",
+    "start": 95,
+    "end": 697
+  },
+  {
+    "part": "用",
+    "start": 709,
+    "end": 993
+  },
+  {
+    "part": "Zustand",
+    "start": 1084,
+    "end": 1618
+  },
+  {
+    "part": "的",
+    "start": 1618,
+    "end": 1709
+  },
+  {
+    "part": "create",
+    "start": 1731,
+    "end": 2118
+  },
+  {
+    "part": "定义。",
+    "start": 2129,
+    "end": 2527
+  },
+  {
+    "part": "messagesByConversation",
+    "start": 3045,
+    "end": 4545
+  },
+  {
+    "part": "是",
+    "start": 4625,
+    "end": 4806
+  },
+  {
+    "part": "Record",
+    "start": 4818,
+    "end": 5204
+  },
+  {
+    "part": "类型，",
+    "start": 5215,
+    "end": 5693
+  },
+  {
+    "part": "key",
+    "start": 5931,
+    "end": 6193
+  },
+  {
+    "part": "是",
+    "start": 6193,
+    "end": 6409
+  },
+  {
+    "part": "conversationId。",
+    "start": 6420,
+    "end": 7477
+  },
+  {
+    "part": "addMessage",
+    "start": 8000,
+    "end": 8772
+  },
+  {
+    "part": "往",
+    "start": 8863,
+    "end": 9068
+  },
+  {
+    "part": "对应",
+    "start": 9068,
+    "end": 9306
+  },
+  {
+    "part": "数组",
+    "start": 9318,
+    "end": 9647
+  },
+  {
+    "part": "push，",
+    "start": 9647,
+    "end": 10068
+  },
+  {
+    "part": "updateMessage",
+    "start": 10306,
+    "end": 11249
+  },
+  {
+    "part": "通过",
+    "start": 11340,
+    "end": 11715
+  },
+  {
+    "part": "id",
+    "start": 11727,
+    "end": 12079
+  },
+  {
+    "part": "查找",
+    "start": 12102,
+    "end": 12443
+  },
+  {
+    "part": "替换。",
+    "start": 12454,
+    "end": 12886
+  }
+]

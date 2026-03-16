@@ -1,0 +1,17 @@
+[
+  {
+    "id": "svdb-intro",
+    "startMs": 95,
+    "endMs": 12647
+  },
+  {
+    "id": "svdb-agents",
+    "startMs": 13170,
+    "endMs": 25579
+  },
+  {
+    "id": "svdb-market",
+    "startMs": 26090,
+    "endMs": 40159
+  }
+]
