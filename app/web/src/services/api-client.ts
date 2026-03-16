@@ -44,6 +44,18 @@ async function request<T>(
   return res.json() as Promise<T>
 }
 
+// ---------- Conversations (chat list) ----------
+
+export async function listConversations(): Promise<{ agents: Agent[] }> {
+  return request('/conversations')
+}
+
+export async function startConversation(
+  agentId: string,
+): Promise<{ agent: Agent }> {
+  return request(`/conversations/${agentId}`, { method: 'POST' })
+}
+
 // ---------- Agent CRUD ----------
 
 export async function listAgents(): Promise<{ agents: Agent[] }> {

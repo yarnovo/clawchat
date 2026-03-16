@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 import { useAgentStore } from "@/stores/agent-store"
-import { listAgents } from "@/services/api-client"
+import { listConversations } from "@/services/api-client"
 
 interface ConversationListProps {
   className?: string
@@ -78,7 +78,7 @@ export function ConversationList({
   const setAgents = useAgentStore((s) => s.setAgents)
 
   useEffect(() => {
-    listAgents()
+    listConversations()
       .then((data) => setAgents(data.agents))
       .catch(() => {})
   }, [setAgents])

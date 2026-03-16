@@ -1,5 +1,6 @@
 import { useNavigate } from "@tanstack/react-router"
 import { ChevronLeft, MessageCircle, Zap } from "lucide-react"
+import { startConversation } from "@/services/api-client"
 import { cn } from "@/lib/utils"
 import type { Agent } from "@/types"
 
@@ -54,7 +55,8 @@ export function AgentDetail({ agent, onBack }: AgentDetailProps) {
   const navigate = useNavigate()
   const { color, label } = statusConfig[agent.status] ?? statusConfig.created
 
-  const handleStartChat = () => {
+  const handleStartChat = async () => {
+    await startConversation(agent.id).catch(() => {})
     navigate({ to: "/chat/$agentId", params: { agentId: agent.id } })
   }
 

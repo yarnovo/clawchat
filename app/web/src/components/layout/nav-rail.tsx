@@ -6,7 +6,7 @@ import {
 import { useNavigate } from "@tanstack/react-router"
 import { cn } from "@/lib/utils"
 import { useUIStore } from "@/stores/ui-store"
-import { useAgentStore } from "@/stores/agent-store"
+import { startConversation } from "@/services/api-client"
 
 interface NavRailProps {
   activePage: "chat" | "agents"
@@ -20,26 +20,10 @@ const navItems = [
 
 export function NavRail({ activePage, onNavigate }: NavRailProps) {
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen)
-  const agents = useAgentStore((s) => s.agents)
-  const addAgent = useAgentStore((s) => s.addAgent)
   const navigate = useNavigate()
 
-  const handleSelfChat = () => {
-    // Add self to conversation list if not already there
-    if (!agents.find((a) => a.id === "self")) {
-      addAgent({
-        id: "self",
-        name: "自己",
-        description: "给自己发消息",
-        avatar: "https://api.dicebear.com/9.x/notionists/svg?seed=self",
-        status: "running",
-        currentSessionId: 1,
-        resourceProfile: "standard",
-        skills: [],
-        createdAt: new Date().toISOString(),
-      })
-    }
-    // Navigate to chat tab then into self chat
+  const handleSelfChat = async () => {
+    await startConversation("self").catch(() => {})
     onNavigate("chat")
     navigate({ to: "/chat/$agentId", params: { agentId: "self" } })
   }

@@ -1,35 +1,59 @@
 import { http, HttpResponse, delay } from 'msw'
-import { MOCK_AGENTS, MOCK_MESSAGES, MOCK_RESPONSES } from '@/data/mock-data'
+import { MOCK_AGENTS, MOCK_RESPONSES } from '@/data/mock-data'
 import type { Agent, Message } from '@/types'
 
-// In-memory state (survives across requests within a session)
+// ── In-memory state ──
+
+// All available agents (marketplace)
 let agents: Agent[] = [...MOCK_AGENTS]
-const messagesMap: Record<string, Message[]> = { ...MOCK_MESSAGES }
+
+// Conversations the user has started (initially empty)
+const conversations = new Set<string>()
+
+// Message history per agent
+const messagesMap: Record<string, Message[]> = {}
+
 let nextSessionId = 2
 
 export const handlers = [
-  // ── Agent CRUD ──
+  // ── Conversations (chat list) ──
+
+  http.get('/api/conversations', async () => {
+    await delay(200)
+    const list = agents
+      .filter((a) => conversations.has(a.id))
+      .map((agent) => {
+        const msgs = messagesMap[agent.id]
+        const last = msgs?.at(-1)
+        return {
+          ...agent,
+          lastMessage: last
+            ? { content: last.content, timestamp: last.timestamp }
+            : undefined,
+        }
+      })
+    return HttpResponse.json({ agents: list })
+  }),
+
+  // Start a conversation with an agent (add to chat list)
+  http.post('/api/conversations/:agentId', async ({ params }) => {
+    await delay(100)
+    const agent = agents.find((a) => a.id === params.agentId)
+    if (!agent) return HttpResponse.json({ error: 'Not found' }, { status: 404 })
+    conversations.add(agent.id)
+    return HttpResponse.json({ agent })
+  }),
+
+  // ── Agent CRUD (marketplace) ──
 
   http.get('/api/agents', async () => {
     await delay(200)
-    // Attach lastMessage to each agent
-    const agentsWithLast = agents.map((agent) => {
-      const msgs = messagesMap[agent.id]
-      const last = msgs?.at(-1)
-      return {
-        ...agent,
-        lastMessage: last
-          ? { content: last.content, timestamp: last.timestamp }
-          : undefined,
-      }
-    })
-    return HttpResponse.json({ agents: agentsWithLast })
+    return HttpResponse.json({ agents })
   }),
 
   http.get('/api/agents/:agentId', async ({ params }) => {
     await delay(150)
     let agent = agents.find((a) => a.id === params.agentId)
-    // Auto-create self agent if requested
     if (!agent && params.agentId === 'self') {
       agent = {
         id: 'self',
@@ -73,6 +97,7 @@ export const handlers = [
   http.delete('/api/agents/:agentId', async ({ params }) => {
     await delay(200)
     agents = agents.filter((a) => a.id !== params.agentId)
+    conversations.delete(params.agentId as string)
     return HttpResponse.json({ ok: true })
   }),
 
@@ -102,7 +127,9 @@ export const handlers = [
     const { agentId } = params as { agentId: string }
     const body = (await request.json()) as { text: string }
 
-    // Store user message
+    // Auto-add to conversations
+    conversations.add(agentId)
+
     const userMsg: Message = {
       id: crypto.randomUUID(),
       agentId,
@@ -115,10 +142,8 @@ export const handlers = [
     if (!messagesMap[agentId]) messagesMap[agentId] = []
     messagesMap[agentId].push(userMsg)
 
-    // Simulate thinking delay
     await delay(800 + Math.random() * 1200)
 
-    // Generate mock reply
     const reply =
       MOCK_RESPONSES[Math.floor(Math.random() * MOCK_RESPONSES.length)]
     const assistantMsg: Message = {
@@ -143,7 +168,7 @@ export const handlers = [
     return HttpResponse.json({ sessionId })
   }),
 
-  // ── Messages history (bonus: fetch messages for an agent) ──
+  // ── Message history ──
 
   http.get('/api/agents/:agentId/messages', async ({ params }) => {
     await delay(150)
