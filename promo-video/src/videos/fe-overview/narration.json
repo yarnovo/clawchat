@@ -1,5 +1,0 @@
-[
-  {"id":"feo-intro","text":"ClawChat前端，用React 19加Vite 8构建的AI聊天应用。Tailwind 4做样式，shadcn UI做组件库，全栈TypeScript。"},
-  {"id":"feo-stack","text":"技术栈精选。TanStack Router做类型安全路由，Zustand管状态，fetch加ReadableStream做SSE流式通信，Dexie做客户端存储。"},
-  {"id":"feo-structure","text":"Feature-first目录结构。chat、conversations、agents、settings各自独立，共享的UI组件、hooks、services、stores放在全局层。"}
-]

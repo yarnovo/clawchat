@@ -1,8 +1,0 @@
-[
-  {"id": "asw-intro", "text": "这个视频是agent-server的代码走读。agent-server管理Agent的完整生命周期，从创建到启动到对话，是ClawChat的Agent大脑。"},
-  {"id": "asw-saga", "text": "创建Agent用Saga模式编排四个步骤：在im-server注册账号、建数据库记录、添加好友关系、启动运行时容器。任何一步失败自动逆序回滚，不留脏数据。"},
-  {"id": "asw-runtime", "text": "runtime-client是运行时委托层。它根据Agent配置的runtime字段，把请求委托给openclaw-client、nanoclaw-client或ironclaw-client。三种运行时统一接口，可热切换。"},
-  {"id": "asw-chat", "text": "chat端点是消息代理。收到用户消息后，查找Agent配置，通过runtime-client转发给对应容器。容器处理完后callback回im-server。agent-server本身不存储消息。"},
-  {"id": "asw-security", "text": "安全方面有几个设计。API Key加密存储在数据库，运行时才解密。Agent配额限制每个用户最多创建的数量。JWT认证确保只有owner能管理自己的Agent。"},
-  {"id": "asw-outro", "text": "总结一下：Saga编排保证原子性，runtime-client抽象层支持多运行时，chat代理转发不存消息，API Key加密存储。架构清晰，职责明确。"}
-]

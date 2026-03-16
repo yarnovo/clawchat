@@ -1,8 +1,0 @@
-[
-  {"id": "ts-intro", "text": "聊一下ClawChat的技术栈选型。每个选择背后都有原因，从前端到后端到基础设施，全是实战验证过的方案。"},
-  {"id": "ts-frontend", "text": "前端选Flutter。一套Dart代码编译到六个平台，Web、iOS、Android、macOS、Windows、Linux。代价是生态没React成熟，但跨平台收益远大于代价。"},
-  {"id": "ts-backend", "text": "后端选Hono加TypeScript。Hono极轻量，API风格像Express但性能更好。TypeScript给了端到端类型安全。配合Prisma ORM，数据库操作零拼字符串。"},
-  {"id": "ts-infra", "text": "基础设施选Docker加PostgreSQL加Redis。Docker让每个服务和Agent容器隔离。PostgreSQL是关系型数据库的标杆。Redis做缓存、队列和在线状态，一个组件三个用途。"},
-  {"id": "ts-why", "text": "选型原则很简单：能用一个组件解决就不用两个，能用成熟方案就不造轮子。整个后端没有引入任何复杂框架，Hono加Prisma加Docker就够了。"},
-  {"id": "ts-outro", "text": "总结一下：Flutter跨平台，Hono轻量后端，Prisma类型安全ORM，Docker容器化。简单、成熟、够用，这就是最好的技术栈。"}
-]

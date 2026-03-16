@@ -1,5 +1,0 @@
-[
-  {"id": "akcl-intro", "text": "CLI，AgentKit的命令行入口。四个命令：run运行Agent，eval跑评估，info查看信息，serve启动完整服务。"},
-  {"id": "akcl-design", "text": "CLI是最薄的壳。它只做一件事：解析参数，然后把所有包组装在一起。Provider注入构造函数，Channel和Extension通过点use注册。"},
-  {"id": "akcl-summary", "text": "serve命令是最完整的形态。bash提供工具，Skills注入知识，Memory加载记忆，Scheduler感知时间，HTTP连接网络。一行命令，完整的Agent就上线了。"}
-]

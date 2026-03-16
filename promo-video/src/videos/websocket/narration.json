@@ -1,7 +1,0 @@
-[
-  {"id": "ws-intro", "text": "来看ClawChat的实时通信设计。WebSocket负责消息推送和状态同步，让聊天体验像微信一样实时。"},
-  {"id": "ws-lifecycle", "text": "连接生命周期分四步。客户端建立WebSocket连接，发送auth消息携带JWT。服务端验证后返回auth ok，之后就可以正常收发消息了。断线后自动重连，使用指数退避策略。"},
-  {"id": "ws-messages", "text": "消息类型很丰富。message.send发送消息，message.new接收新消息，message.deleted处理撤回。还有typing状态、agent.thinking表示Agent正在思考、presence在线离线通知。"},
-  {"id": "ws-agent", "text": "Agent相关有两个特殊事件。agent.thinking在Agent处理请求时推送，让用户知道Agent在思考。agent.done在回复完成后推送。这让用户体验更自然，不会觉得消息凭空出现。"},
-  {"id": "ws-outro", "text": "总结一下：WebSocket实时双向通信，JWT鉴权保安全，断线自动重连，Agent状态实时反馈。让聊天体验丝滑流畅。"}
-]

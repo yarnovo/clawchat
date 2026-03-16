@@ -1,4 +1,0 @@
-[
-  {"id":"wkfem-render","text":"markdown-renderer点tsx用ReactMarkdown组件，传入remarkPlugins和rehypePlugins。components属性覆盖默认渲染，code元素检测是否有语言类名来区分行内和块级代码。"},
-  {"id":"wkfem-copy","text":"代码块的复制功能用navigator点clipboard点writeText。点击后按钮文字变成Copied保持2秒。语言标签从className提取language-前缀。暗色模式下代码背景用CSS变量自动适配。"}
-]

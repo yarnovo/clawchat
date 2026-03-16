@@ -1,7 +1,0 @@
-[
-  {"id": "sb-intro", "text": "来看Skill Browser，ClawChat的技能浏览界面。用React加Vite构建，让用户可视化地浏览和搜索Agent技能。"},
-  {"id": "sb-tech", "text": "技术栈是React加TypeScript加Vite。Vite提供极快的开发体验，热更新几乎是即时的。通过nginx的skills路径代理访问。"},
-  {"id": "sb-features", "text": "核心功能是搜索和浏览。连接skill-registry-server的API，展示两万五千多个技能。支持关键词搜索、分类筛选，每个技能都显示描述和版本信息。"},
-  {"id": "sb-integration", "text": "和主应用的集成很简洁。Skill Browser是独立的Web应用，通过iframe或链接嵌入ClawChat。数据来源于skill-registry-server，和Agent安装技能的流程打通。"},
-  {"id": "sb-outro", "text": "总结一下：React加Vite的独立Web应用，连接技能注册表API，可视化搜索两万五千个技能。简洁实用的技能发现工具。"}
-]

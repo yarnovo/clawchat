@@ -96,12 +96,6 @@ React SPA (Vite :5173) ── /api proxy ──→ server (Hono :3000) ── Po
 
 项目路线图：`ROADMAP.md`
 
-## 宣传视频（Remotion）
-
-- 视频有全局字幕层（`Subtitle` 组件，固定在 `bottom: 80`），场景内容排版必须通过 `paddingBottom` 为字幕留出空间，避免场景内的文字与字幕重叠
-- TTS 音频由 `edge-tts`（node-edge-tts）生成，字幕时间戳文件在 `src/words/`，音频文件在 `public/audio/`
-- 每段旁白时长必须短于对应场景时长（减去 delayFrames 和淡出），修改文案后需重新运行 `npm run tts` 生成音频
-
 ## 踩坑笔记
 
 开发过程中的踩坑记录位于 `notes/` 目录：

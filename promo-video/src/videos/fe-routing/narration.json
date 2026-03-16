@@ -1,4 +1,0 @@
-[
-  {"id":"fer-intro","text":"TanStack Router提供端到端类型安全的路由。五条路由覆盖聊天、Agent市场和设置。chat下面嵌套conversationId动态路由。"},
-  {"id":"fer-lazy","text":"非聊天页面懒加载，首屏只加载聊天代码。根布局包裹QueryClientProvider和AppShell，所有页面共享侧边栏和主题。"}
-]

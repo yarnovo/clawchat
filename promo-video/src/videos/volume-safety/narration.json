@@ -1,9 +1,0 @@
-[
-  {"id": "vs-intro", "text": "来讲Agent容器的数据持久化。每个Agent运行在Docker容器里，容器删了数据就没了。Docker Volume解决了这个问题。"},
-  {"id": "vs-problem", "text": "没有Volume的时候，Agent的所有数据都存在容器内部。技能安装记录、对话历史、配置状态，容器一删全部消失。重新启动相当于失忆。"},
-  {"id": "vs-solution", "text": "现在每个Agent创建时自动创建专属Volume。OpenClaw的数据挂载到.openclaw目录，NanoClaw挂载到data目录，IronClaw的LibSQL数据库挂载到data目录。容器删了，Volume还在。"},
-  {"id": "vs-coupling", "text": "要注意的是，Volume数据和运行时耦合。OpenClaw的Volume只能给OpenClaw用，IronClaw的只能给IronClaw用。切换运行时需要重新积累数据，这是架构层面的取舍。"},
-  {"id": "vs-lifecycle", "text": "Volume的生命周期和Agent绑定。创建Agent时自动创建Volume，删除Agent时可以选择是否同时删除Volume。保留Volume就能恢复数据，删除Volume就是彻底清理。"},
-  {"id": "vs-backup", "text": "Volume的备份是下一步。可以用docker cp导出Volume数据，配合pg_dumpall的数据库备份，实现Agent级别的完整快照。数据库存身份配置，Volume存运行时状态，两者缺一不可。"},
-  {"id": "vs-outro", "text": "总结一下：每个Agent专属Volume，数据持久化不怕容器重启。和运行时耦合是设计取舍，生命周期和Agent绑定，删除可选。数据库加Volume，完整保护Agent数据。"}
-]

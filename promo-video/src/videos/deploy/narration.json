@@ -1,8 +1,0 @@
-[
-  {"id": "deploy-intro", "text": "来看一下ClawChat的部署流程。从代码提交到线上服务，完全自动化，一个tag就能触发全流程。"},
-  {"id": "deploy-cicd", "text": "CI/CD用GitHub Actions。打tag触发release workflow，自动构建Docker镜像，rsync同步代码到阿里云ECS，然后docker compose启动所有服务。"},
-  {"id": "deploy-docker", "text": "线上全部跑在Docker里。docker-compose用profiles区分本地开发和线上部署。本地只起数据库，线上起全部服务。每个服务都有独立的Dockerfile和dockerignore。"},
-  {"id": "deploy-nginx", "text": "nginx做统一入口和反向代理。所有API通过路径前缀路由到对应服务，Flutter Web静态文件也通过nginx提供。SSL证书、CORS、安全头全部在nginx层处理。"},
-  {"id": "deploy-db", "text": "数据库迁移完全自动化。每个服务启动时自动执行prisma migrate deploy，不需要手动操作。开发阶段用prisma migrate dev，上线前重置为干净的初始迁移。"},
-  {"id": "deploy-outro", "text": "总结一下：GitHub Actions自动化，Docker容器化，nginx统一入口，Prisma自动迁移。一个tag，全流程自动完成。"}
-]

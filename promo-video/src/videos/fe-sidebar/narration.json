@@ -1,4 +1,0 @@
-[
-  {"id":"fes-intro","text":"AppShell是自适应布局壳。桌面端左侧sidebar常驻72宽，右侧flex-1渲染页面。移动端sidebar收进Sheet抽屉，汉堡按钮触发。"},
-  {"id":"fes-sidebar","text":"Sidebar四层结构。顶部logo和新建聊天按钮，搜索栏，可滚动的会话列表，底部Agent市场和设置入口加用户头像。暗色模式用shadcn主题变量自动切换。"}
-]

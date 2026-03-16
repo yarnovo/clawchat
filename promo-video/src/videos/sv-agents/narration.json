@@ -1,5 +1,0 @@
-[
-  {"id":"sva-intro","text":"Agents路由管理Agent的完整生命周期。创建、查询、启动、停止、删除，六个端点覆盖所有操作。"},
-  {"id":"sva-crud","text":"创建Agent时用Zod校验输入：名称、描述、人格设定、技能列表。数据存入PostgreSQL，状态设为created。删除是软删除，标记deletedAt。"},
-  {"id":"sva-lifecycle","text":"启动调用ContainerOrchestrator创建Docker容器，等健康检查通过后状态变为running。停止时优雅关闭容器，保留工作区数据，下次启动直接恢复。"}
-]

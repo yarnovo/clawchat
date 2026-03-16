@@ -1,4 +1,0 @@
-[
-  {"id":"fem-intro","text":"Agent回复用react-markdown渲染。remark-gfm支持表格和任务列表，rehype-highlight做代码语法高亮。代码块右上角有复制按钮和语言标签。"},
-  {"id":"fem-custom","text":"自定义渲染器处理每种Markdown元素。链接在新标签打开，图片限制最大宽度，表格加边框，引用块加左侧橙色竖线。所有样式跟随暗色主题自动切换。"}
-]

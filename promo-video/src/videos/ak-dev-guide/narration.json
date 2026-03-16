@@ -1,9 +1,0 @@
-[
-  {"id": "akdg-intro", "text": "AgentKit开发者指南。这个视频带你从零写一个自定义的Provider、Channel和Extension，完整覆盖agentic的三个扩展点。"},
-  {"id": "akdg-provider-llm", "text": "第一个扩展点：LLM Provider。Core定义了LLMProvider接口，只有一个方法chat。传入消息数组和工具定义，返回回复和工具调用。你只需要实现这个接口，就能接入任何大模型。"},
-  {"id": "akdg-provider-session", "text": "第二个扩展点：Session Provider。Core定义了ChatSession接口，三个方法：getMessages获取历史，addMessage添加消息，clear清空。内存版InMemorySession是默认实现。要持久化？写一个SQLite或Redis实现就行。"},
-  {"id": "akdg-channel", "text": "第三个扩展点：Channel。Channel连接外部世界和EventLoop。实现setup方法，在里面拿到ctx点eventLoop，收到外部消息时调用push推入事件。teardown里做清理。比如WebSocket Channel，监听连接、收到消息就push。"},
-  {"id": "akdg-extension", "text": "第四个扩展点：Extension。三个能力。systemPrompt注入额外的系统提示词。preBash在bash执行前拦截，返回allowed false可以阻止危险命令。postBash在执行后触发，可以做日志、审计、自动格式化。"},
-  {"id": "akdg-assemble", "text": "最后一步，组装。AgentRunner的构造函数接收Provider：llm和session。点use注册Channel和Extension。调用start，Runner自动把EventLoop和Agent连起来。Extensions的systemPrompt合并到系统提示词，preBash和postBash接入Agent的bash钩子。"},
-  {"id": "akdg-summary", "text": "总结。Provider实现Core接口注入构造函数。Channel在setup里拿EventLoop推事件。Extension注入prompt和拦截bash。三种扩展互不依赖，每个都是独立的npm包。你的Agent需要什么，装什么。"}
-]

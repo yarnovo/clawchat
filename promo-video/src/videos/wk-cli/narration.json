@@ -1,6 +1,0 @@
-[
-  {"id": "wkcl-overview", "text": "这是CLI包的代码走读。main.ts是AgentKit的命令行入口，基于commander实现四个命令：run、eval、info、serve。文件头部从所有包导入：agentic、provider-llm-openai、provider-session-sqlite、extension-skills、extension-memory、channel-scheduler、channel-http、eval。BUILTIN_SKILLS_DIR指向extension-skills下的builtins目录。"},
-  {"id": "wkcl-run", "text": "run命令是最基础的交互方式。创建AgentRunner，注入createLLM返回的OpenAIProvider和SQLiteSession，然后通过点use链式注册skillsExtension和memoryExtension。支持减m参数单条消息模式，否则启动readline交互循环，用户输入直接传给runner.chat。"},
-  {"id": "wkcl-serve", "text": "serve命令是完整组装形态。同样的AgentRunner加Provider加Session，但额外use了schedulerChannel和httpChannel。还支持strategy队列策略和batchWindow批处理窗口参数。启动后监听SIGINT优雅退出。一行命令，Extensions加Channels全部就绪。"},
-  {"id": "wkcl-eval", "text": "eval命令加载workspace下evals目录的cases.jsonl文件，逐行解析为EvalCase数组。对每个case构造AgentTrace，调用runScorers跑评分。最终输出pass和fail计数、通过率百分比和耗时，并将完整报告写入report.json。非零失败数时进程退出码为1。"}
-]

@@ -1,8 +1,0 @@
-[
-  {"id": "arch-intro", "text": "今天来讲ClawChat的整体架构。这是一个微服务系统，六个后端服务通过nginx统一对外，加上Flutter跨平台客户端。"},
-  {"id": "arch-services", "text": "六个服务各司其职。im-server处理IM核心，agent-server管理Agent生命周期，container-server封装Docker操作。openclaw、nanoclaw、ironclaw分别对应三种Agent运行时。"},
-  {"id": "arch-data", "text": "数据层有三个组件。PostgreSQL存储两个库，clawchat是IM数据，clawchat_agent是Agent数据。Redis负责缓存、在线状态和消息队列。"},
-  {"id": "arch-flow", "text": "核心数据流是这样的。用户发消息给Agent，im-server转发到agent-server，委托给对应运行时的容器。容器处理完callback回来，存入Redis队列，Worker异步写库并推送WebSocket。"},
-  {"id": "arch-nginx", "text": "nginx是统一入口。v1/im路由到im-server，v1/agents到agent-server，api/v1到skill-registry-server。Flutter Web也通过nginx提供静态文件服务。"},
-  {"id": "arch-outro", "text": "总结一下：六个微服务，nginx统一入口，PostgreSQL加Redis数据层，Docker容器化部署。清晰分层，各司其职。"}
-]

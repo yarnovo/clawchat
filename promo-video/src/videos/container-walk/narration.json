@@ -1,7 +1,0 @@
-[
-  {"id": "cw-intro", "text": "这个视频是container-server的代码走读。它是Docker容器的薄包装层，负责创建、启动、停止和删除Agent的运行容器。"},
-  {"id": "cw-api", "text": "API很简洁。POST创建容器，指定镜像、环境变量和资源限制。PUT启动或停止容器。DELETE删除容器和关联的Volume。每个操作都直接调用Docker Engine API。"},
-  {"id": "cw-resource", "text": "资源限制是安全的关键。每个容器限制256兆内存和0.5个CPU核心。这确保单个Agent不会占用太多资源，也防止恶意Agent拖垮整个服务器。"},
-  {"id": "cw-volume", "text": "Volume管理让Agent有持久化存储。每个Agent分配独立的Docker Volume，容器重启后数据不丢失。删除Agent时Volume一并清理，不留垃圾。"},
-  {"id": "cw-outro", "text": "总结一下：container-server是一层薄封装。简单的CRUD接口，严格的资源限制，独立的Volume管理。做好一件事，做到极致。"}
-]

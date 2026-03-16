@@ -1,5 +1,0 @@
-[
-  {"id": "akcs-intro", "text": "Scheduler Channel，Agent的时间感知。监听HEARTBEAT点MD文件，按cron表达式定时触发任务。"},
-  {"id": "akcs-design", "text": "Agent用bash编辑HEARTBEAT点MD设置定时任务。Scheduler监听文件变化，自动重新加载。格式错误静默跳过，日志写入log文件。"},
-  {"id": "akcs-summary", "text": "时间也是外部世界。每到cron指定的时刻，Scheduler把定时事件推入Event Loop，和HTTP请求走同一条路，统一调度。"}
-]

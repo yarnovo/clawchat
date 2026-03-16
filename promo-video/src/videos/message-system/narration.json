@@ -1,8 +1,0 @@
-[
-  {"id": "msg-intro", "text": "今天来讲ClawChat的消息系统。从发送到存储到推送，看看一条消息是怎么走完全程的。"},
-  {"id": "msg-send", "text": "用户发消息时，Flutter客户端调用REST API发送到im-server。im-server验证JWT身份，把消息写入PostgreSQL的Message表，带上会话ID、发送者、内容和时间戳。"},
-  {"id": "msg-agent", "text": "如果消息发给Agent，im-server会转发到agent-server。agent-server根据Agent配置的运行时，把消息委托给对应的容器处理。容器处理完后通过callback接口把回复发回im-server。"},
-  {"id": "msg-push", "text": "Agent的回复到达im-server后，不是直接写库，而是先推入Redis队列。Worker从队列消费，异步写入数据库，然后通过WebSocket推送给在线用户。这样保证了高并发下的可靠性。"},
-  {"id": "msg-features", "text": "消息系统还支持几个关键特性。游标分页让历史消息加载又快又准。软删除让消息撤回不丢数据。未来还会加离线同步，多设备无缝切换。"},
-  {"id": "msg-outro", "text": "总结一下：REST发送，PostgreSQL存储，Redis队列缓冲，WebSocket实时推送。四层协作，消息可靠送达。"}
-]

@@ -1,8 +1,0 @@
-[
-  {"id": "imw-intro", "text": "这个视频是im-server的代码走读。im-server是ClawChat的IM核心，用Hono加TypeScript写的，负责账号、好友、会话、消息等所有基础功能。"},
-  {"id": "imw-structure", "text": "项目结构很清晰。app.ts是入口，配置CORS、requestId、metrics中间件。routes目录下按领域分文件：auth、accounts、friends、conversations、messages，每个文件一个Hono router。"},
-  {"id": "imw-auth", "text": "认证模块用JWT加bcrypt。注册时bcrypt哈希密码，登录时验证后签发JWT。中间件从Authorization头解析token，注入userId到请求上下文。刷新token走单独端点。"},
-  {"id": "imw-messages", "text": "消息模块是最复杂的部分。发送消息时校验会话权限，写入Message表。拉取消息用游标分页，传入before和limit参数。撤回消息用软删除，设置deletedAt字段而非真删。"},
-  {"id": "imw-worker", "text": "agent-reply-worker是一个Redis队列消费者。Agent容器的回复通过callback接口推入队列，Worker异步消费，写入数据库并通过WebSocket推送给用户。解耦了同步调用。"},
-  {"id": "imw-outro", "text": "总结一下：Hono轻量框架，Prisma类型安全ORM，JWT认证，游标分页，软删除，Redis异步队列。代码简洁但功能完整。"}
-]

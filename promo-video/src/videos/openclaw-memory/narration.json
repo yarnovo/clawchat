@@ -1,9 +1,0 @@
-[
-  {"id": "mem-intro", "text": "OpenClaw的记忆系统是怎么设计的？一个Agent如果没有记忆，每次对话都是从零开始。这个视频带你看OpenClaw的三层记忆架构，以及怎么备份和迁移Agent的记忆。"},
-  {"id": "mem-session", "text": "第一层是会话记忆。每次对话的所有消息都以JSONL格式追加写入磁盘，路径在.openclaw/agents/sessions目录下。一行一条消息，包含角色、内容、时间戳。这是最原始、最完整的记录。"},
-  {"id": "mem-workspace", "text": "第二层是工作空间记忆。Agent把值得长期保存的信息写成Markdown文件，存在.openclaw/workspace/memory目录。MEMORY.md是索引文件，memory目录下按日期生成每日笔记。人类可读，方便手动编辑。会话重置时，session-memory钩子自动保存摘要。"},
-  {"id": "mem-vector", "text": "第三层是向量索引。所有Markdown记忆和会话转录会被切块、生成嵌入向量，存进SQLite数据库。搜索时用混合检索：向量相似度占七成权重，BM25全文匹配占三成。支持OpenAI、Gemini、Voyage、本地模型等多种嵌入提供商。"},
-  {"id": "mem-tools", "text": "Agent通过三个工具操作记忆。memory_search做语义搜索，返回相关片段。memory_store主动保存重要信息，带重要性评分和分类标签。memory_forget按查询或ID删除记忆，支持GDPR合规。还有自动回忆功能：对话开始时自动搜索相关记忆注入上下文。"},
-  {"id": "mem-backup", "text": "备份记忆有三种方案。第一种最简单：直接打包整个.openclaw目录，包含会话文件、Markdown记忆和SQLite索引，完整恢复。第二种更精准：只备份workspace/memory目录下的Markdown文件，这是Agent的长期知识，体积小、人类可读、跨版本兼容。第三种面向迁移：导出向量索引的文本块，通过memory_store API写入新实例。"},
-  {"id": "mem-outro", "text": "总结一下：三层架构，会话层保完整日志，工作空间层存人类可读笔记，向量层支持语义搜索。备份推荐打包Markdown文件，轻量且通用。Agent的记忆就是它的经验，值得好好保管。"}
-]

@@ -1,8 +1,0 @@
-[
-  {"id": "registry-intro", "text": "今天聊一下ClawChat的技能注册表。我们自建了一个兼容ClawHub协议的Skill Registry，让Agent在国内也能秒装技能。"},
-  {"id": "registry-problem", "text": "为什么要自建？ClawHub官方服务器在美国，国内访问慢甚至超时。而且今年二月的ClawHavoc事件，三百多个恶意技能被植入官方市场，安全完全不可控。"},
-  {"id": "registry-protocol", "text": "我们的做法是完全兼容ClawHub的协议。只要设一个环境变量CLAWHUB_REGISTRY，指向我们的服务，clawhub命令行就能无缝切换。不改CLI，不造轮子。"},
-  {"id": "registry-arch", "text": "架构很简单。skill-registry-server是一个Hono服务，启动时扫描skills目录建内存索引。两万五千多个技能，三秒建完索引。搜索、下载、版本解析，全部走本地。"},
-  {"id": "registry-agent", "text": "最关键的一步：openclaw-server在创建Agent容器时，自动注入CLAWHUB_REGISTRY环境变量。Agent容器启动后，所有clawhub install操作都走我们的注册表，对用户完全透明。"},
-  {"id": "registry-outro", "text": "总结一下：兼容协议、本地索引、自动注入。三步实现一个私有技能市场，不依赖外网，安全可控。"}
-]

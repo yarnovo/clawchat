@@ -1,7 +1,0 @@
-[
-  {"id": "ct-intro", "text": "来看container-server，ClawChat的Docker容器管理层。它是Agent运行时的基础设施，负责容器的创建、启动、停止和删除。"},
-  {"id": "ct-design", "text": "设计理念是薄包装。container-server不关心容器里跑的是什么，它只管Docker操作。这让它可以服务于任何运行时，OpenClaw、NanoClaw还是IronClaw都一样。"},
-  {"id": "ct-resources", "text": "资源限制是安全的关键。每个容器限制256兆内存和0.5核CPU。Volume管理让Agent数据持久化，容器重启不丢数据。"},
-  {"id": "ct-api", "text": "API很简洁。创建容器、启动、停止、删除，加上Volume的创建和删除。通过Docker Socket直接和Docker守护进程通信，没有中间层。"},
-  {"id": "ct-outro", "text": "总结一下：薄包装设计，不关心业务逻辑。资源限制保安全，Volume保持久化。简洁的API，直连Docker Socket。"}
-]

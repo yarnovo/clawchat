@@ -1,5 +1,0 @@
-[
-  {"id": "akag-intro", "text": "Agentic，Agent的身体。定义三种扩展方式：Channel连接外部世界，Extension增强行为，Provider供给核心依赖。"},
-  {"id": "akag-design", "text": "AgentRunner管理两个循环。Event Loop接收外部事件，Agent循环处理思考。Runner是桥梁，把事件翻译成Agent能理解的输入。"},
-  {"id": "akag-summary", "text": "用Express风格的点use注册扩展。一行代码加一个能力。Channel、Extension互不依赖，按需组合。"}
-]

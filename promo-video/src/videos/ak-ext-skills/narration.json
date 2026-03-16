@@ -1,5 +1,0 @@
-[
-  {"id": "akes-intro", "text": "Skills Extension，Agent的技能系统。加载SKILL点MD文件，注入提示词，执行生命周期钩子。"},
-  {"id": "akes-design", "text": "一个技能就是一个目录。SKILL点MD是提示词，scripts目录放可执行脚本，hooks目录放生命周期钩子。Agent用bash执行脚本，钩子拦截工具调用。"},
-  {"id": "akes-summary", "text": "内置两个技能：网络搜索和任务管理。记忆和调度是独立的扩展。用户可以创建自定义技能，放到skills目录就自动加载。"}
-]

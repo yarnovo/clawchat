@@ -1,5 +1,0 @@
-[
-  {"id":"svdb-intro","text":"数据库用PostgreSQL加Drizzle ORM。四张表覆盖Agent管理、市场上架、用量记录、技能安装。Drizzle的SQL-first设计让查询精确可控。"},
-  {"id":"svdb-agents","text":"agents表是核心。status字段是枚举：created、starting、running、stopped、error、deleted。config是JSONB存储灵活配置。支持软删除。"},
-  {"id":"svdb-market","text":"market_listings关联agents表，记录上架信息。usage_records按用户和Agent追踪每次操作。skill_installations记录哪个Agent安装了哪些技能。"}
-]

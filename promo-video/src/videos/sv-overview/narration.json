@@ -1,5 +1,0 @@
-[
-  {"id":"svo-intro","text":"ClawChat Server，连接前端和Agent容器的中间层。不替代现有微服务，专注三件事：Agent市场、SSE代理、计费追踪。"},
-  {"id":"svo-arch","text":"Server是网关角色。前端的所有请求先到Server做鉴权和路由，再转发到对应的Agent容器。Agent容器通过Docker内网DNS寻址，不暴露端口。"},
-  {"id":"svo-routes","text":"五个路由模块。agents管理Agent生命周期，proxy做SSE代理转发，market是Agent市场，billing追踪用量，skills管理技能安装。"}
-]

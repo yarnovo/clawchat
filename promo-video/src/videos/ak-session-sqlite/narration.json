@@ -1,4 +1,0 @@
-[
-  {"id": "akss-intro", "text": "SQLite Session，对话记忆的持久化方案。Agent重启后还记得之前的对话，不会失忆。"},
-  {"id": "akss-summary", "text": "基于Drizzle实现的ORM，类型安全。数据存在SQLite文件里，Docker commit能直接带走。容器就是Agent，记忆跟着容器走。"}
-]

@@ -1,4 +1,0 @@
-[
-  {"id": "akem-intro", "text": "Memory Extension，Agent的长期记忆。从MEMORY点MD加载跨对话的持久知识，注入到系统提示词。"},
-  {"id": "akem-summary", "text": "Agent写入MEMORY点MD后，记忆自动热更新，不需要重启。下一轮对话就能用到新记忆。未来可扩展为向量数据库存储。"}
-]

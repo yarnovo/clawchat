@@ -1,5 +1,0 @@
-[
-  {"id":"wkfesse-client","text":"sse-client点ts用fetch发GET请求，拿到response的body作为ReadableStream。TextDecoder解码后按双换行分割SSE帧，解析data字段的JSON。返回close函数用AbortController取消。"},
-  {"id":"wkfesse-hook","text":"use-sse点ts包装sse-client，管理status状态：connecting、connected、disconnected。收到connected事件重置退避计时器。组件unmount时自动close。"},
-  {"id":"wkfesse-chat","text":"use-chat点ts组合api-client和chat-store。send函数做乐观更新：先加用户消息标记sending，发请求，成功后加Agent消息标记complete，失败标记error。"}
-]

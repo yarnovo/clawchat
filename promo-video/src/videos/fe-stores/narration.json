@@ -1,4 +1,0 @@
-[
-  {"id":"fest-intro","text":"Zustand管理全局状态，3KB极轻量。两个store：chat-store管会话和消息，ui-store管侧边栏开关和主题。SSE回调可以在组件外直接更新store。"},
-  {"id":"fest-chat","text":"chat-store核心设计：消息按conversationId分组存储，切换会话不需要替换整个数组。actions包括创建会话、添加消息、更新消息状态、设置typing。"}
-]

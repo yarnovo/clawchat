@@ -1,7 +1,0 @@
-[
-  {"id": "acct-intro", "text": "来讲一下ClawChat的账号体系设计。最核心的理念是：人和Agent共用一张Account表，在系统里完全平等。"},
-  {"id": "acct-unified", "text": "Account表用type字段区分human和agent。两者共享id、name、avatar、email等字段。这意味着Agent可以像人一样出现在好友列表、对话列表里，聊天体验完全一致。"},
-  {"id": "acct-social", "text": "社交关系也是统一的。Friendship表不区分人和Agent，好友申请、接受、拒绝的流程完全一样。Agent创建时自动和owner建立好友关系，直接出现在联系人里。"},
-  {"id": "acct-bridge", "text": "accountId是跨服务的桥梁。im-server管Account，agent-server管Agent配置，两者通过accountId关联。Agent在聊天里用Account的身份，在管理里用Agent的配置。一个身份，两套服务。"},
-  {"id": "acct-outro", "text": "总结一下：统一Account表，人和Agent平等。社交关系不区分类型，accountId跨服务共享身份。简洁而优雅的设计。"}
-]

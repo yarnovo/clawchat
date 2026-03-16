@@ -1,9 +1,0 @@
-[
-  {"id": "ta-intro", "text": "Agent市场的技术架构长什么样？从用户点开聊到Agent回复，中间经过了哪些层？这个视频带你看完整的技术栈。"},
-  {"id": "ta-layers", "text": "四层架构。最上层是用户界面，网页或者App。第二层是API网关，负责路由和认证。第三层是Agent运行时，K8s管理的Pod，每个Pod跑一个Agent。最底层是基础设施，Docker镜像仓库、数据库、对象存储。"},
-  {"id": "ta-runtime", "text": "Agent运行时是核心。agent-core提供while循环和工具调用。OpenAI兼容的Provider接入任何大模型。百炼、DeepSeek、GPT，换一行配置就切换。工具系统可插拔，技能市场动态安装。"},
-  {"id": "ta-container", "text": "容器就是Agent。Docker镜像包含agent-core引擎、预装工具和技能、CLAUDE.md人格文件。用户开聊时K8s创建Pod，聊完Pod销毁。fork等于docker commit加docker run。"},
-  {"id": "ta-data", "text": "数据流。用户消息通过WebSocket到达网关，网关路由到对应的Pod。Pod里的agent-core调大模型API，执行工具，返回结果。聊天记录存数据库，镜像存Registry。"},
-  {"id": "ta-stack", "text": "技术选型。前端Flutter跨平台。网关用Hono加TypeScript。Agent引擎是agentkit的agent-core。容器编排K8s。镜像仓库Harbor。数据库PostgreSQL。消息队列Redis。全栈TypeScript加Docker。"},
-  {"id": "ta-outro", "text": "总结。四层架构，每层职责清晰。agent-core是引擎，K8s是调度器，Docker是载体，大模型是大脑。整个技术栈已经验证可行，现在需要的是执行。"}
-]

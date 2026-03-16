@@ -1,9 +1,0 @@
-[
-  {"id": "sf-intro", "text": "OpenClaw和IronClaw对安全的态度截然不同。一个追求灵活开放，一个追求纵深防御。这个视频逐层对比它们的安全模型。"},
-  {"id": "sf-sandbox", "text": "工具沙箱是最大差异。OpenClaw的工具跟Agent跑在同一个进程里，没有隔离边界。IronClaw用WASM沙箱隔离每个工具，capability-based权限控制，燃料计量加内存限制，工具崩溃不影响Agent。"},
-  {"id": "sf-cred", "text": "凭证管理。OpenClaw用环境变量存密钥，应用级访问控制。IronClaw用AES-256-GCM加密存储，集成操作系统钥匙链，密钥从不暴露给工具，在宿主边界注入。"},
-  {"id": "sf-leak", "text": "泄露检测。OpenClaw没有内置泄露检测机制。IronClaw在请求和响应两端扫描，检测密钥是否被工具意外输出，发现泄露立即拦截并告警。"},
-  {"id": "sf-endpoint", "text": "网络访问控制。OpenClaw对工具的网络请求没有限制。IronClaw对WASM工具实施endpoint白名单，只允许访问预先批准的域名和路径，阻断未授权外联。"},
-  {"id": "sf-comms", "text": "容器间通信。OpenClaw通过普通HTTP回调。IronClaw加了HMAC签名验证，每个请求都带签名，容器和宿主之间互相验证身份，防止伪造请求。"},
-  {"id": "sf-outro", "text": "总结。OpenClaw的安全模型够用于个人场景，信任工具、信任网络。IronClaw面向零信任环境，每一层都有防御。选择取决于你的威胁模型。"}
-]

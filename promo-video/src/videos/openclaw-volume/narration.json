@@ -1,9 +1,0 @@
-[
-  {"id": "ov-intro", "text": "这个视频给开发者讲OpenClaw容器内的数据结构。Volume挂载到home/node/.openclaw目录，里面存了Agent的所有运行时数据。"},
-  {"id": "ov-overview", "text": "目录总览：openclaw.json是主配置文件，credentials存OAuth凭证，agents目录按agentId组织实例数据，extensions存已安装的技能插件，workspace存工作区文件。"},
-  {"id": "ov-sessions", "text": "会话数据是最重要的部分。agents目录下按agentId分子目录，每个Agent有sessions文件夹。sessions.json存元数据，每个会话是一个.jsonl文件，逐行JSON记录对话历史。"},
-  {"id": "ov-extensions", "text": "技能安装数据在extensions目录。每个技能一个子目录，包含package.json、dist和node_modules。这就是为什么装了技能后Volume会变大，卸载技能后空间要手动回收。"},
-  {"id": "ov-workspace", "text": "workspace存放Agent的人设文件。AGENTS.md定义Agent配置，SOUL.md定义人格，TOOLS.md定义工具清单。这些文件首次启动时由模板生成，之后可以热编辑。"},
-  {"id": "ov-mount", "text": "Volume挂载路径要注意：OpenClaw的Dockerfile最终用USER node，所以数据目录是/home/node/.openclaw，不是/root/.openclaw。挂错路径数据就丢了。"},
-  {"id": "ov-outro", "text": "总结一下：五个核心目录，配置、凭证、Agent数据、技能、工作区。会话用JSONL格式，技能用npm包结构。理解这些，Volume的备份和迁移就心里有数了。"}
-]

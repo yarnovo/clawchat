@@ -1,9 +1,0 @@
-[
-  {"id": "rb-intro", "text": "ClawChat有三个Agent Runtime。OpenClaw、IronClaw、NanoClaw。不是历史遗留，是设计意图。这个视频帮你理解它们各自的定位和取舍。"},
-  {"id": "rb-arch", "text": "架构层面。OpenClaw是TypeScript单进程Gateway，所有渠道汇聚到一个Agent Loop。IronClaw是Rust单二进制，多Job调度器并行执行。NanoClaw最简单，每个群组一个独立容器，隔离清晰。"},
-  {"id": "rb-size", "text": "容器体积差异明显。OpenClaw基于Node.js运行时，完整镜像约两百兆。IronClaw是Rust编译的单二进制，约五十兆。NanoClaw同样基于Node.js，但核心代码极少，理解成本最低。"},
-  {"id": "rb-philosophy", "text": "设计哲学完全不同。OpenClaw追求灵活，二十五个以上内置渠道，丰富的插件生态。IronClaw追求安全，WASM沙箱隔离，凭证加密，审计日志。NanoClaw追求极简，小到你能完全理解。"},
-  {"id": "rb-strengths", "text": "各自的强项。OpenClaw的渠道生态无可替代，Telegram、Discord、Slack开箱即用。IronClaw的安全模型是企业级的，WASM沙箱加凭证保护加泄露检测。NanoClaw的代码可读性最好，想定制直接改源码。"},
-  {"id": "rb-tradeoffs", "text": "取舍也很明确。OpenClaw工具和Agent同进程，没有沙箱隔离。IronClaw渠道少，生态不如OpenClaw丰富。NanoClaw功能最少，不适合复杂场景。没有万能选项，只有最合适的选择。"},
-  {"id": "rb-outro", "text": "三个Runtime并存不是冗余，是覆盖不同需求。个人多渠道选OpenClaw，企业安全选IronClaw，轻量定制选NanoClaw。每个Agent可以独立选择自己的Runtime。"}
-]

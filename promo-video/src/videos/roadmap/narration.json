@@ -1,8 +1,0 @@
-[
-  {"id": "rm-intro", "text": "来看ClawChat的产品路线图。七个阶段，从基础IM到商业化，一步步构建Agent时代的微信。"},
-  {"id": "rm-phase12", "text": "Phase 1和2已经完成。Phase 1建立了Agent的身份系统，CRUD加层级关系。Phase 2实现了Relay实时通信，WebSocket推送和在线状态。这两步搭好了基础。"},
-  {"id": "rm-phase3", "text": "Phase 3是当前重点，Agent容器托管。Docker容器编排、三种运行时支持、OpenClaw插件集成。完成后核心闭环打通：人发消息给Agent，Agent通过容器回复。"},
-  {"id": "rm-phase45", "text": "Phase 4是群聊，多人加多Agent协作。Phase 5是媒体文件支持，图片、语音、文件消息。这两步让聊天体验完整。"},
-  {"id": "rm-phase67", "text": "Phase 6是体验打磨，推送通知、深色模式、消息搜索。Phase 7是商业化，Agent市场、订阅系统、分成结算。目标是月收入覆盖服务器成本。"},
-  {"id": "rm-outro", "text": "总结一下：七个阶段，从基础到商业化。当前在Phase 3，核心闭环即将打通。每一步都在朝着Agent时代的微信前进。"}
-]
