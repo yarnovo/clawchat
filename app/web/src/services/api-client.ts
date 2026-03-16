@@ -2,12 +2,6 @@ import type { Agent } from '@/types'
 
 const BASE_URL = '/api'
 
-let authToken: string | null = null
-
-export function setAuthToken(token: string | null) {
-  authToken = token
-}
-
 class ApiError extends Error {
   status: number
 
@@ -27,13 +21,10 @@ async function request<T>(
     ...(options.headers as Record<string, string>),
   }
 
-  if (authToken) {
-    headers['Authorization'] = `Bearer ${authToken}`
-  }
-
   const res = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers,
+    credentials: 'include', // httpOnly cookie auto-sent
   })
 
   if (!res.ok) {
@@ -42,6 +33,37 @@ async function request<T>(
   }
 
   return res.json() as Promise<T>
+}
+
+// ---------- Auth ----------
+
+export async function apiLogin(
+  username: string,
+): Promise<{ user: { id: string; name: string } }> {
+  return request('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ username }),
+  })
+}
+
+export async function apiRegister(
+  username: string,
+  avatar?: string,
+): Promise<{ user: { id: string; name: string } }> {
+  return request('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ username, avatar }),
+  })
+}
+
+export async function apiLogout(): Promise<void> {
+  return request('/auth/logout', { method: 'POST' })
+}
+
+export async function getMe(): Promise<{
+  user: { id: string; name: string; type: string }
+}> {
+  return request('/auth/me')
 }
 
 // ---------- Conversations (chat list) ----------
@@ -69,8 +91,8 @@ export async function getAgent(agentId: string): Promise<{ agent: Agent }> {
 export async function createAgent(body: {
   name: string
   description?: string
-  persona?: string
-  resourceProfile?: string
+  avatar?: string
+  category?: string
 }): Promise<{ agent: Agent }> {
   return request('/agents', { method: 'POST', body: JSON.stringify(body) })
 }
@@ -89,7 +111,7 @@ export async function stopAgent(agentId: string): Promise<{ agent: Agent }> {
   return request(`/agents/${agentId}/stop`, { method: 'POST' })
 }
 
-// ---------- Messages (proxy to container) ----------
+// ---------- Messages ----------
 
 export async function sendMessage(
   agentId: string,

@@ -1,4 +1,6 @@
-import { useRef, useEffect, useState, useMemo } from "react"
+import { useRef, useState, useMemo } from "react"
+import { useForm } from "react-hook-form"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Search, Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -11,7 +13,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
-import { useAgentStore } from "@/stores/agent-store"
 import { listAgents, createAgent } from "@/services/api-client"
 
 interface AgentListProps {
@@ -38,40 +39,35 @@ function getAvatarColor(id: string) {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
 }
 
+interface CreateAgentForm {
+  name: string
+  category: string
+  description: string
+}
+
 export function AgentList({
   className,
   selectedAgentId,
   onAgentSelect,
   autoFocusSearch = false,
 }: AgentListProps) {
-  const agents = useAgentStore((s) => s.agents)
-  const setAgents = useAgentStore((s) => s.setAgents)
-  const addAgentToStore = useAgentStore((s) => s.addAgent)
+  const queryClient = useQueryClient()
+  const { data } = useQuery({
+    queryKey: ["agents"],
+    queryFn: () => listAgents(),
+  })
+  const agents = data?.agents ?? []
 
   const searchRef = useRef<HTMLInputElement>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [newName, setNewName] = useState("")
   const [avatarSeed, setAvatarSeed] = useState(() => String(Date.now()))
-  const [newDesc, setNewDesc] = useState("")
 
-  const avatarUrl = `https://api.dicebear.com/9.x/bottts/svg?seed=${encodeURIComponent(avatarSeed)}`
+  const avatarUrl = `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(avatarSeed)}`
 
-  const randomizeAvatar = () => setAvatarSeed(String(Date.now()))
+  const { register, handleSubmit, reset, formState: { isValid } } = useForm<CreateAgentForm>({
+    mode: "onChange",
+  })
 
-  // Fetch agents from API
-  useEffect(() => {
-    listAgents()
-      .then((data) => setAgents(data.agents))
-      .catch(() => {})
-  }, [setAgents])
-
-  useEffect(() => {
-    if (autoFocusSearch) {
-      searchRef.current?.focus()
-    }
-  }, [autoFocusSearch])
-
-  // Group agents by category (derived from data)
   const grouped = useMemo(() => {
     const map = new Map<string, typeof agents>()
     for (const agent of agents) {
@@ -82,33 +78,21 @@ export function AgentList({
     return [...map.entries()]
   }, [agents])
 
-  const handleCreate = async () => {
-    const name = newName.trim()
-    if (!name) return
-
+  const onCreateSubmit = async (formData: CreateAgentForm) => {
     try {
-      const { agent } = await createAgent({
-        name,
-        description: newDesc.trim(),
+      await createAgent({
+        name: formData.name,
+        description: formData.description,
+        avatar: avatarUrl,
+        category: formData.category,
       })
-      addAgentToStore(agent)
+      await queryClient.invalidateQueries({ queryKey: ["agents"] })
     } catch {
-      // fallback: add locally
-      addAgentToStore({
-        id: `agent-${Date.now()}`,
-        name,
-        description: newDesc.trim(),
-        status: "running",
-        currentSessionId: 1,
-        resourceProfile: "standard",
-        skills: [],
-        createdAt: new Date().toISOString(),
-      })
+      // ignore — backend not ready
     }
 
-    setNewName("")
+    reset()
     setAvatarSeed(String(Date.now()))
-    setNewDesc("")
     setDialogOpen(false)
   }
 
@@ -119,7 +103,6 @@ export function AgentList({
         className,
       )}
     >
-      {/* Search + Add */}
       <div className="flex h-14 shrink-0 items-center gap-2 border-b border-sidebar-border px-3">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -137,7 +120,6 @@ export function AgentList({
         </button>
       </div>
 
-      {/* Categorized agent list — categories derived from data */}
       <ScrollArea className="flex-1">
         <div className="flex flex-col">
           {grouped.map(([category, categoryAgents]) => (
@@ -194,14 +176,13 @@ export function AgentList({
             <DialogTitle>创建 Agent</DialogTitle>
           </DialogHeader>
 
-          <div className="flex flex-col gap-4 py-2">
+          <form onSubmit={handleSubmit(onCreateSubmit)} className="flex flex-col gap-4 py-2">
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium">
                 名称 <span className="text-destructive">*</span>
               </label>
               <Input
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
+                {...register("name", { required: true })}
                 placeholder="例如: MyBot"
                 autoFocus
               />
@@ -221,7 +202,7 @@ export function AgentList({
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={randomizeAvatar}
+                  onClick={() => setAvatarSeed(String(Date.now()))}
                 >
                   随机换一个
                 </Button>
@@ -229,22 +210,39 @@ export function AgentList({
             </div>
 
             <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium">
+                分类 <span className="text-destructive">*</span>
+              </label>
+              <Input
+                {...register("category", { required: true })}
+                placeholder="例如: 编程开发"
+                list="category-options"
+              />
+              <datalist id="category-options">
+                {[...new Set(agents.map((a) => a.category).filter(Boolean))].map(
+                  (cat) => (
+                    <option key={cat} value={cat} />
+                  ),
+                )}
+              </datalist>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium">描述</label>
               <textarea
-                value={newDesc}
-                onChange={(e) => setNewDesc(e.target.value)}
+                {...register("description")}
                 placeholder="这个 Agent 能做什么..."
                 rows={3}
                 className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
               />
             </div>
-          </div>
 
-          <DialogFooter>
-            <Button onClick={handleCreate} disabled={!newName.trim()}>
-              创建
-            </Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button type="submit" disabled={!isValid}>
+                创建
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

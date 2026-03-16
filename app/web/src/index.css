@@ -30,7 +30,7 @@
     --chart-4: oklch(0.488 0.243 264.376);
     --chart-5: oklch(0.424 0.199 265.638);
     --radius: 0.625rem;
-    --chat-bg: oklch(0.955 0.005 100);
+    --chat-bg: oklch(0.97 0 0);
     --chat-user: oklch(0.85 0.12 145);
     --chat-user-foreground: oklch(0.2 0 0);
     --sidebar: oklch(0.985 0 0);

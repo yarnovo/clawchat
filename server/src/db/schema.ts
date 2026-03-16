@@ -21,30 +21,28 @@ export const agentStatusEnum = pgEnum('agent_status', [
 
 // ---------- Tables ----------
 
+export const accounts = pgTable('accounts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  username: text('username').notNull().unique(),
+  name: text('name').notNull(),
+  avatar: text('avatar'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const agents = pgTable('agents', {
   id: uuid('id').primaryKey().defaultRandom(),
-  ownerId: uuid('owner_id').notNull(),
+  ownerId: uuid('owner_id')
+    .notNull()
+    .references(() => accounts.id),
   name: text('name').notNull(),
   description: text('description').default(''),
-  imageTag: text('image_tag'),
+  avatar: text('avatar'),
+  category: text('category'),
   status: agentStatusEnum('status').notNull().default('created'),
   channelUrl: text('channel_url'),
   containerName: text('container_name'),
-  config: jsonb('config').default({}),
   currentSessionId: integer('current_session_id').notNull().default(1),
-  resourceProfile: text('resource_profile').notNull().default('default'),
+  config: jsonb('config').default({}),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  deletedAt: timestamp('deleted_at', { withTimezone: true }),
 });
-
-export const skillInstallations = pgTable('skill_installations', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  agentId: uuid('agent_id')
-    .notNull()
-    .references(() => agents.id),
-  skillName: text('skill_name').notNull(),
-  version: text('version').notNull().default('latest'),
-  installedAt: timestamp('installed_at', { withTimezone: true }).notNull().defaultNow(),
-});
-

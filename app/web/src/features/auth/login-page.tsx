@@ -1,23 +1,30 @@
-import { useState, type KeyboardEvent } from 'react'
-import { Link } from '@tanstack/react-router'
+import { useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { Link, useNavigate } from '@tanstack/react-router'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { useUIStore } from '@/stores/ui-store'
+import { apiLogin } from '@/services/api-client'
+
+interface LoginForm {
+  username: string
+  password: string
+}
 
 export function LoginPage() {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const login = useUIStore((s) => s.login)
+  const navigate = useNavigate()
+  const [error, setError] = useState('')
+  const { register, handleSubmit, formState: { isValid, isSubmitting } } = useForm<LoginForm>({
+    mode: 'onChange',
+  })
 
-  const canLogin = username.trim().length > 0
-
-  const handleLogin = () => {
-    if (!canLogin) return
-    login()
-  }
-
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Enter' && canLogin) handleLogin()
+  const onSubmit = async (data: LoginForm) => {
+    setError('')
+    try {
+      await apiLogin(data.username)
+      navigate({ to: '/chat' })
+    } catch {
+      setError('登录失败，请重试')
+    }
   }
 
   return (
@@ -28,29 +35,22 @@ export function LoginPage() {
           <p className="mt-1 text-sm text-muted-foreground">登录你的账号</p>
         </div>
 
-        <div className="space-y-3">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
           <Input
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            onKeyDown={handleKeyDown}
+            {...register('username', { required: true })}
             placeholder="用户名"
             autoFocus
           />
           <Input
             type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={handleKeyDown}
+            {...register('password')}
             placeholder="密码"
           />
-          <Button
-            className="w-full"
-            onClick={handleLogin}
-            disabled={!canLogin}
-          >
-            登录
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <Button className="w-full" type="submit" disabled={!isValid || isSubmitting}>
+            {isSubmitting ? '登录中...' : '登录'}
           </Button>
-        </div>
+        </form>
 
         <p className="text-center text-sm text-muted-foreground">
           没有账号？

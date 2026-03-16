@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { agents } from '../db/schema.js';
 import type { AuthEnv } from '../middleware/auth.js';
@@ -15,7 +15,7 @@ async function getRunningAgent(agentId: string, userId: string) {
   const [agent] = await db
     .select()
     .from(agents)
-    .where(and(eq(agents.id, agentId), eq(agents.ownerId, userId), isNull(agents.deletedAt)));
+    .where(and(eq(agents.id, agentId), eq(agents.ownerId, userId)));
 
   if (!agent) return { error: 'Agent not found', status: 404 as const };
   if (agent.status !== 'running') return { error: 'Agent is not running', status: 400 as const };
@@ -98,7 +98,7 @@ app.post('/:agentId/sessions/new', async (c) => {
   const [agent] = await db
     .select()
     .from(agents)
-    .where(and(eq(agents.id, agentId), eq(agents.ownerId, userId), isNull(agents.deletedAt)));
+    .where(and(eq(agents.id, agentId), eq(agents.ownerId, userId)));
 
   if (!agent) {
     return c.json({ error: 'Agent not found' }, 404);

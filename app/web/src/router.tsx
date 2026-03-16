@@ -12,21 +12,28 @@ import { AppShell } from '@/components/layout/app-shell'
 import { LoginPage } from '@/features/auth/login-page'
 import { RegisterPage } from '@/features/auth/register-page'
 import { useTheme } from '@/hooks/use-theme'
+import { getMe } from '@/services/api-client'
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30_000,
-      retry: 1,
+      retry: false,
     },
   },
 })
 
-function isLoggedIn() {
-  return localStorage.getItem('loggedIn') === 'true'
+/** Check auth by calling /api/auth/me — returns true if cookie is valid */
+async function checkAuth(): Promise<boolean> {
+  try {
+    await getMe()
+    return true
+  } catch {
+    return false
+  }
 }
 
-// Root layout — just providers + theme
+// Root layout
 const rootRoute = createRootRoute({
   component: function RootLayout() {
     useTheme()
@@ -45,8 +52,8 @@ const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
   component: LoginPage,
-  beforeLoad: () => {
-    if (isLoggedIn()) throw redirect({ to: '/chat' })
+  beforeLoad: async () => {
+    if (await checkAuth()) throw redirect({ to: '/chat' })
   },
 })
 
@@ -55,12 +62,12 @@ const registerRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/register',
   component: RegisterPage,
-  beforeLoad: () => {
-    if (isLoggedIn()) throw redirect({ to: '/chat' })
+  beforeLoad: async () => {
+    if (await checkAuth()) throw redirect({ to: '/chat' })
   },
 })
 
-// Authenticated layout — wraps all protected routes
+// Authenticated layout
 const authLayout = createRoute({
   getParentRoute: () => rootRoute,
   id: 'auth',
@@ -71,12 +78,12 @@ const authLayout = createRoute({
       </AppShell>
     )
   },
-  beforeLoad: () => {
-    if (!isLoggedIn()) throw redirect({ to: '/login' })
+  beforeLoad: async () => {
+    if (!(await checkAuth())) throw redirect({ to: '/login' })
   },
 })
 
-// Index route — redirect to /chat
+// Index route
 const indexRoute = createRoute({
   getParentRoute: () => authLayout,
   path: '/',
@@ -103,9 +110,6 @@ const agentsRoute = createRoute({
   getParentRoute: () => authLayout,
   path: '/agents',
   component: lazyRouteComponent(() => import('./pages/agents')),
-  validateSearch: (search: Record<string, unknown>) => ({
-    focus: (search.focus as string) || undefined,
-  }),
 })
 
 // Build route tree

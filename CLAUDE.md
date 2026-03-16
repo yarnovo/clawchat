@@ -3,41 +3,32 @@
 ## 架构总览
 
 ```
-Flutter App ── REST/WebSocket ──→ nginx ──┬── im-server (3000)            ── PostgreSQL (clawchat)
-Skill Browser ── /skills/ ──→ nginx      ├── agent-server (3004)         ── PostgreSQL (clawchat_agent)
-                                          ├── skill-registry-server (3007) ── skills/ submodule
-                                          └── mcp-server (8000)
-
-agent-server ──→ openclaw-server (3003) ──→ container-server (3002) ──→ Docker
-                                                                         │
-                                                                   openclaw-agent 容器
-                                                                     │         │
-                                                  CLAWHUB_REGISTRY ──┘         │
-                                                  → skill-registry-server      │
-                                                            callback ──→ im-server → Redis queue → Worker
+React SPA (Vite :5173) ── /api proxy ──→ server (Hono :3000) ── PostgreSQL (clawchat)
+                                              │
+                                         orchestrator (dockerode)
+                                              │
+                                        AgentKit 容器 ──→ /workspace (volume)
 ```
 
-| 服务 | 职责 |
-|------|------|
-| im-server | IM 核心：账号、好友、会话、消息、WebSocket 推送 |
-| agent-server | Agent CRUD + 生命周期（start/stop/chat），JWT 认证，Saga 编排 |
-| openclaw-server | OpenClaw 实例配置生成 + 编排（create/start/stop） |
-| container-server | Docker 容器管理（thin wrapper，未来可接入其他 runtime） |
-| skill-registry-server | ClawHub 兼容的技能注册表，从 skills/ submodule 提供搜索/下载 |
-| mcp-server | MCP 工具服务（FastAPI/Python） |
+| 模块 | 技术 | 职责 |
+|------|------|------|
+| app/web | React 19 + Vite + TanStack Router/Query + Tailwind + shadcn + Zustand | Web 前端 SPA |
+| server | Hono + Drizzle + PostgreSQL + dockerode | 统一后端：Auth、Agent CRUD、消息代理、容器编排 |
+| agentkit | TypeScript | Agent 运行时框架（core + CLI + extension-skills） |
+| ironclaw | Rust | 独立 AI 助手（单独数据库，Flyway 迁移） |
+| openclaw | TypeScript | OpenClaw 源码，Agent 容器镜像基础 |
 
 **关键数据流：**
-1. 创建 Agent → Saga: 注册 IM 账号 → 建 DB 记录 → 加好友关系 → 启动容器
-2. 用户发消息给 Agent → im-server → agent-server /chat → openclaw 容器
-3. Agent 回复 → openclaw 容器 callback → im-server Redis queue → Worker 存消息 + WebSocket 推送
+1. 创建 Agent → DB 记录（agents 表）
+2. 启动 Agent → 创建 workspace → Docker 容器启动 → 健康检查 → 状态更新为 running
+3. 用户发消息 → server 代理到 Agent 容器的 `/api/chat` → SSE 流式返回
 
 ## 本地开发流程
 
-- `make dev` — 启动所有服务（Docker Compose + nginx），Web UI 在 http://localhost:8080
-- `make reload` — 前端改动后重新构建 Flutter Web + 重启 nginx，刷新即可看到效果
+- `make dev` — 启动 Docker DB + server (pnpm dev, :3000) + Vite 前端 (:5173)
 - `make dev-stop` — 停止所有服务
-- **禁止用 `flutter run -d chrome` 做本地开发**，前端通过 nginx 代理访问（与后端 API 同域）
-- Playwright MCP 调试目标地址：http://localhost:8080
+- 前端通过 Vite proxy 将 `/api` 请求转发到 `localhost:3000`
+- Playwright MCP 调试目标地址：http://localhost:5173
 
 ## 部署检查清单
 
@@ -49,37 +40,37 @@ agent-server ──→ openclaw-server (3003) ──→ container-server (3002) 
 
 ### 具体规则
 
-- 新增后端服务时，必须确保容器启动时自动完成数据库迁移（如 `prisma migrate deploy`），不能依赖手动操作
-- Docker 服务必须加 `.dockerignore`，排除 `node_modules`、`dist`、`.env` 等，避免 rsync 和 build 变慢
-- rsync 部署时必须 `--exclude=node_modules`，Dockerfile 内 `npm ci` 重新安装
+- 数据库迁移通过 drizzle-kit 管理，容器启动时自动执行 `tsx src/db/migrate.ts`
+- Docker 服务必须加 `.dockerignore`，排除 `node_modules`、`dist`、`.env` 等
 - `docker-compose.yml` 使用 profiles 区分本地开发（db only）和线上部署（全部服务）
-- 线上所有服务都跑在 Docker 内，不在宿主机直接安装运行时（如 Node.js、Python）
-- 新增服务必须同步更新：Dockerfile、docker-compose.yml、nginx 配置、release.yml deploy 步骤、Makefile 快捷指令、CI workflow
+- 线上所有服务都跑在 Docker 内，不在宿主机直接安装运行时
+- 新增功能必须同步更新：docker-compose.yml、Makefile 快捷指令、CI workflow
 
 ## 测试规则
 
 ### 测试分层
 
-- **L1 单元/Widget**：mock HTTP，CI 每次 push 跑。Flutter widget + im-server JWT 单元测试
-- **L2 API e2e**：真实 DB，CI 每次 push 跑。im-server 用 app.request() 直连测试数据库
-- **L3 全链路集成**：Flutter + 真实 im-server + 真实 DB，覆盖注册→登录→加好友→私聊。本地/CD 前跑
+- **L1 单元测试**：mock HTTP，CI 每次 push 跑。server 用 vitest
+- **L2 API e2e**：真实 DB，CI 每次 push 跑。server 用 Hono `app.request()` 直连测试数据库
+- **L3 全链路 E2E**：React 前端 + 真实 server + 真实 DB，Playwright 覆盖注册→登录→创建 Agent→对话
 
 ### 具体规则
 
-- 每次新增功能必须同步编写测试：每个新 API 补 L2 测试，每个新页面补 L1 widget 测试
-- Flutter 测试中使用 `InMemoryTokenStore` 注入 `AuthService`，不依赖真实 SharedPreferences
-- im-server 测试使用 `vitest`，e2e 测试通过 Hono `app.request()` 直连测试数据库
-- 提交前 lefthook 自动检查：Flutter analyze + TypeScript typecheck
+- 每次新增功能必须同步编写测试：每个新 API 补 L2 测试，每个新页面补 Playwright E2E 测试
+- server 测试使用 `vitest`，e2e 测试通过 Hono `app.request()` 直连测试数据库
+- 提交前 lefthook 自动检查：TypeScript typecheck
 
 ## API 路由
 
-- `/v1/im/*` — im-server (Hono/TypeScript)，IM 核心业务
-- `/v1/agents/*` — agent-server (Hono/TypeScript)，Agent CRUD + 生命周期
-- `/v1/containers/*` — container-server (Hono/TypeScript)，Docker 容器管理
-- `/v1/openclaw/*` — openclaw-server (Hono/TypeScript)，OpenClaw 实例编排
-- `/v1/mcp/*` — mcp-server (FastAPI/Python)，MCP 服务
-- `/api/v1/*` — skill-registry-server (Hono/TypeScript)，ClawHub 兼容技能注册表
-- `/.well-known/clawhub.json` — skill-registry-server，Registry 发现协议
+所有 API 由统一的 server (Hono) 提供，前缀 `/api`：
+
+- `/api/auth/*` — 认证：register、login、logout、me（cookie-based JWT，无密码）
+- `/api/agents` — Agent CRUD：list、create、get、delete
+- `/api/agents/:id/start` `/api/agents/:id/stop` — Agent 容器生命周期
+- `/api/agents/:agentId/messages` — 消息代理（POST 发送 + GET SSE 流）
+- `/api/agents/:agentId/sessions/new` — 新建会话
+- `/api/agents/:agentId/info` — Agent 信息（代理到容器）
+- `/api/skills` — 内置技能列表、详情、安装/卸载
 
 ## 文档导航
 

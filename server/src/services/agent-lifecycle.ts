@@ -62,12 +62,12 @@ export async function startAgent(agentId: string): Promise<{ channelUrl: string 
     if (config.llmBaseUrl) env.LLM_BASE_URL = String(config.llmBaseUrl);
     if (config.llmModel) env.LLM_MODEL = String(config.llmModel);
 
-    // 启动容器（根据 resourceProfile 选择资源配置）
-    const profile = PROFILES[agent.resourceProfile ?? 'default'] ?? PROFILES.default;
+    // 启动容器
+    const profile = PROFILES.default;
 
     const containerInfo = await orchestrator.run({
       name: containerName,
-      image: agent.imageTag || DEFAULT_IMAGE,
+      image: DEFAULT_IMAGE,
       env,
       volumes: [{ host: wsPath, container: '/workspace' }],
       network: DEFAULT_NETWORK,
@@ -152,7 +152,6 @@ export async function forkAgent(
       ownerId: input.userId,
       name: input.name,
       description: input.description || sourceAgent.description,
-      imageTag: sourceAgent.imageTag,
       config: sourceAgent.config,
       status: 'created',
     })
@@ -184,7 +183,6 @@ export async function deleteAgent(agentId: string): Promise<void> {
     .update(agents)
     .set({
       status: 'deleted',
-      deletedAt: new Date(),
       updatedAt: new Date(),
     })
     .where(eq(agents.id, agentId));

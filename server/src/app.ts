@@ -5,25 +5,109 @@
 import { Hono } from 'hono';
 import { serve } from '@hono/node-server';
 import { cors } from 'hono/cors';
+import { sign } from 'hono/utils/jwt/jwt';
+import { setCookie } from 'hono/cookie';
+import { eq } from 'drizzle-orm';
 import { authMiddleware, type AuthEnv } from './middleware/auth.js';
+import { db } from './db/index.js';
+import { accounts } from './db/schema.js';
 import { agentsRoutes } from './routes/agents.js';
 import { messagesRoutes } from './routes/messages.js';
 import { skillsRoutes } from './routes/skills.js';
 
 const app = new Hono<AuthEnv>();
 
-// ---------- Global middleware ----------
-app.use('*', cors());
+const jwtSecret = process.env.JWT_SECRET || 'dev-secret';
+const isDev = process.env.NODE_ENV !== 'production';
 
-// Health check (before auth)
+// ---------- Global middleware ----------
+app.use('*', cors({
+  origin: isDev ? 'http://localhost:5173' : '',
+  credentials: true,
+}));
+
+// Health check
 app.get('/health', (c) => c.json({ status: 'ok' }));
 
-// JWT auth (skips /health internally)
+// ---------- Auth ----------
+
+function setTokenCookie(c: Parameters<typeof setCookie>[0], token: string) {
+  setCookie(c, 'token', token, {
+    httpOnly: true,
+    secure: !isDev,
+    sameSite: isDev ? 'Lax' : 'Strict',
+    path: '/',
+    maxAge: 60 * 60 * 24 * 7,
+  });
+}
+
+async function signToken(accountId: string, name: string) {
+  return sign({ accountId, type: 'human', name }, jwtSecret, 'HS256');
+}
+
+app.post('/api/auth/register', async (c) => {
+  const { username, name, avatar } = await c.req.json<{
+    username: string; name?: string; avatar?: string;
+  }>();
+  if (!username) return c.json({ error: 'username required' }, 400);
+
+  // Check if username already exists
+  const existing = await db.select().from(accounts).where(eq(accounts.username, username)).limit(1);
+  if (existing.length > 0) {
+    return c.json({ error: 'username already taken' }, 409);
+  }
+
+  const [account] = await db.insert(accounts).values({
+    username,
+    name: name ?? username,
+    avatar: avatar ?? null,
+  }).returning();
+
+  const token = await signToken(account.id, account.name);
+  setTokenCookie(c, token);
+  return c.json({ user: { id: account.id, name: account.name, username: account.username } });
+});
+
+app.post('/api/auth/login', async (c) => {
+  const { username } = await c.req.json<{ username: string }>();
+  if (!username) return c.json({ error: 'username required' }, 400);
+
+  const [account] = await db.select().from(accounts).where(eq(accounts.username, username)).limit(1);
+  if (!account) {
+    return c.json({ error: 'user not found' }, 404);
+  }
+
+  const token = await signToken(account.id, account.name);
+  setTokenCookie(c, token);
+  return c.json({ user: { id: account.id, name: account.name, username: account.username } });
+});
+
+app.post('/api/auth/logout', (c) => {
+  setCookie(c, 'token', '', {
+    httpOnly: true,
+    secure: !isDev,
+    sameSite: isDev ? 'Lax' : 'Strict',
+    path: '/',
+    maxAge: 0,
+  });
+  return c.json({ ok: true });
+});
+
+// JWT auth
 app.use('*', authMiddleware());
+
+// Auth: get current user
+app.get('/api/auth/me', async (c) => {
+  const [account] = await db.select().from(accounts).where(eq(accounts.id, c.get('userId'))).limit(1);
+  if (!account) return c.json({ error: 'not found' }, 404);
+  return c.json({
+    user: { id: account.id, name: account.name, username: account.username, avatar: account.avatar },
+  });
+});
 
 // ---------- Routes ----------
 app.route('/api/agents', agentsRoutes);
-app.route('/api/agents', messagesRoutes);  // :agentId/messages, :agentId/sessions, :agentId/info
+app.route('/api/agents', messagesRoutes);
 app.route('/api/skills', skillsRoutes);
 
 // ---------- Start ----------

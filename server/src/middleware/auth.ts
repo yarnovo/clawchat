@@ -1,8 +1,9 @@
 import { Context, MiddlewareHandler } from 'hono';
+import { getCookie } from 'hono/cookie';
 import { jwt } from 'hono/jwt';
 
 /**
- * JWT payload structure (issued by im-server)
+ * JWT payload structure
  */
 export interface JwtPayload {
   accountId: string;
@@ -24,17 +25,24 @@ export interface AuthEnv {
 
 /**
  * JWT auth middleware.
- * Skips authentication for /health endpoint.
+ * Reads token from httpOnly cookie or Authorization header.
+ * Skips /health and /api/auth/* endpoints.
  */
 export function authMiddleware(): MiddlewareHandler {
   const secret = process.env.JWT_SECRET || 'dev-secret';
-
   const jwtMiddleware = jwt({ secret, alg: 'HS256' });
 
   return async (c: Context, next) => {
-    // Skip auth for health check
-    if (c.req.path === '/health') {
+    // Skip auth for health check and public auth endpoints
+    const publicPaths = ['/health', '/api/auth/login', '/api/auth/register', '/api/auth/logout'];
+    if (publicPaths.includes(c.req.path)) {
       return next();
+    }
+
+    // Read token from cookie and inject as Authorization header
+    const cookieToken = getCookie(c, 'token');
+    if (cookieToken && !c.req.header('Authorization')) {
+      c.req.raw.headers.set('Authorization', `Bearer ${cookieToken}`);
     }
 
     // Run Hono's built-in JWT middleware
