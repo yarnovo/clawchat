@@ -20,7 +20,7 @@ export function LoginPage() {
   const onSubmit = async (data: LoginForm) => {
     setError('')
     try {
-      await apiLogin(data.username)
+      await apiLogin(data.username, data.password)
       navigate({ to: '/chat' })
     } catch {
       setError('登录失败，请重试')
@@ -43,7 +43,7 @@ export function LoginPage() {
           />
           <Input
             type="password"
-            {...register('password')}
+            {...register('password', { required: true })}
             placeholder="密码"
           />
           {error && <p className="text-xs text-destructive">{error}</p>}

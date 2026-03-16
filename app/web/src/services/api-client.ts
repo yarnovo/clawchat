@@ -39,20 +39,22 @@ async function request<T>(
 
 export async function apiLogin(
   username: string,
+  password: string,
 ): Promise<{ user: { id: string; name: string } }> {
   return request('/auth/login', {
     method: 'POST',
-    body: JSON.stringify({ username }),
+    body: JSON.stringify({ username, password }),
   })
 }
 
 export async function apiRegister(
   username: string,
+  password: string,
   avatar?: string,
 ): Promise<{ user: { id: string; name: string } }> {
   return request('/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ username, avatar }),
+    body: JSON.stringify({ username, password, avatar }),
   })
 }
 

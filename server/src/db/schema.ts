@@ -24,6 +24,7 @@ export const agentStatusEnum = pgEnum('agent_status', [
 export const accounts = pgTable('accounts', {
   id: uuid('id').primaryKey().defaultRandom(),
   username: text('username').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
   name: text('name').notNull(),
   avatar: text('avatar'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

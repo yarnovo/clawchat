@@ -8,6 +8,7 @@ import { cors } from 'hono/cors';
 import { sign } from 'hono/utils/jwt/jwt';
 import { setCookie } from 'hono/cookie';
 import { eq } from 'drizzle-orm';
+import { hash, compare } from 'bcryptjs';
 import { authMiddleware, type AuthEnv } from './middleware/auth.js';
 import { db } from './db/index.js';
 import { accounts } from './db/schema.js';
@@ -46,10 +47,11 @@ async function signToken(accountId: string, name: string) {
 }
 
 app.post('/api/auth/register', async (c) => {
-  const { username, name, avatar } = await c.req.json<{
-    username: string; name?: string; avatar?: string;
+  const { username, password, name, avatar } = await c.req.json<{
+    username: string; password: string; name?: string; avatar?: string;
   }>();
   if (!username) return c.json({ error: 'username required' }, 400);
+  if (!password) return c.json({ error: 'password required' }, 400);
 
   // Check if username already exists
   const existing = await db.select().from(accounts).where(eq(accounts.username, username)).limit(1);
@@ -57,8 +59,10 @@ app.post('/api/auth/register', async (c) => {
     return c.json({ error: 'username already taken' }, 409);
   }
 
+  const passwordHash = await hash(password, 10);
   const [account] = await db.insert(accounts).values({
     username,
+    passwordHash,
     name: name ?? username,
     avatar: avatar ?? null,
   }).returning();
@@ -69,12 +73,18 @@ app.post('/api/auth/register', async (c) => {
 });
 
 app.post('/api/auth/login', async (c) => {
-  const { username } = await c.req.json<{ username: string }>();
+  const { username, password } = await c.req.json<{ username: string; password: string }>();
   if (!username) return c.json({ error: 'username required' }, 400);
+  if (!password) return c.json({ error: 'password required' }, 400);
 
   const [account] = await db.select().from(accounts).where(eq(accounts.username, username)).limit(1);
   if (!account) {
     return c.json({ error: 'user not found' }, 404);
+  }
+
+  const valid = await compare(password, account.passwordHash);
+  if (!valid) {
+    return c.json({ error: 'invalid password' }, 401);
   }
 
   const token = await signToken(account.id, account.name);

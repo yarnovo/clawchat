@@ -26,7 +26,7 @@ export function RegisterPage() {
   const onSubmit = async (data: RegisterForm) => {
     setError('')
     try {
-      await apiRegister(data.username, avatarUrl)
+      await apiRegister(data.username, data.password, avatarUrl)
       navigate({ to: '/chat' })
     } catch {
       setError('注册失败，请重试')
