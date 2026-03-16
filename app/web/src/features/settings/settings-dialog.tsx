@@ -31,6 +31,7 @@ import { useTheme } from "@/hooks/use-theme"
 export function SettingsDialog() {
   const open = useUIStore((s) => s.settingsOpen)
   const setOpen = useUIStore((s) => s.setSettingsOpen)
+  const logout = useUIStore((s) => s.logout)
   const { theme, setTheme } = useTheme()
 
   return (
@@ -75,7 +76,7 @@ export function SettingsDialog() {
                 <Separator />
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">操作</span>
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" onClick={logout}>
                     退出登录
                   </Button>
                 </div>
