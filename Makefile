@@ -41,10 +41,13 @@ deploy-logs:
 	docker compose --profile deploy logs -f
 
 # ---- AgentKit ----
-.PHONY: agentkit-build agentkit-test agentkit-run agentkit-eval
+.PHONY: agentkit-build agentkit-test agentkit-run agentkit-eval agentkit-image
 
 agentkit-build:
 	cd agentkit && pnpm build
+
+agentkit-image:
+	docker build -t agentkit-base:latest -f agentkit/agentkit-base/Dockerfile .
 
 agentkit-test:
 	cd agentkit/core && npx vitest run

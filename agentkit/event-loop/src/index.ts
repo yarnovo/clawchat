@@ -29,6 +29,7 @@ export function createEvent(
 export interface Runnable {
   run(message: string): Promise<string>;
   inject(content: string): void;
+  abort(): void;
 }
 
 // ---- 格式化 ----
@@ -76,6 +77,11 @@ export class EventLoop {
     this.push(event).catch(err =>
       console.error(`[EventLoop] ${event.type}:${event.source} error: ${(err as Error).message}`),
     );
+  }
+
+  /** 中断当前运行 */
+  abort(): void {
+    this.agent?.abort();
   }
 
   get isProcessing(): boolean { return this.runningPromise !== null; }

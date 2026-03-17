@@ -45,6 +45,11 @@ app.post('/', async (c) => {
     })
     .returning();
 
+  // 创建后自动启动容器（fire-and-forget）
+  startAgent(agent.id).catch((err) => {
+    console.error(`[agents] auto-start failed for ${agent.id}:`, err);
+  });
+
   return c.json({ agent }, 201);
 });
 

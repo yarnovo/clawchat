@@ -6,6 +6,7 @@
  * GET  /api/info     → Agent 信息（收集所有插件 info）
  */
 import { createServer, Server, ServerResponse } from 'http';
+import crypto from 'crypto';
 import type { Channel, AgenticContext } from '@agentkit/agentic';
 import { createEvent } from '@agentkit/event-loop';
 import type { EventLoop } from '@agentkit/event-loop';
@@ -48,26 +49,52 @@ export function httpChannel(opts: HttpPluginOptions = {}): Channel {
           return;
         }
 
-        // Chat
+        // Chat (fire-and-forget: return 202 immediately, response via SSE)
         if (url.pathname === '/api/chat' && req.method === 'POST') {
           const chunks: Buffer[] = [];
           req.on('data', c => chunks.push(c));
-          req.on('end', async () => {
+          req.on('end', () => {
             try {
-              const { text } = JSON.parse(Buffer.concat(chunks).toString());
+              const { text, requestId } = JSON.parse(Buffer.concat(chunks).toString());
               if (!text?.trim()) { res.writeHead(400); res.end('{"error":"empty"}'); return; }
 
-              broadcast({ type: 'typing', isTyping: true });
-              const reply = await loop.push(createEvent('message', 'http', { text: text.trim() }));
-              broadcast({ type: 'typing', isTyping: false });
-              broadcast({ type: 'assistant', text: reply });
+              const rid = requestId || crypto.randomUUID();
 
-              res.writeHead(200, { 'Content-Type': 'application/json' });
-              res.end(JSON.stringify({ ok: true, reply }));
+              // 立即返回 202
+              res.writeHead(202, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ ok: true, requestId: rid }));
+
+              // 异步处理：broadcast typing → run → broadcast result
+              const event = createEvent('message', 'http', { text: text.trim(), requestId: rid });
+              broadcast({ type: 'typing', isTyping: true, requestId: rid });
+
+              loop.push(event).then(reply => {
+                broadcast({ type: 'typing', isTyping: false, requestId: rid });
+                broadcast({ type: 'assistant', text: reply, requestId: rid });
+              }).catch(err => {
+                broadcast({ type: 'typing', isTyping: false, requestId: rid });
+                broadcast({ type: 'error', message: (err as Error).message, requestId: rid });
+              });
             } catch {
               res.writeHead(400); res.end('{"error":"invalid request"}');
             }
           });
+          return;
+        }
+
+        // Abort current processing
+        if (url.pathname === '/api/abort' && req.method === 'POST') {
+          loop.abort();
+          broadcast({ type: 'aborted' });
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ ok: true }));
+          return;
+        }
+
+        // Health (for Docker health check)
+        if (url.pathname === '/health' && req.method === 'GET') {
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ status: 'ok' }));
           return;
         }
 
@@ -83,7 +110,7 @@ export function httpChannel(opts: HttpPluginOptions = {}): Channel {
 
       await new Promise<void>(resolve => server!.listen(port, resolve));
       console.log(`   HTTP: http://localhost:${port}`);
-      console.log(`     POST /api/chat  GET /api/events  GET /api/info`);
+      console.log(`     POST /api/chat  POST /api/abort  GET /api/events  GET /api/info`);
     },
 
     teardown: async () => {

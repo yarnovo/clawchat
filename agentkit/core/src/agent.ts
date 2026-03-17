@@ -47,6 +47,7 @@ export class Agent {
   private onAfterBash?: AgentOptions['onAfterBash'];
   private onText?: AgentOptions['onText'];
   private inbox: ChatMessage[] = [];
+  private abortController: AbortController | null = null;
 
   constructor(options: AgentOptions) {
     this.llm = options.llm;
@@ -74,11 +75,24 @@ export class Agent {
     }
   }
 
+  /** Abort the current run */
+  abort(): void {
+    this.abortController?.abort();
+  }
+
   async run(userMessage: string): Promise<string> {
+    this.abortController = new AbortController();
+    const signal = this.abortController.signal;
+
     this.session.addMessage({ role: 'user', content: userMessage });
     let round = 0;
 
     while (round < this.maxRounds) {
+      if (signal.aborted) {
+        const text = '[Aborted]';
+        this.session.addMessage({ role: 'assistant', content: text });
+        return text;
+      }
       round++;
       this.drainInbox();
       const messages: ChatMessage[] = [

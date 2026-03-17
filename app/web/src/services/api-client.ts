@@ -112,11 +112,18 @@ export async function stopAgent(agentId: string): Promise<{ agent: Agent }> {
 export async function sendMessage(
   agentId: string,
   text: string,
-): Promise<Record<string, unknown>> {
+  requestId?: string,
+): Promise<{ ok: boolean; requestId: string }> {
   return request(`/agents/${agentId}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, requestId }),
   })
+}
+
+export async function abortAgent(
+  agentId: string,
+): Promise<{ ok: boolean }> {
+  return request(`/agents/${agentId}/abort`, { method: 'POST' })
 }
 
 // ---------- Sessions ----------

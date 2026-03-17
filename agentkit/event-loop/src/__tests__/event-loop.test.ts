@@ -4,10 +4,11 @@ import type { AgentEvent, Runnable } from '../index.js';
 
 // ---- helpers ----
 
-function makeAgent(reply = 'agent reply'): Runnable & { run: ReturnType<typeof vi.fn>; inject: ReturnType<typeof vi.fn> } {
+function makeAgent(reply = 'agent reply'): Runnable & { run: ReturnType<typeof vi.fn>; inject: ReturnType<typeof vi.fn>; abort: ReturnType<typeof vi.fn> } {
   return {
     run: vi.fn().mockResolvedValue(reply),
     inject: vi.fn(),
+    abort: vi.fn(),
   };
 }
 
@@ -75,6 +76,7 @@ describe('EventLoop.push() — agent idle', () => {
     const agent: Runnable = {
       run: vi.fn((): Promise<string> => new Promise(r => { resolveRun = r; })),
       inject: vi.fn(),
+      abort: vi.fn(),
     };
     loop.bind(agent);
 
@@ -99,6 +101,7 @@ describe('EventLoop.push() — agent idle', () => {
     const agent: Runnable = {
       run: vi.fn().mockRejectedValue(new Error('boom')),
       inject: vi.fn(),
+      abort: vi.fn(),
     };
     loop.bind(agent);
 
@@ -118,6 +121,7 @@ describe('EventLoop.push() — agent busy → inject', () => {
     const agent: Runnable = {
       run: vi.fn((): Promise<string> => new Promise(r => { resolveRun = r; })),
       inject: vi.fn(),
+      abort: vi.fn(),
     };
     loop.bind(agent);
 
@@ -144,6 +148,7 @@ describe('EventLoop.push() — agent busy → inject', () => {
     const agent: Runnable = {
       run: vi.fn((): Promise<string> => new Promise(r => { resolveRun = r; })),
       inject: vi.fn(),
+      abort: vi.fn(),
     };
     loop.bind(agent);
 
@@ -192,6 +197,7 @@ describe('EventLoop.fire()', () => {
     const agent: Runnable = {
       run: vi.fn().mockRejectedValue(new Error('boom')),
       inject: vi.fn(),
+      abort: vi.fn(),
     };
     loop.bind(agent);
 

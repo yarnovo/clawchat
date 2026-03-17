@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { eq, and, asc } from 'drizzle-orm';
@@ -24,7 +25,7 @@ async function getRunningAgent(agentId: string, userId: string) {
   return { agent };
 }
 
-/** Send message to agent container (pure proxy, no DB persistence) */
+/** Send message — persist user msg, fire-and-forget to container, return 202 */
 app.post('/:agentId/messages', async (c) => {
   const userId = c.get('userId');
   const agentId = c.req.param('agentId');
@@ -34,18 +35,31 @@ app.post('/:agentId/messages', async (c) => {
     return c.json({ error: result.error }, result.status);
   }
 
-  const body = await c.req.json();
-  const upstream = await fetch(`${result.agent.channelUrl}/api/chat`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+  const body = await c.req.json<{ text: string; requestId?: string }>();
+  const requestId = body.requestId || crypto.randomUUID();
+
+  // 持久化 user 消息
+  await db.insert(messages).values({
+    agentId,
+    userId,
+    sessionId: result.agent.currentSessionId,
+    role: 'user',
+    content: body.text,
   });
 
-  const data = await upstream.json();
-  return c.json(data, upstream.status as any);
+  // Fire-and-forget: 不 await 容器响应
+  fetch(`${result.agent.channelUrl}/api/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: body.text, requestId }),
+  }).catch((err) => {
+    console.error(`[messages] fire-and-forget to container failed for ${agentId}:`, err);
+  });
+
+  return c.json({ ok: true, requestId }, 202);
 });
 
-/** SSE stream proxy — pipe agent's event stream to client */
+/** SSE stream proxy — pipe agent's event stream to client, persist assistant messages */
 app.get('/:agentId/messages/stream', async (c) => {
   const userId = c.get('userId');
   const agentId = c.req.param('agentId');
@@ -78,7 +92,24 @@ app.get('/:agentId/messages/stream', async (c) => {
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
-            await stream.writeSSE({ data: line.slice(6) });
+            const raw = line.slice(6);
+            await stream.writeSSE({ data: raw });
+
+            // 持久化 assistant 消息
+            try {
+              const parsed = JSON.parse(raw);
+              if (parsed.type === 'assistant' && parsed.text) {
+                await db.insert(messages).values({
+                  agentId,
+                  userId,
+                  sessionId: result.agent.currentSessionId,
+                  role: 'assistant',
+                  content: parsed.text,
+                });
+              }
+            } catch {
+              // JSON parse error or DB error — skip
+            }
           }
         }
       }
@@ -88,6 +119,25 @@ app.get('/:agentId/messages/stream', async (c) => {
       reader.releaseLock();
     }
   });
+});
+
+/** Abort current agent processing */
+app.post('/:agentId/abort', async (c) => {
+  const userId = c.get('userId');
+  const agentId = c.req.param('agentId');
+  const result = await getRunningAgent(agentId, userId);
+
+  if ('error' in result) {
+    return c.json({ error: result.error }, result.status);
+  }
+
+  try {
+    const upstream = await fetch(`${result.agent.channelUrl}/api/abort`, { method: 'POST' });
+    const data = await upstream.json();
+    return c.json(data, upstream.status as any);
+  } catch (err) {
+    return c.json({ error: 'Failed to abort' }, 500);
+  }
 });
 
 /** Start new session — increment currentSessionId */

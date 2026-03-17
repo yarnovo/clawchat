@@ -51,9 +51,9 @@ export class DockerOrchestrator implements ContainerOrchestrator {
         PidsLimit: opts.resources.pidsLimit,
         RestartPolicy: { Name: 'unless-stopped' },
       },
-      // 健康检查: 每 5s ping 一次，3 次失败标记 unhealthy
+      // 健康检查: 每 5s ping 一次，3 次失败标记 unhealthy（用 node 代替 curl）
       Healthcheck: {
-        Test: ['CMD-SHELL', `curl -sf http://localhost:${CONTAINER_INTERNAL_PORT}/health || exit 1`],
+        Test: ['CMD-SHELL', `node -e "fetch('http://localhost:${CONTAINER_INTERNAL_PORT}/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"`],
         Interval: 5_000_000_000,  // 5s in nanoseconds
         Timeout: 3_000_000_000,   // 3s
         Retries: 3,

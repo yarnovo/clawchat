@@ -1,6 +1,6 @@
 import { useCallback } from 'react'
 import { useAgentStore } from '@/stores/agent-store'
-import { sendMessage, newSession } from '@/services/api-client'
+import { sendMessage, abortAgent, newSession } from '@/services/api-client'
 import type { Message } from '@/types'
 
 export function useAgentChat(agentId: string | null) {
@@ -10,7 +10,6 @@ export function useAgentChat(agentId: string | null) {
   const addMessage = useAgentStore((s) => s.addMessage)
   const updateMessage = useAgentStore((s) => s.updateMessage)
   const updateAgent = useAgentStore((s) => s.updateAgent)
-  const setTyping = useAgentStore((s) => s.setTyping)
   const setCurrentSessionId = useAgentStore((s) => s.setCurrentSessionId)
   const clearMessages = useAgentStore((s) => s.clearMessages)
 
@@ -18,9 +17,9 @@ export function useAgentChat(agentId: string | null) {
     async (text: string) => {
       if (!agentId) return
 
-      const messageId = crypto.randomUUID()
+      const requestId = crypto.randomUUID()
       const userMessage: Message = {
-        id: messageId,
+        id: crypto.randomUUID(),
         agentId,
         sessionId: currentSessionId,
         role: 'user',
@@ -29,42 +28,31 @@ export function useAgentChat(agentId: string | null) {
         timestamp: Date.now(),
       }
 
+      // 乐观更新：立即添加 user 消息
       addMessage(userMessage)
       updateAgent(agentId, {
         lastMessage: { content: text, timestamp: userMessage.timestamp },
       })
-      setTyping(true)
 
+      // Fire-and-forget: POST 只确认 202，不等 assistant reply
       try {
-        const data = await sendMessage(agentId, text)
-
-        const replyContent =
-          (data as Record<string, string>).reply ??
-          (data as Record<string, string>).error ??
-          'No response'
-        const replyTimestamp = Date.now()
-
-        const assistantMessage: Message = {
-          id: crypto.randomUUID(),
-          agentId,
-          sessionId: currentSessionId,
-          role: 'assistant',
-          content: replyContent,
-          status: 'complete',
-          timestamp: replyTimestamp,
-        }
-        addMessage(assistantMessage)
-        updateAgent(agentId, {
-          lastMessage: { content: replyContent, timestamp: replyTimestamp },
-        })
+        await sendMessage(agentId, text, requestId)
       } catch {
-        updateMessage(messageId, { status: 'error' })
-      } finally {
-        setTyping(false)
+        updateMessage(userMessage.id, { status: 'error' })
       }
+      // assistant 消息由 SSE 驱动添加
     },
-    [agentId, currentSessionId, addMessage, updateMessage, updateAgent, setTyping],
+    [agentId, currentSessionId, addMessage, updateMessage, updateAgent],
   )
+
+  const abort = useCallback(async () => {
+    if (!agentId) return
+    try {
+      await abortAgent(agentId)
+    } catch {
+      // ignore
+    }
+  }, [agentId])
 
   const startNewSession = useCallback(async () => {
     if (!agentId) return
@@ -77,5 +65,5 @@ export function useAgentChat(agentId: string | null) {
     }
   }, [agentId, clearMessages, setCurrentSessionId])
 
-  return { messages, isTyping, currentSessionId, send, startNewSession }
+  return { messages, isTyping, currentSessionId, send, abort, startNewSession }
 }

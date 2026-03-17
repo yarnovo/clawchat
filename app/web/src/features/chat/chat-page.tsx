@@ -6,6 +6,7 @@ import {
   InputArea,
 } from './components'
 import { useAgentChat } from '@/hooks/use-agent-chat'
+import { useSSE } from '@/hooks/use-sse'
 import { useAgentStore } from '@/stores/agent-store'
 import { getAgent } from '@/services/api-client'
 import type { Message } from '@/types'
@@ -23,15 +24,20 @@ async function fetchMessages(agentId: string): Promise<Message[]> {
 
 export function ChatPage({ agentId }: ChatPageProps) {
   const [input, setInput] = useState('')
-  const { messages, isTyping, send } = useAgentChat(agentId)
+  const { messages, isTyping, send, abort } = useAgentChat(agentId)
   const setActiveAgent = useAgentStore((s) => s.setActiveAgent)
   const setCurrentSessionId = useAgentStore((s) => s.setCurrentSessionId)
   const setMessages = useAgentStore((s) => s.setMessages)
 
+  // 轮询 agent 状态：非 running 时 2s 刷新
   const { data: agentData } = useQuery({
     queryKey: ['agent', agentId],
     queryFn: () => getAgent(agentId),
     retry: false,
+    refetchInterval: (query) => {
+      const status = query.state.data?.agent?.status
+      return status === 'running' ? false : 2000
+    },
   })
 
   const { data: historyMessages } = useQuery({
@@ -41,6 +47,12 @@ export function ChatPage({ agentId }: ChatPageProps) {
   })
 
   const agent = agentData?.agent ?? null
+  const agentStatus = agent?.status ?? 'created'
+  const isRunning = agentStatus === 'running'
+
+  // SSE 连接：仅 agent running 时连接
+  const sseUrl = isRunning ? `/api/agents/${agentId}/messages/stream` : null
+  useSSE(sseUrl)
 
   useEffect(() => {
     setActiveAgent(agentId)
@@ -52,16 +64,35 @@ export function ChatPage({ agentId }: ChatPageProps) {
     if (historyMessages?.length) setMessages(historyMessages)
   }, [historyMessages, setMessages])
 
+  // ESC 全局监听 → abort
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isTyping) {
+        abort()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isTyping, abort])
+
   const handleSend = useCallback(async () => {
     const text = input.trim()
-    if (!text || isTyping) return
+    if (!text) return
     setInput('')
     await send(text)
-  }, [input, isTyping, send])
+  }, [input, send])
 
   const handleRetry = useCallback((_messageId: string) => {
     // TODO: re-send
   }, [])
+
+  const statusLabel = agentStatus === 'starting'
+    ? '正在启动...'
+    : agentStatus === 'created'
+      ? '正在创建...'
+      : agentStatus === 'error'
+        ? '启动失败'
+        : undefined
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -69,6 +100,7 @@ export function ChatPage({ agentId }: ChatPageProps) {
         name={agent?.name ?? ''}
         avatar={agent?.avatar}
         isTyping={isTyping}
+        statusLabel={statusLabel}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         {messages.length === 0 ? (
@@ -82,7 +114,9 @@ export function ChatPage({ agentId }: ChatPageProps) {
         value={input}
         onChange={setInput}
         onSend={handleSend}
+        onStop={isTyping ? abort : undefined}
         loading={isTyping}
+        disabled={!isRunning}
       />
     </div>
   )

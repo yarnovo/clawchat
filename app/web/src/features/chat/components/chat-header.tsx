@@ -6,9 +6,10 @@ interface ChatHeaderProps {
   name: string
   avatar?: string
   isTyping?: boolean
+  statusLabel?: string
 }
 
-export function ChatHeader({ name, isTyping }: ChatHeaderProps) {
+export function ChatHeader({ name, isTyping, statusLabel }: ChatHeaderProps) {
   const isDesktop = useMediaQuery('(min-width: 768px)')
   const navigate = useNavigate()
 
@@ -17,7 +18,10 @@ export function ChatHeader({ name, isTyping }: ChatHeaderProps) {
       title={name}
       onBack={!isDesktop ? () => navigate({ to: '/chat' }) : undefined}
     >
-      {isTyping && (
+      {statusLabel && (
+        <p className="ml-2 text-[11px] text-muted-foreground">{statusLabel}</p>
+      )}
+      {!statusLabel && isTyping && (
         <p className="ml-2 text-[11px] text-muted-foreground">正在输入...</p>
       )}
     </PageHeader>

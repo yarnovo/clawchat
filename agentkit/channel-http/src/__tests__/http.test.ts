@@ -12,6 +12,7 @@ function mockEventLoop(reply = 'mock-reply'): EventLoop {
   loop.bind({
     run: async () => reply,
     inject: () => {},
+    abort: () => {},
   });
   return loop;
 }
@@ -122,16 +123,16 @@ describe('httpChannel', () => {
 
   // -- POST /api/chat --
 
-  it('POST /api/chat: pushes event to EventLoop and returns reply', async () => {
+  it('POST /api/chat: returns 202 immediately (fire-and-forget)', async () => {
     loop = mockEventLoop('hello from agent');
     channel = httpChannel({ port: 14322 });
     await channel.setup(makeCtx(loop));
 
     const res = await request(14322, 'POST', '/api/chat', JSON.stringify({ text: 'hi' }));
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     const json = JSON.parse(res.body);
     expect(json.ok).toBe(true);
-    expect(json.reply).toBe('hello from agent');
+    expect(json.requestId).toBeDefined();
   });
 
   it('POST /api/chat: returns 400 for empty message', async () => {
@@ -294,14 +295,14 @@ describe('httpChannel', () => {
     // Wait a bit for SSE to be connected before sending chat
     await new Promise((r) => setTimeout(r, 100));
 
-    // Send a chat message (triggers typing + reply broadcast)
+    // Send a chat message (fire-and-forget, triggers async typing + reply broadcast)
     await request(14334, 'POST', '/api/chat', JSON.stringify({ text: 'hello' }));
 
     const { events } = await ssePromise;
     expect(events).toHaveLength(4);
     expect(events[0]).toEqual({ type: 'connected' });
-    expect(events[1]).toEqual({ type: 'typing', isTyping: true });
-    expect(events[2]).toEqual({ type: 'typing', isTyping: false });
-    expect(events[3]).toEqual({ type: 'assistant', text: 'agent says hi' });
+    expect(events[1]).toEqual(expect.objectContaining({ type: 'typing', isTyping: true }));
+    expect(events[2]).toEqual(expect.objectContaining({ type: 'typing', isTyping: false }));
+    expect(events[3]).toEqual(expect.objectContaining({ type: 'assistant', text: 'agent says hi' }));
   });
 });

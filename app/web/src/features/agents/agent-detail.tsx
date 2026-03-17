@@ -1,9 +1,11 @@
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { MessageCircle, MoreVertical, Trash2, ChevronRight } from "lucide-react"
-import { deleteAgent, getChatSessions } from "@/services/api-client"
+import { MessageCircle, MoreVertical, Trash2, ChevronRight, Settings2, Plus } from "lucide-react"
+import { deleteAgent, getChatSessions, getCredentials, setCredentials } from "@/services/api-client"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { PageHeader } from "@/components/ui/page-header"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -44,6 +46,7 @@ export function AgentDetail({ agent, onBack, onDeleted }: AgentDetailProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [envOpen, setEnvOpen] = useState(false)
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteAgent(agent.id),
@@ -70,6 +73,10 @@ export function AgentDetail({ agent, onBack, onDeleted }: AgentDetailProps) {
               <MoreVertical className="size-4" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setEnvOpen(true)}>
+                <Settings2 className="size-4 mr-2" />
+                环境变量
+              </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
                 onClick={() => setDeleteOpen(true)}
@@ -105,6 +112,9 @@ export function AgentDetail({ agent, onBack, onDeleted }: AgentDetailProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Env vars dialog */}
+      <EnvVarsDialog agentId={agent.id} open={envOpen} onOpenChange={setEnvOpen} />
 
       <div className="flex-1 overflow-y-auto">
       <div className="px-6 py-10 max-w-xl mx-auto w-full">
@@ -166,6 +176,164 @@ function VideoSection({ url }: { url: string }) {
         />
       </div>
     </div>
+  )
+}
+
+// ── Env Vars Dialog ──
+
+interface EnvEntry {
+  key: string
+  value: string
+  note: string
+  noteOpen: boolean
+}
+
+function EnvVarsDialog({
+  agentId,
+  open,
+  onOpenChange,
+}: {
+  agentId: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const queryClient = useQueryClient()
+  const [entries, setEntries] = useState<EnvEntry[]>([])
+  const [loaded, setLoaded] = useState(false)
+
+  const { data } = useQuery({
+    queryKey: ["credentials", agentId],
+    queryFn: () => getCredentials(agentId),
+    enabled: open,
+  })
+
+  if (open && data && !loaded) {
+    const existing = data.credentials.map((c) => ({
+      key: c.name, value: "", note: "", noteOpen: false,
+    }))
+    setEntries(existing.length > 0 ? existing : [{ key: "", value: "", note: "", noteOpen: false }])
+    setLoaded(true)
+  }
+
+  const handleOpenChange = useCallback(
+    (v: boolean) => {
+      if (!v) setLoaded(false)
+      onOpenChange(v)
+    },
+    [onOpenChange],
+  )
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const creds: Record<string, string> = {}
+      for (const e of entries) {
+        const k = e.key.trim()
+        if (k && e.value) creds[k] = e.value
+      }
+      return setCredentials(agentId, creds)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["credentials", agentId] })
+      handleOpenChange(false)
+    },
+  })
+
+  const addEntry = () =>
+    setEntries([...entries, { key: "", value: "", note: "", noteOpen: false }])
+  const removeEntry = (i: number) =>
+    setEntries(entries.filter((_, idx) => idx !== i))
+  const updateEntry = (i: number, patch: Partial<EnvEntry>) =>
+    setEntries(entries.map((e, idx) => (idx === i ? { ...e, ...patch } : e)))
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>环境变量</DialogTitle>
+          <DialogDescription>
+            设置注入容器的环境变量，Agent 启动时生效。
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="-mx-3">
+          <div className="max-h-[60vh] overflow-y-auto px-3 py-0.5">
+          {/* Column headers */}
+          {entries.length > 0 && (
+            <div className="flex items-center gap-3 mb-2">
+              <span className="flex-1 text-xs font-medium text-muted-foreground">Key</span>
+              <span className="flex-1 text-xs font-medium text-muted-foreground">Value</span>
+              <span className="w-8" />
+            </div>
+          )}
+
+          <div className="space-y-4">
+            {entries.map((entry, i) => (
+              <div key={i}>
+                {/* Key + Value + Delete */}
+                <div className="flex items-center gap-3">
+                  <Input
+                    placeholder="变量名..."
+                    value={entry.key}
+                    onChange={(e) => updateEntry(i, { key: e.target.value })}
+                    className="flex-1 font-mono text-sm"
+                  />
+                  <Input
+                    placeholder=""
+                    type="password"
+                    value={entry.value}
+                    onChange={(e) => updateEntry(i, { value: e.target.value })}
+                    className="flex-1 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeEntry(i)}
+                    className="flex shrink-0 size-8 items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                </div>
+
+                {/* Note */}
+                {entry.noteOpen ? (
+                  <div className="mt-2 mr-11">
+                    <span className="text-xs font-medium text-muted-foreground mb-1 block">备注</span>
+                    <Textarea
+                      placeholder="例如：来自 Supabase 的数据库密钥..."
+                      value={entry.note}
+                      onChange={(e) => updateEntry(i, { note: e.target.value })}
+                      className="text-sm min-h-[60px]"
+                    />
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => updateEntry(i, { noteOpen: true })}
+                    className="mt-2.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    添加备注
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          </div>
+        </div>
+
+        <Button variant="outline" size="sm" onClick={addEntry} className="w-fit">
+          <Plus className="size-3.5 mr-1.5" />
+          添加变量
+        </Button>
+
+        <DialogFooter>
+          <Button
+            disabled={saveMutation.isPending}
+            onClick={() => saveMutation.mutate()}
+          >
+            {saveMutation.isPending ? "保存中..." : "保存"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

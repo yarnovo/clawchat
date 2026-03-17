@@ -22,7 +22,7 @@ export function InputArea({
   disabled = false,
 }: InputAreaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const canSend = value.trim().length > 0 && !loading && !disabled
+  const canSend = value.trim().length > 0 && !disabled
 
   useEffect(() => {
     if (!disabled) {
@@ -51,7 +51,7 @@ export function InputArea({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={disabled ? "Agent 未运行" : "输入消息..."}
+          placeholder={disabled ? "Agent 未运行，正在启动..." : "输入消息..."}
           minRows={3}
           maxRows={10}
           disabled={disabled}

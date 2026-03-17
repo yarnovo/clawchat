@@ -34,22 +34,29 @@ export function useSSE(url: string | null) {
             backoffRef.current = INITIAL_BACKOFF
             break
           case 'typing':
-            setTyping(true)
+            setTyping(event.isTyping !== false)
             break
           case 'assistant':
             setTyping(false)
             if (activeAgentId) {
+              const content = event.text || event.content || ''
               addMessage({
                 id: crypto.randomUUID(),
                 agentId: activeAgentId,
                 sessionId: currentSessionId,
                 role: 'assistant',
-                content: event.content,
+                content,
                 status: 'complete',
                 requestId: event.requestId,
                 timestamp: Date.now(),
               })
             }
+            break
+          case 'error':
+            setTyping(false)
+            break
+          case 'aborted':
+            setTyping(false)
             break
         }
       },
