@@ -13,6 +13,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
+import { EmptyState } from "@/components/ui/empty-state"
 import { listAgents, createAgent } from "@/services/api-client"
 
 interface AgentListProps {
@@ -108,7 +109,7 @@ export function AgentList({
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             ref={searchRef}
-            placeholder="搜索"
+            placeholder="搜索 Agent..."
             className="h-8 rounded-md bg-sidebar-accent/60 border-0 pl-8 text-xs focus:bg-sidebar-accent"
           />
         </div>
@@ -120,6 +121,9 @@ export function AgentList({
         </button>
       </div>
 
+      {agents.length === 0 ? (
+        <EmptyState action={{ label: "创建 Agent", onClick: () => setDialogOpen(true) }} />
+      ) : (
       <ScrollArea className="flex-1">
         <div className="flex flex-col">
           {grouped.map(([category, categoryAgents]) => (
@@ -168,6 +172,7 @@ export function AgentList({
           ))}
         </div>
       </ScrollArea>
+      )}
 
       {/* Create Agent Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

@@ -1,9 +1,11 @@
 import { useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { useNavigate } from "@tanstack/react-router"
 import { Search } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
+import { EmptyState } from "@/components/ui/empty-state"
 import { listConversations } from "@/services/api-client"
 
 interface ConversationListProps {
@@ -72,6 +74,7 @@ export function ConversationList({
   activeAgentId,
   onAgentSelect,
 }: ConversationListProps) {
+  const navigate = useNavigate()
   const { data } = useQuery({
     queryKey: ["conversations"],
     queryFn: () => listConversations(),
@@ -97,12 +100,15 @@ export function ConversationList({
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="搜索"
+            placeholder="搜索对话..."
             className="h-8 rounded-md bg-sidebar-accent/60 border-0 pl-8 text-xs focus:bg-sidebar-accent"
           />
         </div>
       </div>
 
+      {sortedAgents.length === 0 ? (
+        <EmptyState action={{ label: "去创建 Agent", onClick: () => navigate({ to: "/agents" }) }} />
+      ) : (
       <ScrollArea className="flex-1">
         <div className="flex flex-col">
           {sortedAgents.map((agent) => {
@@ -158,6 +164,7 @@ export function ConversationList({
           })}
         </div>
       </ScrollArea>
+      )}
     </div>
   )
 }

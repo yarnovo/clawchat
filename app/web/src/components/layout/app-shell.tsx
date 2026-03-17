@@ -5,6 +5,8 @@ import { NavRail } from "@/components/layout/nav-rail"
 import { ConversationList } from "@/components/layout/conversation-list"
 import { TabBar } from "@/components/layout/tab-bar"
 import { SettingsDialog } from "@/features/settings/settings-dialog"
+import { SkillMarketplaceDialog } from "@/features/skills/skill-marketplace-dialog"
+import { useUIStore } from "@/stores/ui-store"
 
 interface AppShellProps {
   children: ReactNode
@@ -14,6 +16,8 @@ export function AppShell({ children }: AppShellProps) {
   const isDesktop = useMediaQuery("(min-width: 768px)")
   const navigate = useNavigate()
   const matchRoute = useMatchRoute()
+  const skillsOpen = useUIStore((s) => s.skillsOpen)
+  const setSkillsOpen = useUIStore((s) => s.setSkillsOpen)
 
   const handleNavigate = (page: "chat" | "agents") => {
     if (page === "chat") navigate({ to: "/chat" })
@@ -53,6 +57,7 @@ export function AppShell({ children }: AppShellProps) {
           {children}
         </main>
         <SettingsDialog />
+        <SkillMarketplaceDialog open={skillsOpen} onOpenChange={setSkillsOpen} />
       </div>
     )
   }
@@ -63,6 +68,7 @@ export function AppShell({ children }: AppShellProps) {
       <div className="flex h-screen flex-col bg-background">
         <main className="flex-1 flex flex-col overflow-hidden">{children}</main>
         <SettingsDialog />
+        <SkillMarketplaceDialog open={skillsOpen} onOpenChange={setSkillsOpen} />
       </div>
     )
   }
@@ -87,6 +93,7 @@ export function AppShell({ children }: AppShellProps) {
         onTabChange={(tab) => handleNavigate(tab)}
       />
       <SettingsDialog />
+      <SkillMarketplaceDialog open={skillsOpen} onOpenChange={setSkillsOpen} />
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { AgentList } from "@/components/layout/agent-list"
 import { AgentDetail } from "@/features/agents/agent-detail"
+import { EmptyState } from "@/components/ui/empty-state"
 import { listAgents } from "@/services/api-client"
 import { useMediaQuery } from "@/hooks/use-media-query"
 
@@ -22,6 +23,7 @@ export default function AgentsPage() {
         <AgentDetail
           agent={selectedAgent}
           onBack={() => setSelectedId(null)}
+          onDeleted={() => setSelectedId(null)}
         />
       )
     }
@@ -43,9 +45,9 @@ export default function AgentsPage() {
       />
 
       {selectedAgent ? (
-        <AgentDetail agent={selectedAgent} />
+        <AgentDetail agent={selectedAgent} onDeleted={() => setSelectedId(null)} />
       ) : (
-        <div className="flex-1" />
+        <div className="flex-1 bg-background" />
       )}
     </div>
   )

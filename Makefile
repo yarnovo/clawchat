@@ -80,7 +80,20 @@ promo-render:
 	cd promo-video && npm run render
 
 # ---- DB ----
-.PHONY: db-backup db-restore
+.PHONY: db-reset db-seed db-backup db-restore
+
+db-reset:
+	docker exec clawchat-postgres psql -U clawchat -d clawchat -c \
+		"DROP TABLE IF EXISTS agents CASCADE; DROP TABLE IF EXISTS accounts CASCADE; DROP TABLE IF EXISTS skills CASCADE; DROP TYPE IF EXISTS agent_status CASCADE;"
+	cd server && npx drizzle-kit push --force
+	cd server && npx tsx --env-file=.env src/db/seed.ts
+	@echo ""
+	@echo "  DB reset + seed 完成"
+	@echo "  默认账号: admin / 123456"
+	@echo ""
+
+db-seed:
+	cd server && npx tsx --env-file=.env src/db/seed.ts
 
 db-backup:
 	bash scripts/db-backup.sh

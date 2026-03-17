@@ -1,12 +1,12 @@
 import {
   MessageCircle,
   Store,
+  Package,
   Settings,
 } from "lucide-react"
 import { useNavigate } from "@tanstack/react-router"
 import { cn } from "@/lib/utils"
 import { useUIStore } from "@/stores/ui-store"
-import { startConversation } from "@/services/api-client"
 
 interface NavRailProps {
   activePage: "chat" | "agents"
@@ -20,10 +20,10 @@ const navItems = [
 
 export function NavRail({ activePage, onNavigate }: NavRailProps) {
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen)
+  const setSkillsOpen = useUIStore((s) => s.setSkillsOpen)
   const navigate = useNavigate()
 
-  const handleSelfChat = async () => {
-    await startConversation("self").catch(() => {})
+  const handleSelfChat = () => {
     onNavigate("chat")
     navigate({ to: "/chat/$agentId", params: { agentId: "self" } })
   }
@@ -61,6 +61,14 @@ export function NavRail({ activePage, onNavigate }: NavRailProps) {
           )
         })}
       </nav>
+
+      {/* Skills marketplace */}
+      <button
+        onClick={() => setSkillsOpen(true)}
+        className="flex size-10 items-center justify-center rounded-lg transition-colors text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground mb-2"
+      >
+        <Package className="size-5" />
+      </button>
 
       {/* Settings */}
       <button

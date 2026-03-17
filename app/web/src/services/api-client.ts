@@ -1,4 +1,4 @@
-import type { Agent } from '@/types'
+import type { Agent, Skill, SkillDetail, CredentialKey } from '@/types'
 
 const BASE_URL = '/api'
 
@@ -71,13 +71,7 @@ export async function getMe(): Promise<{
 // ---------- Conversations (chat list) ----------
 
 export async function listConversations(): Promise<{ agents: Agent[] }> {
-  return request('/conversations')
-}
-
-export async function startConversation(
-  agentId: string,
-): Promise<{ agent: Agent }> {
-  return request(`/conversations/${agentId}`, { method: 'POST' })
+  return listAgents()
 }
 
 // ---------- Agent CRUD ----------
@@ -131,6 +125,54 @@ export async function newSession(
   agentId: string,
 ): Promise<{ sessionId: number }> {
   return request(`/agents/${agentId}/sessions/new`, { method: 'POST' })
+}
+
+// ---------- Skills ----------
+
+export async function listSkills(): Promise<{ skills: Skill[] }> {
+  return request('/skills')
+}
+
+export async function getSkill(name: string): Promise<{ skill: SkillDetail }> {
+  return request(`/skills/${name}`)
+}
+
+export async function installSkill(
+  skillName: string,
+  agentId: string,
+): Promise<{ installed: boolean }> {
+  return request(`/skills/${skillName}/install`, {
+    method: 'POST',
+    body: JSON.stringify({ agentId }),
+  })
+}
+
+export async function uninstallSkill(
+  skillName: string,
+  agentId: string,
+): Promise<{ uninstalled: boolean }> {
+  return request(`/skills/${skillName}/uninstall`, {
+    method: 'DELETE',
+    body: JSON.stringify({ agentId }),
+  })
+}
+
+// ---------- Credentials ----------
+
+export async function getCredentials(
+  agentId: string,
+): Promise<{ credentials: CredentialKey[] }> {
+  return request(`/agents/${agentId}/credentials`)
+}
+
+export async function setCredentials(
+  agentId: string,
+  credentials: Record<string, string>,
+): Promise<{ updated: boolean }> {
+  return request(`/agents/${agentId}/credentials`, {
+    method: 'PUT',
+    body: JSON.stringify({ credentials }),
+  })
 }
 
 export { ApiError }
