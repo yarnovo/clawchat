@@ -1,13 +1,1 @@
-pre-commit:
-  commands:
-    flutter-analyze:
-      glob: "app/**/*.dart"
-      run: cd app && flutter analyze
-    agentkit-typecheck:
-      glob: "agentkit/**/*.ts"
-      root: "agentkit/"
-      run: pnpm build
-    server-typecheck:
-      glob: "server/**/*.ts"
-      root: "server/"
-      run: npx tsc --noEmit
+
