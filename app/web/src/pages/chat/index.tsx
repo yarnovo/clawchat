@@ -1,8 +1,8 @@
-import { Outlet, useMatches } from '@tanstack/react-router'
+import { Outlet, useParams } from '@tanstack/react-router'
 
 export default function ChatPage() {
-  const matches = useMatches()
-  const hasChildRoute = matches.some((m) => m.routeId === '/chat/$agentId')
+  const params = useParams({ strict: false }) as { agentId?: string }
+  const hasChildRoute = !!params.agentId
 
   return hasChildRoute ? (
     <Outlet />
