@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import TextareaAutosize from 'react-textarea-autosize'
-import { Smile, Paperclip, Send, Square } from 'lucide-react'
+import { Square, Maximize2, Minimize2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -22,9 +22,9 @@ export function InputArea({
   disabled = false,
 }: InputAreaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const [expanded, setExpanded] = useState(false)
   const canSend = value.trim().length > 0 && !loading && !disabled
 
-  // Auto-focus when component mounts (entering a chat)
   useEffect(() => {
     if (!disabled) {
       textareaRef.current?.focus()
@@ -44,30 +44,20 @@ export function InputArea({
   )
 
   return (
-    <div className="border-t border-border bg-background">
-      {/* Toolbar */}
-      <div className="flex items-center gap-1 px-4 pt-2">
-        <Button variant="ghost" size="icon-sm" disabled={disabled} className="text-muted-foreground">
-          <Smile className="size-5" />
-        </Button>
-        <Button variant="ghost" size="icon-sm" disabled={disabled} className="text-muted-foreground">
-          <Paperclip className="size-5" />
-        </Button>
-      </div>
-
-      {/* Input + Send */}
-      <div className="flex items-end gap-2 px-4 pb-3 pt-1">
+    <div className="border-t border-border bg-background px-4 py-3">
+      {/* Input wrapper */}
+      <div className="relative">
         <TextareaAutosize
           ref={textareaRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={disabled ? "Agent is not running" : "Type a message..."}
-          minRows={1}
-          maxRows={6}
+          placeholder={disabled ? "Agent 未运行" : "输入消息..."}
+          minRows={expanded ? 8 : 2}
+          maxRows={expanded ? 16 : 6}
           disabled={disabled}
           className={cn(
-            'w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm leading-relaxed text-foreground',
+            'w-full resize-none rounded-lg border border-input bg-background px-3 py-2.5 pr-9 text-sm leading-relaxed text-foreground',
             'placeholder:text-muted-foreground',
             'focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring',
             'disabled:cursor-not-allowed disabled:opacity-50',
@@ -75,27 +65,40 @@ export function InputArea({
           )}
         />
 
-        {loading && onStop ? (
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={onStop}
-            className="shrink-0 rounded-md"
-            aria-label="Stop"
-          >
-            <Square className="size-4" />
-          </Button>
-        ) : (
-          <Button
-            size="icon"
-            onClick={onSend}
-            disabled={!canSend}
-            className="shrink-0 rounded-md"
-            aria-label="Send"
-          >
-            <Send className="size-4" />
-          </Button>
-        )}
+        {/* Expand/collapse toggle — top right corner */}
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          className="absolute right-2 top-2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+        >
+          {expanded ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
+        </button>
+      </div>
+
+      {/* Bottom bar */}
+      <div className="flex items-center justify-between mt-2">
+        <div className="flex items-center gap-1">
+          {loading && onStop && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onStop}
+              className="h-7 px-2"
+            >
+              <Square className="size-3.5 mr-1" />
+              停止
+            </Button>
+          )}
+        </div>
+
+        <Button
+          size="sm"
+          onClick={onSend}
+          disabled={!canSend}
+          className="h-7 px-3"
+        >
+          发送
+        </Button>
       </div>
     </div>
   )
