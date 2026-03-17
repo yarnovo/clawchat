@@ -1,7 +1,7 @@
 import { useState, useCallback } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { MessageCircle, MoreVertical, Trash2, ChevronRight, Settings2, Plus } from "lucide-react"
+import { MessageCircle, MoreVertical, Trash2, ChevronRight, Settings2, Plus, ShieldCheck } from "lucide-react"
 import { deleteAgent, getChatSessions, getCredentials, setCredentials } from "@/services/api-client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -186,6 +186,8 @@ interface EnvEntry {
   value: string
   note: string
   noteOpen: boolean
+  /** 该 key 在 DB 中已有值（加密存储） */
+  existing: boolean
 }
 
 function EnvVarsDialog({
@@ -209,9 +211,9 @@ function EnvVarsDialog({
 
   if (open && data && !loaded) {
     const existing = data.credentials.map((c) => ({
-      key: c.name, value: "", note: "", noteOpen: false,
+      key: c.name, value: "", note: "", noteOpen: false, existing: c.hasValue,
     }))
-    setEntries(existing.length > 0 ? existing : [{ key: "", value: "", note: "", noteOpen: false }])
+    setEntries(existing.length > 0 ? existing : [{ key: "", value: "", note: "", noteOpen: false, existing: false }])
     setLoaded(true)
   }
 
@@ -225,12 +227,18 @@ function EnvVarsDialog({
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const creds: Record<string, string> = {}
+      // 收集要更新的 key：有新值的发送值，已有值未修改的发送 null 标记保留
+      const creds: Record<string, string | null> = {}
       for (const e of entries) {
         const k = e.key.trim()
-        if (k && e.value) creds[k] = e.value
+        if (!k) continue
+        if (e.value) {
+          creds[k] = e.value          // 新值 → 加密存储
+        } else if (e.existing) {
+          creds[k] = null             // 未修改 → 保留原值
+        }
       }
-      return setCredentials(agentId, creds)
+      return setCredentials(agentId, creds as Record<string, string>)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["credentials", agentId] })
@@ -239,7 +247,7 @@ function EnvVarsDialog({
   })
 
   const addEntry = () =>
-    setEntries([...entries, { key: "", value: "", note: "", noteOpen: false }])
+    setEntries([...entries, { key: "", value: "", note: "", noteOpen: false, existing: false }])
   const removeEntry = (i: number) =>
     setEntries(entries.filter((_, idx) => idx !== i))
   const updateEntry = (i: number, patch: Partial<EnvEntry>) =>
@@ -278,10 +286,10 @@ function EnvVarsDialog({
                     className="flex-1 font-mono text-sm"
                   />
                   <Input
-                    placeholder=""
+                    placeholder={entry.existing ? "••••••••" : ""}
                     type="password"
                     value={entry.value}
-                    onChange={(e) => updateEntry(i, { value: e.target.value })}
+                    onChange={(e) => updateEntry(i, { value: e.target.value, existing: false })}
                     className="flex-1 text-sm"
                   />
                   <button
@@ -323,6 +331,11 @@ function EnvVarsDialog({
           <Plus className="size-3.5 mr-1.5" />
           添加变量
         </Button>
+
+        <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
+          <ShieldCheck className="size-4 shrink-0 text-emerald-500" />
+          <span>所有值均通过 AES-256-GCM 加密存储。</span>
+        </div>
 
         <DialogFooter>
           <Button

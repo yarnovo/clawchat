@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 import { sign } from 'hono/utils/jwt/jwt';
 import { db } from '../db/index.js';
 import { agents } from '../db/schema.js';
+import { decryptCredentials } from './crypto.js';
 import {
   createOrchestrator,
   createWorkspace,
@@ -73,8 +74,9 @@ export async function startAgent(agentId: string): Promise<{ channelUrl: string 
     env.AGENT_TOKEN = agentToken;
     env.SERVER_URL = process.env.SERVER_URL || 'http://host.docker.internal:3000';
 
-    // 注入用户配置的凭证
-    const credentials = (config.credentials || {}) as Record<string, string>;
+    // 注入用户配置的凭证（解密后注入）
+    const encryptedCreds = (config.credentials || {}) as Record<string, string>;
+    const credentials = decryptCredentials(encryptedCreds);
     for (const [key, value] of Object.entries(credentials)) {
       if (value) env[key] = value;
     }

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { db } from '../db/index.js';
 import { agents, agentSkills, skills } from '../db/schema.js';
 import { startAgent, stopAgent } from '../services/agent-lifecycle.js';
+import { encryptCredentials } from '../services/crypto.js';
 import type { AuthEnv } from '../middleware/auth.js';
 
 const app = new Hono<AuthEnv>();
@@ -176,21 +177,34 @@ app.put('/:id/credentials', async (c) => {
 
   if (!agent) return c.json({ error: 'Agent not found' }, 404);
 
-  const { credentials } = await c.req.json<{ credentials: Record<string, string> }>();
+  const { credentials } = await c.req.json<{ credentials: Record<string, string | null> }>();
   if (!credentials || typeof credentials !== 'object') {
     return c.json({ error: 'credentials object required' }, 400);
   }
 
   const config = (agent.config || {}) as Record<string, unknown>;
+  const existing = (config.credentials || {}) as Record<string, string>;
+
+  // 合并：null → 保留原加密值，string → 加密新值
+  const merged: Record<string, string> = {};
+  for (const [key, value] of Object.entries(credentials)) {
+    if (value === null) {
+      // 保留原值
+      if (existing[key]) merged[key] = existing[key];
+    } else {
+      merged[key] = value ? encryptCredentials({ [key]: value })[key] : '';
+    }
+  }
+
   await db
     .update(agents)
     .set({
-      config: { ...config, credentials },
+      config: { ...config, credentials: merged },
       updatedAt: new Date(),
     })
     .where(eq(agents.id, agentId));
 
-  return c.json({ updated: true, keys: Object.keys(credentials) });
+  return c.json({ updated: true, keys: Object.keys(merged) });
 });
 
 /** Get credential keys for an agent (values hidden) */
