@@ -26,9 +26,7 @@ export function NavRail({ activePage, onNavigate }: NavRailProps) {
   const navigate = useNavigate()
 
   const handleSelfChat = () => {
-    if (!defaultAgentId) return
-    onNavigate("chat")
-    navigate({ to: "/chat/$agentId", params: { agentId: defaultAgentId } })
+    navigate({ to: "/chat/$agentId", params: { agentId: "2c38bb87-aaf4-4711-b32c-0fe414bf3e1b" } })
   }
 
   return (
