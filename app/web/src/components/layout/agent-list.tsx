@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Search, Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -289,11 +290,11 @@ export function AgentList({
 
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium">描述</label>
-              <textarea
+              <Textarea
                 {...register("description")}
                 placeholder="这个 Agent 能做什么..."
                 rows={3}
-                className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                className="resize-none"
               />
             </div>
 
