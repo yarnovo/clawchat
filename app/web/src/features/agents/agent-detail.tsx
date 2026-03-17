@@ -1,11 +1,13 @@
-import { useState, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { MessageCircle, MoreVertical, Trash2, ChevronRight, Settings2, Plus, ShieldCheck } from "lucide-react"
+import { MessageCircle, MoreVertical, Trash2, ChevronRight, Settings2, Plus } from "lucide-react"
 import { deleteAgent, getChatSessions, getCredentials, setCredentials } from "@/services/api-client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { useForm, useFieldArray } from "react-hook-form"
+import { validateEnvVarName, computeCanSave } from "@/lib/env-var"
 import { PageHeader } from "@/components/ui/page-header"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -181,16 +183,17 @@ function VideoSection({ url }: { url: string }) {
 
 // ── Env Vars Dialog ──
 
-interface EnvEntry {
-  key: string
-  value: string
-  note: string
-  noteOpen: boolean
-  /** 该 key 在 DB 中已有值（加密存储） */
-  existing: boolean
+interface EnvFormValues {
+  entries: {
+    key: string
+    value: string
+    note: string
+    noteOpen: boolean
+    existing: boolean
+  }[]
 }
 
-function EnvVarsDialog({
+export function EnvVarsDialog({
   agentId,
   open,
   onOpenChange,
@@ -200,62 +203,60 @@ function EnvVarsDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const queryClient = useQueryClient()
-  const [entries, setEntries] = useState<EnvEntry[]>([])
-  const [loaded, setLoaded] = useState(false)
+  const [initialKeys, setInitialKeys] = useState<Set<string>>(new Set())
 
-  const { data } = useQuery({
+  const form = useForm<EnvFormValues>({
+    defaultValues: { entries: [{ key: "", value: "", note: "", noteOpen: false, existing: false }] },
+    mode: "onChange",
+  })
+
+  const { fields, append, remove } = useFieldArray({ control: form.control, name: "entries" })
+
+  const { data, isSuccess } = useQuery({
     queryKey: ["credentials", agentId],
     queryFn: () => getCredentials(agentId),
     enabled: open,
   })
 
-  if (open && data && !loaded) {
-    const existing = data.credentials.map((c) => ({
+  // 加载已有凭证 → reset form
+  useEffect(() => {
+    if (!open || !data) return
+    const rows = data.credentials.map((c) => ({
       key: c.name, value: "", note: "", noteOpen: false, existing: c.hasValue,
     }))
-    setEntries(existing.length > 0 ? existing : [{ key: "", value: "", note: "", noteOpen: false, existing: false }])
-    setLoaded(true)
-  }
+    setInitialKeys(new Set(data.credentials.filter(c => c.hasValue).map(c => c.name)))
+    form.reset({ entries: rows.length > 0 ? rows : [{ key: "", value: "", note: "", noteOpen: false, existing: false }] })
+  }, [open, data, form])
 
-  const handleOpenChange = useCallback(
-    (v: boolean) => {
-      if (!v) setLoaded(false)
-      onOpenChange(v)
-    },
-    [onOpenChange],
+  const watchedEntries = form.watch("entries")
+  const canSave = computeCanSave(
+    watchedEntries.map(e => ({ key: e.key, value: e.value, existing: e.existing })),
+    initialKeys,
   )
 
   const saveMutation = useMutation({
-    mutationFn: async () => {
-      // 收集要更新的 key：有新值的发送值，已有值未修改的发送 null 标记保留
+    mutationFn: async (values: EnvFormValues) => {
       const creds: Record<string, string | null> = {}
-      for (const e of entries) {
+      for (const e of values.entries) {
         const k = e.key.trim()
         if (!k) continue
         if (e.value) {
-          creds[k] = e.value          // 新值 → 加密存储
+          creds[k] = e.value
         } else if (e.existing) {
-          creds[k] = null             // 未修改 → 保留原值
+          creds[k] = null
         }
       }
       return setCredentials(agentId, creds as Record<string, string>)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["credentials", agentId] })
-      handleOpenChange(false)
+      onOpenChange(false)
     },
   })
 
-  const addEntry = () =>
-    setEntries([...entries, { key: "", value: "", note: "", noteOpen: false, existing: false }])
-  const removeEntry = (i: number) =>
-    setEntries(entries.filter((_, idx) => idx !== i))
-  const updateEntry = (i: number, patch: Partial<EnvEntry>) =>
-    setEntries(entries.map((e, idx) => (idx === i ? { ...e, ...patch } : e)))
-
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-lg">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>环境变量</DialogTitle>
           <DialogDescription>
@@ -263,88 +264,98 @@ function EnvVarsDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="-mx-3">
-          <div className="max-h-[60vh] overflow-y-auto px-3 py-0.5">
-          {/* Column headers */}
-          {entries.length > 0 && (
-            <div className="flex items-center gap-3 mb-2">
-              <span className="flex-1 text-xs font-medium text-muted-foreground">Key</span>
-              <span className="flex-1 text-xs font-medium text-muted-foreground">Value</span>
-              <span className="w-8" />
-            </div>
-          )}
-
-          <div className="space-y-4">
-            {entries.map((entry, i) => (
-              <div key={i}>
-                {/* Key + Value + Delete */}
-                <div className="flex items-center gap-3">
-                  <Input
-                    placeholder="变量名..."
-                    value={entry.key}
-                    onChange={(e) => updateEntry(i, { key: e.target.value })}
-                    className="flex-1 font-mono text-sm"
-                  />
-                  <Input
-                    placeholder={entry.existing ? "••••••••" : ""}
-                    type="password"
-                    value={entry.value}
-                    onChange={(e) => updateEntry(i, { value: e.target.value, existing: false })}
-                    className="flex-1 text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeEntry(i)}
-                    className="flex shrink-0 size-8 items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
+        <form onSubmit={form.handleSubmit((v) => saveMutation.mutate(v))} data-ready={isSuccess || undefined}>
+          <div className="-mx-3">
+            <div className="max-h-[60vh] overflow-y-auto px-3 py-0.5">
+              {/* Column headers */}
+              {fields.length > 0 && (
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="flex-1 text-xs font-medium text-muted-foreground">Key</span>
+                  <span className="flex-1 text-xs font-medium text-muted-foreground">Value</span>
+                  <span className="w-8" />
                 </div>
+              )}
 
-                {/* Note */}
-                {entry.noteOpen ? (
-                  <div className="mt-2 mr-11">
-                    <span className="text-xs font-medium text-muted-foreground mb-1 block">备注</span>
-                    <Textarea
-                      placeholder="例如：来自 Supabase 的数据库密钥..."
-                      value={entry.note}
-                      onChange={(e) => updateEntry(i, { note: e.target.value })}
-                      className="text-sm min-h-[60px]"
-                    />
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => updateEntry(i, { noteOpen: true })}
-                    className="mt-2.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    添加备注
-                  </button>
-                )}
+              <div className="space-y-4">
+                {fields.map((field, i) => {
+                  const existing = form.watch(`entries.${i}.existing`)
+                  const noteOpen = form.watch(`entries.${i}.noteOpen`)
+                  const keyError = form.formState.errors.entries?.[i]?.key
+                  return (
+                    <div key={field.id}>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                          <Input
+                            placeholder="变量名..."
+                            {...form.register(`entries.${i}.key`, {
+                              validate: (v) => validateEnvVarName(v.trim()) ?? true,
+                            })}
+                            aria-invalid={!!keyError}
+                            className="w-full font-mono text-sm"
+                          />
+                          {keyError && <p className="text-xs text-destructive mt-1">{keyError.message}</p>}
+                        </div>
+                        <Input
+                          placeholder={existing ? "••••••••" : ""}
+                          type="password"
+                          value={form.watch(`entries.${i}.value`)}
+                          onChange={(e) => {
+                            form.setValue(`entries.${i}.value`, e.target.value)
+                            form.setValue(`entries.${i}.existing`, false)
+                          }}
+                          className="flex-1 text-sm"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => remove(i)}
+                          className="flex shrink-0 size-8 items-center justify-center text-muted-foreground hover:text-destructive transition-colors"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
+                      </div>
+
+                      {noteOpen ? (
+                        <div className="mt-2 mr-11">
+                          <span className="text-xs font-medium text-muted-foreground mb-1 block">备注</span>
+                          <Textarea
+                            placeholder="例如：来自 Supabase 的数据库密钥..."
+                            {...form.register(`entries.${i}.note`)}
+                            className="text-sm min-h-[60px]"
+                          />
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => form.setValue(`entries.${i}.noteOpen`, true)}
+                          className="mt-2.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          添加备注
+                        </button>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
-            ))}
+            </div>
           </div>
-          </div>
-        </div>
 
-        <Button variant="outline" size="sm" onClick={addEntry} className="w-fit">
-          <Plus className="size-3.5 mr-1.5" />
-          添加变量
-        </Button>
-
-        <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
-          <ShieldCheck className="size-4 shrink-0 text-emerald-500" />
-          <span>所有值均通过 AES-256-GCM 加密存储。</span>
-        </div>
-
-        <DialogFooter>
           <Button
-            disabled={saveMutation.isPending}
-            onClick={() => saveMutation.mutate()}
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => append({ key: "", value: "", note: "", noteOpen: false, existing: false })}
+            className="w-fit mt-4"
           >
-            {saveMutation.isPending ? "保存中..." : "保存"}
+            <Plus className="size-3.5 mr-1.5" />
+            添加变量
           </Button>
-        </DialogFooter>
+
+          <DialogFooter className="mt-4">
+            <Button type="submit" disabled={saveMutation.isPending || !canSave}>
+              {saveMutation.isPending ? "保存中..." : "保存"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )

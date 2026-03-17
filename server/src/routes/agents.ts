@@ -199,7 +199,7 @@ app.put('/:id/credentials', async (c) => {
   await db
     .update(agents)
     .set({
-      config: { ...config, credentials: merged },
+      config: { ...config, credentials: merged, credentialOrder: Object.keys(merged) },
       updatedAt: new Date(),
     })
     .where(eq(agents.id, agentId));
@@ -221,11 +221,14 @@ app.get('/:id/credentials', async (c) => {
 
   const config = (agent.config || {}) as Record<string, unknown>;
   const credentials = (config.credentials || {}) as Record<string, string>;
-  // Only return key names, not values
-  const keys = Object.keys(credentials).map((key) => ({
-    name: key,
-    hasValue: Boolean(credentials[key]),
-  }));
+  const order = (config.credentialOrder || Object.keys(credentials)) as string[];
+  // Only return key names, not values — in saved order
+  const keys = order
+    .filter((key) => key in credentials)
+    .map((key) => ({
+      name: key,
+      hasValue: Boolean(credentials[key]),
+    }));
 
   return c.json({ credentials: keys });
 });
