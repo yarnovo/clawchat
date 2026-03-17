@@ -6,7 +6,12 @@ import {
   pgEnum,
   jsonb,
   integer,
+  customType,
 } from 'drizzle-orm/pg-core';
+
+const bytea = customType<{ data: Buffer }>({
+  dataType() { return 'bytea'; },
+});
 
 // ---------- Enums ----------
 
@@ -44,6 +49,20 @@ export const agents = pgTable('agents', {
   containerName: text('container_name'),
   currentSessionId: integer('current_session_id').notNull().default(1),
   config: jsonb('config').default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const skills = pgTable('skills', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull().unique(),
+  displayName: text('display_name').notNull(),
+  description: text('description').default(''),
+  version: text('version').notNull().default('1.0.0'),
+  authorId: uuid('author_id')
+    .notNull()
+    .references(() => accounts.id),
+  zipData: bytea('zip_data').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

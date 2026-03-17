@@ -124,4 +124,56 @@ app.post('/:id/stop', async (c) => {
   }
 });
 
+/** Set credentials for an agent */
+app.put('/:id/credentials', async (c) => {
+  const userId = c.get('userId');
+  const agentId = c.req.param('id');
+
+  const [agent] = await db
+    .select()
+    .from(agents)
+    .where(and(eq(agents.id, agentId), eq(agents.ownerId, userId)));
+
+  if (!agent) return c.json({ error: 'Agent not found' }, 404);
+
+  const { credentials } = await c.req.json<{ credentials: Record<string, string> }>();
+  if (!credentials || typeof credentials !== 'object') {
+    return c.json({ error: 'credentials object required' }, 400);
+  }
+
+  const config = (agent.config || {}) as Record<string, unknown>;
+  await db
+    .update(agents)
+    .set({
+      config: { ...config, credentials },
+      updatedAt: new Date(),
+    })
+    .where(eq(agents.id, agentId));
+
+  return c.json({ updated: true, keys: Object.keys(credentials) });
+});
+
+/** Get credential keys for an agent (values hidden) */
+app.get('/:id/credentials', async (c) => {
+  const userId = c.get('userId');
+  const agentId = c.req.param('id');
+
+  const [agent] = await db
+    .select()
+    .from(agents)
+    .where(and(eq(agents.id, agentId), eq(agents.ownerId, userId)));
+
+  if (!agent) return c.json({ error: 'Agent not found' }, 404);
+
+  const config = (agent.config || {}) as Record<string, unknown>;
+  const credentials = (config.credentials || {}) as Record<string, string>;
+  // Only return key names, not values
+  const keys = Object.keys(credentials).map((key) => ({
+    name: key,
+    hasValue: Boolean(credentials[key]),
+  }));
+
+  return c.json({ credentials: keys });
+});
+
 export { app as agentsRoutes };

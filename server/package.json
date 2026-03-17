@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.11",
+    "adm-zip": "^0.5.16",
     "bcryptjs": "^3.0.3",
     "dockerode": "^4.0.9",
     "drizzle-orm": "^0.45.1",
@@ -21,6 +22,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
     "@types/bcryptjs": "^3.0.0",
     "@types/dockerode": "^4.0.1",
     "@types/node": "^22.10.0",

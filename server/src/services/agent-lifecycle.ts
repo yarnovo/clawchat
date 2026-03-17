@@ -4,6 +4,7 @@
  */
 
 import { eq } from 'drizzle-orm';
+import { sign } from 'hono/utils/jwt/jwt';
 import { db } from '../db/index.js';
 import { agents } from '../db/schema.js';
 import {
@@ -18,6 +19,7 @@ import type { AgentConfig } from '../orchestrator/index.js';
 
 const orchestrator = createOrchestrator();
 
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 const DEFAULT_IMAGE = process.env.AGENTKIT_IMAGE || 'agentkit-base:latest';
 const DEFAULT_NETWORK = process.env.CONTAINER_NETWORK || 'clawchat-net';
 const HEALTH_TIMEOUT_MS = 60_000;
@@ -61,6 +63,21 @@ export async function startAgent(agentId: string): Promise<{ channelUrl: string 
     if (config.llmApiKey) env.LLM_API_KEY = String(config.llmApiKey);
     if (config.llmBaseUrl) env.LLM_BASE_URL = String(config.llmBaseUrl);
     if (config.llmModel) env.LLM_MODEL = String(config.llmModel);
+
+    // 签发 Agent JWT — 让容器内脚本能调用 server API
+    const agentToken = await sign(
+      { accountId: agent.ownerId, agentId, type: 'agent', name: agent.name },
+      JWT_SECRET,
+      'HS256',
+    );
+    env.AGENT_TOKEN = agentToken;
+    env.SERVER_URL = process.env.SERVER_URL || 'http://host.docker.internal:3000';
+
+    // 注入用户配置的凭证
+    const credentials = (config.credentials || {}) as Record<string, string>;
+    for (const [key, value] of Object.entries(credentials)) {
+      if (value) env[key] = value;
+    }
 
     // 启动容器
     const profile = PROFILES.default;

@@ -9,6 +9,8 @@ export interface JwtPayload {
   accountId: string;
   type: string;
   name: string;
+  /** Present when type === 'agent' */
+  agentId?: string;
 }
 
 /**
@@ -54,9 +56,10 @@ export function authMiddleware(): MiddlewareHandler {
       return c.json({ error: 'Invalid token: missing accountId' }, 401);
     }
 
+    // Agent tokens use ownerId (stored as accountId) so ownership checks work
     c.set('userId', payload.accountId);
     c.set('userType', payload.type);
-    c.set('userName', payload.name);
+    c.set('userName', payload.name || '');
 
     await next();
   };
