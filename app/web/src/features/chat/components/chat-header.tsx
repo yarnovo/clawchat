@@ -17,13 +17,7 @@ export function ChatHeader({ name, isTyping, statusLabel }: ChatHeaderProps) {
     <PageHeader
       title={name}
       onBack={!isDesktop ? () => navigate({ to: '/chat' }) : undefined}
-    >
-      {statusLabel && (
-        <p className="ml-2 text-[11px] text-muted-foreground">{statusLabel}</p>
-      )}
-      {!statusLabel && isTyping && (
-        <p className="ml-2 text-[11px] text-muted-foreground">正在输入...</p>
-      )}
-    </PageHeader>
+      status={statusLabel || (isTyping ? '正在输入...' : undefined)}
+    />
   )
 }

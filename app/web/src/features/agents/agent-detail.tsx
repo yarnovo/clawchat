@@ -11,6 +11,14 @@ import { validateEnvVarName, computeCanSave } from "@/lib/env-var"
 import { PageHeader } from "@/components/ui/page-header"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import {
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog"
 import dayjs from "dayjs"
 import relativeTime from "dayjs/plugin/relativeTime"
 import "dayjs/locale/zh-cn"
@@ -182,6 +190,7 @@ export function EnvVarsDialog({
   })
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "entries" })
+  const userOpenedNotes = useRef(new Set<number>())
 
   const { data, isSuccess } = useQuery({
     queryKey: ["credentials", agentId],
@@ -201,6 +210,7 @@ export function EnvVarsDialog({
       key: c.name, value: "", note: c.note || "", noteOpen: Boolean(c.note), existing: c.hasValue,
     }))
     setInitialKeys(new Set(data.credentials.filter(c => c.hasValue).map(c => c.name)))
+    userOpenedNotes.current.clear()
     form.reset({ entries: rows.length > 0 ? rows : [{ key: "", value: "", note: "", noteOpen: false, existing: false }] })
   }, [open, data, form])
 
@@ -234,14 +244,14 @@ export function EnvVarsDialog({
   })
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg" initialFocus={false}>
-        <DialogHeader>
-          <DialogTitle>环境变量</DialogTitle>
-          <DialogDescription>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent className="sm:max-w-lg" initialFocus={false}>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>环境变量</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             设置注入容器的环境变量，Agent 启动时生效。
-          </DialogDescription>
-        </DialogHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
         <form onSubmit={form.handleSubmit((v) => saveMutation.mutate(v))} data-ready={isSuccess || undefined}>
           <div className="-mx-3">
@@ -267,7 +277,12 @@ export function EnvVarsDialog({
                           <Input
                             placeholder="变量名..."
                             {...form.register(`entries.${i}.key`, {
-                              validate: (v) => validateEnvVarName(v.trim()) ?? true,
+                              validate: (v) => {
+                                const trimmed = v.trim()
+                                // 空行（key 和 value 都没填）不报错
+                                if (!trimmed && !form.getValues(`entries.${i}.value`)) return true
+                                return validateEnvVarName(trimmed) ?? true
+                              },
                             })}
                             readOnly={existing}
                             aria-invalid={!!keyError}
@@ -295,11 +310,14 @@ export function EnvVarsDialog({
                       </div>
 
                       {noteOpen ? (
-                        <NoteField register={form.register(`entries.${i}.note`)} />
+                        <NoteField register={form.register(`entries.${i}.note`)} autoFocus={userOpenedNotes.current.has(i)} />
                       ) : (
                         <button
                           type="button"
-                          onClick={() => form.setValue(`entries.${i}.noteOpen`, true)}
+                          onClick={() => {
+                            userOpenedNotes.current.add(i)
+                            form.setValue(`entries.${i}.noteOpen`, true)
+                          }}
                           className="mt-2.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
                         >
                           添加备注
@@ -323,26 +341,26 @@ export function EnvVarsDialog({
             添加变量
           </Button>
 
-          <DialogFooter className="mt-4">
+          <ResponsiveDialogFooter className="mt-4">
             <Button type="submit" disabled={saveMutation.isPending || !canSave}>
               {saveMutation.isPending ? "保存中..." : "保存"}
             </Button>
-          </DialogFooter>
+          </ResponsiveDialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   )
 }
 
 // ── Note Field (展开时自动聚焦) ──
 
-function NoteField({ register }: { register: ReturnType<ReturnType<typeof useForm>["register"]> }) {
+function NoteField({ register, autoFocus = false }: { register: ReturnType<ReturnType<typeof useForm>["register"]>; autoFocus?: boolean }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const { ref, ...rest } = register
 
   useEffect(() => {
-    textareaRef.current?.focus()
-  }, [])
+    if (autoFocus) textareaRef.current?.focus()
+  }, [autoFocus])
 
   return (
     <div className="mt-2 mr-11">

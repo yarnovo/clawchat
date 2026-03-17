@@ -1,10 +1,10 @@
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog"
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogDescription,
+} from "@/components/ui/responsive-dialog"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import {
   Card,
@@ -35,12 +35,12 @@ export function SettingsDialog() {
   const { theme, setTheme } = useTheme()
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>设置</DialogTitle>
-          <DialogDescription>管理你的账号和偏好设置</DialogDescription>
-        </DialogHeader>
+    <ResponsiveDialog open={open} onOpenChange={setOpen}>
+      <ResponsiveDialogContent className="sm:max-w-md">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>设置</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>管理你的账号和偏好设置</ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
         <Tabs defaultValue="account">
           <TabsList className="w-full">
@@ -211,7 +211,7 @@ export function SettingsDialog() {
             </Card>
           </TabsContent>
         </Tabs>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   )
 }

@@ -36,6 +36,8 @@ export function AppShell({ children }: AppShellProps) {
       : undefined
 
   const isInChat = !!activeAgentId
+  const isAgentDetail = !!matchRoute({ to: "/agents/$agentId", fuzzy: true })
+  const isFullScreen = isInChat || isAgentDetail
   const isChatPage = !!matchRoute({ to: "/chat", fuzzy: true })
   const isAgentsPage = !!matchRoute({ to: "/agents", fuzzy: true })
 
@@ -62,10 +64,10 @@ export function AppShell({ children }: AppShellProps) {
     )
   }
 
-  // Mobile: full-screen chat
-  if (isInChat) {
+  // Mobile: full-screen (chat or agent detail/history)
+  if (isFullScreen) {
     return (
-      <div className="flex h-screen flex-col bg-background">
+      <div className="flex h-screen flex-col bg-background pt-[env(safe-area-inset-top)]">
         <main className="flex-1 flex flex-col overflow-hidden">{children}</main>
         <SettingsDialog />
         <SkillMarketplaceDialog open={skillsOpen} onOpenChange={setSkillsOpen} />
@@ -75,7 +77,7 @@ export function AppShell({ children }: AppShellProps) {
 
   // Mobile: tab pages
   return (
-    <div className="flex h-screen flex-col bg-background">
+    <div className="flex h-screen flex-col bg-background pt-[env(safe-area-inset-top)]">
       <main className="flex-1 flex flex-col overflow-hidden">
         {isChatPage ? (
           <ConversationList

@@ -7,12 +7,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog"
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+  ResponsiveDialogFooter,
+} from "@/components/ui/responsive-dialog"
 import { cn } from "@/lib/utils"
 import { EmptyState } from "@/components/ui/empty-state"
 import { listAgents, createAgent } from "@/services/api-client"
@@ -158,11 +158,11 @@ export function AgentList({
       )}
 
       {/* Create Agent Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader>
-            <DialogTitle>创建 Agent</DialogTitle>
-          </DialogHeader>
+      <ResponsiveDialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <ResponsiveDialogContent className="sm:max-w-sm">
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>创建 Agent</ResponsiveDialogTitle>
+          </ResponsiveDialogHeader>
 
           <form onSubmit={handleSubmit(onCreateSubmit)} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
@@ -270,14 +270,14 @@ export function AgentList({
               />
             </div>
 
-            <DialogFooter>
+            <ResponsiveDialogFooter>
               <Button type="submit" disabled={!isValid}>
                 创建
               </Button>
-            </DialogFooter>
+            </ResponsiveDialogFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
     </div>
   )
 }

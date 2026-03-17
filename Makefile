@@ -73,6 +73,31 @@ app-run:
 app-build-web:
 	cd app && flutter build web
 
+# ---- Mobile (Capacitor) ----
+.PHONY: mobile-setup mobile-build mobile-ios mobile-android
+
+mobile-setup:
+	cd app/mobile && pnpm install
+
+mobile-build:
+	cd app/web && pnpm build
+	cd app/mobile && npx cap sync
+
+mobile-ios:
+	cd app/mobile && npx cap open ios
+
+mobile-android:
+	cd app/mobile && npx cap open android
+
+# ---- Desktop ----
+.PHONY: desktop-dev desktop-build
+
+desktop-dev:
+	cd app/desktop && pnpm tauri dev
+
+desktop-build:
+	cd app/desktop && pnpm tauri build
+
 # ---- Storybook ----
 .PHONY: storybook
 
