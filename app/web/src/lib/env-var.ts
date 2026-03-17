@@ -12,6 +12,7 @@ export interface EnvEntry {
   key: string
   value: string
   existing: boolean
+  note?: string
 }
 
 /**
@@ -21,6 +22,7 @@ export interface EnvEntry {
 export function computeCanSave(
   entries: EnvEntry[],
   initialKeys: Set<string>,
+  initialNotes?: Record<string, string>,
 ): boolean {
   for (const e of entries) {
     const k = e.key.trim()
@@ -39,5 +41,12 @@ export function computeCanSave(
   // 有新增或修改？（existing: false 且 key+value 都有值）
   const hasNewOrModified = entries.some(e => !e.existing && e.key.trim() && e.value)
 
-  return hasDeleted || hasNewOrModified
+  // 有 note 变化？
+  const hasNoteChange = initialNotes ? entries.some(e => {
+    const k = e.key.trim()
+    if (!k) return false
+    return (e.note || '') !== (initialNotes[k] || '')
+  }) : false
+
+  return hasDeleted || hasNewOrModified || hasNoteChange
 }

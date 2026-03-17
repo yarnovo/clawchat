@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { MessageCircle, MoreVertical, Trash2, ChevronRight, Settings2, Plus } from "lucide-react"
@@ -14,7 +14,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import dayjs from "dayjs"
 import relativeTime from "dayjs/plugin/relativeTime"
 import "dayjs/locale/zh-cn"
-import { cn } from "@/lib/utils"
 import type { Agent } from "@/types"
 
 dayjs.extend(relativeTime)
@@ -25,24 +24,6 @@ interface AgentDetailProps {
   onBack?: () => void
   onDeleted?: () => void
 }
-
-const AVATAR_COLORS = [
-  "bg-blue-500",
-  "bg-emerald-500",
-  "bg-orange-500",
-  "bg-purple-500",
-  "bg-pink-500",
-  "bg-cyan-500",
-  "bg-amber-600",
-  "bg-red-500",
-]
-
-function getAvatarColor(id: string) {
-  let hash = 0
-  for (const ch of id) hash = ((hash << 5) - hash + ch.charCodeAt(0)) | 0
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
-}
-
 
 export function AgentDetail({ agent, onBack, onDeleted }: AgentDetailProps) {
   const navigate = useNavigate()
@@ -122,22 +103,11 @@ export function AgentDetail({ agent, onBack, onDeleted }: AgentDetailProps) {
       <div className="px-6 py-10 max-w-xl mx-auto w-full">
         {/* Hero */}
         <div className="flex flex-col items-center text-center mb-8">
-          {agent.avatar ? (
-            <img
-              src={agent.avatar}
-              alt={agent.name}
-              className="size-20 rounded-2xl bg-muted object-cover mb-4"
-            />
-          ) : (
-            <div
-              className={cn(
-                "flex size-20 items-center justify-center rounded-2xl text-white text-3xl font-bold mb-4",
-                getAvatarColor(agent.id),
-              )}
-            >
-              {agent.name.charAt(0)}
-            </div>
-          )}
+          <img
+            src={agent.avatar || `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(agent.name)}`}
+            alt={agent.name}
+            className="size-20 rounded-2xl bg-muted object-cover mb-4"
+          />
           <h2 className="text-xl font-bold text-foreground">{agent.name}</h2>
           {agent.description && (
             <p className="text-sm text-muted-foreground mt-1 max-w-sm">{agent.description}</p>
@@ -204,6 +174,7 @@ export function EnvVarsDialog({
 }) {
   const queryClient = useQueryClient()
   const [initialKeys, setInitialKeys] = useState<Set<string>>(new Set())
+  const [initialNotes, setInitialNotes] = useState<Record<string, string>>({})
 
   const form = useForm<EnvFormValues>({
     defaultValues: { entries: [{ key: "", value: "", note: "", noteOpen: false, existing: false }] },
@@ -221,8 +192,13 @@ export function EnvVarsDialog({
   // 加载已有凭证 → reset form
   useEffect(() => {
     if (!open || !data) return
+    const notesMap: Record<string, string> = {}
+    for (const c of data.credentials) {
+      if (c.note) notesMap[c.name] = c.note
+    }
+    setInitialNotes(notesMap)
     const rows = data.credentials.map((c) => ({
-      key: c.name, value: "", note: "", noteOpen: false, existing: c.hasValue,
+      key: c.name, value: "", note: c.note || "", noteOpen: Boolean(c.note), existing: c.hasValue,
     }))
     setInitialKeys(new Set(data.credentials.filter(c => c.hasValue).map(c => c.name)))
     form.reset({ entries: rows.length > 0 ? rows : [{ key: "", value: "", note: "", noteOpen: false, existing: false }] })
@@ -230,13 +206,15 @@ export function EnvVarsDialog({
 
   const watchedEntries = form.watch("entries")
   const canSave = computeCanSave(
-    watchedEntries.map(e => ({ key: e.key, value: e.value, existing: e.existing })),
+    watchedEntries.map(e => ({ key: e.key, value: e.value, existing: e.existing, note: e.note })),
     initialKeys,
+    initialNotes,
   )
 
   const saveMutation = useMutation({
     mutationFn: async (values: EnvFormValues) => {
       const creds: Record<string, string | null> = {}
+      const notes: Record<string, string> = {}
       for (const e of values.entries) {
         const k = e.key.trim()
         if (!k) continue
@@ -245,8 +223,9 @@ export function EnvVarsDialog({
         } else if (e.existing) {
           creds[k] = null
         }
+        if (e.note) notes[k] = e.note
       }
-      return setCredentials(agentId, creds as Record<string, string>)
+      return setCredentials(agentId, creds as Record<string, string>, notes)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["credentials", agentId] })
@@ -256,7 +235,7 @@ export function EnvVarsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg" initialFocus={false}>
         <DialogHeader>
           <DialogTitle>环境变量</DialogTitle>
           <DialogDescription>
@@ -290,8 +269,9 @@ export function EnvVarsDialog({
                             {...form.register(`entries.${i}.key`, {
                               validate: (v) => validateEnvVarName(v.trim()) ?? true,
                             })}
+                            readOnly={existing}
                             aria-invalid={!!keyError}
-                            className="w-full font-mono text-sm"
+                            className={`w-full font-mono text-sm${existing ? " bg-muted text-muted-foreground cursor-not-allowed" : ""}`}
                           />
                           {keyError && <p className="text-xs text-destructive mt-1">{keyError.message}</p>}
                         </div>
@@ -315,14 +295,7 @@ export function EnvVarsDialog({
                       </div>
 
                       {noteOpen ? (
-                        <div className="mt-2 mr-11">
-                          <span className="text-xs font-medium text-muted-foreground mb-1 block">备注</span>
-                          <Textarea
-                            placeholder="例如：来自 Supabase 的数据库密钥..."
-                            {...form.register(`entries.${i}.note`)}
-                            className="text-sm min-h-[60px]"
-                          />
-                        </div>
+                        <NoteField register={form.register(`entries.${i}.note`)} />
                       ) : (
                         <button
                           type="button"
@@ -358,6 +331,32 @@ export function EnvVarsDialog({
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ── Note Field (展开时自动聚焦) ──
+
+function NoteField({ register }: { register: ReturnType<ReturnType<typeof useForm>["register"]> }) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const { ref, ...rest } = register
+
+  useEffect(() => {
+    textareaRef.current?.focus()
+  }, [])
+
+  return (
+    <div className="mt-2 mr-11">
+      <span className="text-xs font-medium text-muted-foreground mb-1 block">备注</span>
+      <Textarea
+        placeholder="例如：来自 Supabase 的数据库密钥..."
+        ref={(el) => {
+          ref(el)
+          textareaRef.current = el
+        }}
+        {...rest}
+        className="text-sm min-h-[60px]"
+      />
+    </div>
   )
 }
 

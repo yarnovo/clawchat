@@ -215,10 +215,11 @@ export async function getCredentials(
 export async function setCredentials(
   agentId: string,
   credentials: Record<string, string>,
+  notes?: Record<string, string>,
 ): Promise<{ updated: boolean }> {
   return request(`/agents/${agentId}/credentials`, {
     method: 'PUT',
-    body: JSON.stringify({ credentials }),
+    body: JSON.stringify({ credentials, notes }),
   })
 }
 

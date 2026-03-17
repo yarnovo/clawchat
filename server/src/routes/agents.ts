@@ -177,7 +177,7 @@ app.put('/:id/credentials', async (c) => {
 
   if (!agent) return c.json({ error: 'Agent not found' }, 404);
 
-  const { credentials } = await c.req.json<{ credentials: Record<string, string | null> }>();
+  const { credentials, notes } = await c.req.json<{ credentials: Record<string, string | null>; notes?: Record<string, string> }>();
   if (!credentials || typeof credentials !== 'object') {
     return c.json({ error: 'credentials object required' }, 400);
   }
@@ -196,10 +196,22 @@ app.put('/:id/credentials', async (c) => {
     }
   }
 
+  // 只保留存在于 merged 中的 key 的 notes
+  const existingNotes = (config.credentialNotes || {}) as Record<string, string>;
+  const mergedNotes: Record<string, string> = {};
+  const incomingNotes = notes || {};
+  for (const key of Object.keys(merged)) {
+    if (incomingNotes[key]) {
+      mergedNotes[key] = incomingNotes[key];
+    } else if (existingNotes[key] && !(key in incomingNotes)) {
+      mergedNotes[key] = existingNotes[key];
+    }
+  }
+
   await db
     .update(agents)
     .set({
-      config: { ...config, credentials: merged, credentialOrder: Object.keys(merged) },
+      config: { ...config, credentials: merged, credentialOrder: Object.keys(merged), credentialNotes: mergedNotes },
       updatedAt: new Date(),
     })
     .where(eq(agents.id, agentId));
@@ -222,12 +234,14 @@ app.get('/:id/credentials', async (c) => {
   const config = (agent.config || {}) as Record<string, unknown>;
   const credentials = (config.credentials || {}) as Record<string, string>;
   const order = (config.credentialOrder || Object.keys(credentials)) as string[];
+  const credentialNotes = (config.credentialNotes || {}) as Record<string, string>;
   // Only return key names, not values — in saved order
   const keys = order
     .filter((key) => key in credentials)
     .map((key) => ({
       name: key,
       hasValue: Boolean(credentials[key]),
+      note: credentialNotes[key] || '',
     }));
 
   return c.json({ credentials: keys });

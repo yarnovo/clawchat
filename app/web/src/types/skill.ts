@@ -15,4 +15,5 @@ export interface SkillDetail extends Skill {
 export interface CredentialKey {
   name: string
   hasValue: boolean
+  note: string
 }
