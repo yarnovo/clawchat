@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { useParams, useNavigate, useSearch } from "@tanstack/react-router"
-import { ChevronLeft } from "lucide-react"
+import { PageHeader } from "@/components/ui/page-header"
 import { MessageList } from "@/features/chat/components"
 import { getAgent, getSessionMessages } from "@/services/api-client"
 
@@ -26,15 +26,10 @@ export default function AgentHistoryPage() {
 
   return (
     <div className="flex flex-1 flex-col min-w-0 overflow-hidden bg-background">
-      <div className="flex h-14 shrink-0 items-center border-b border-border px-4">
-        <button
-          onClick={() => navigate({ to: "/agents/$agentId", params: { agentId } })}
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ChevronLeft className="size-5" />
-          {title || agent?.name || "返回"}
-        </button>
-      </div>
+      <PageHeader
+        title={title || agent?.name || "返回"}
+        onBack={() => navigate({ to: "/agents/$agentId", params: { agentId } })}
+      />
       <div className="flex-1 flex flex-col overflow-hidden">
         {msgs.length === 0 ? (
           <div className="flex-1" />

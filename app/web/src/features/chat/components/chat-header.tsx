@@ -1,7 +1,6 @@
-import { ChevronLeft } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
-import { Button } from '@/components/ui/button'
 import { useMediaQuery } from '@/hooks/use-media-query'
+import { PageHeader } from '@/components/ui/page-header'
 
 interface ChatHeaderProps {
   name: string
@@ -14,23 +13,13 @@ export function ChatHeader({ name, isTyping }: ChatHeaderProps) {
   const navigate = useNavigate()
 
   return (
-    <header className="flex h-14 shrink-0 items-center border-b border-border bg-background px-2 md:px-5">
-      {!isDesktop && (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => navigate({ to: '/chat' })}
-          className="-ml-1"
-        >
-          <ChevronLeft className="size-5" />
-        </Button>
+    <PageHeader
+      title={name}
+      onBack={!isDesktop ? () => navigate({ to: '/chat' }) : undefined}
+    >
+      {isTyping && (
+        <p className="ml-2 text-[11px] text-muted-foreground">正在输入...</p>
       )}
-      <div>
-        <h2 className="text-sm font-semibold text-foreground">{name}</h2>
-        {isTyping && (
-          <p className="text-[11px] text-muted-foreground">正在输入...</p>
-        )}
-      </div>
-    </header>
+    </PageHeader>
   )
 }

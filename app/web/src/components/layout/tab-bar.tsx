@@ -1,4 +1,4 @@
-import { MessageCircle, Store, Settings } from "lucide-react"
+import { MessageCircle, Bot, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useUIStore } from "@/stores/ui-store"
 
@@ -11,7 +11,7 @@ interface TabBarProps {
 
 const tabs: { id: Tab; icon: typeof MessageCircle; label: string }[] = [
   { id: "chat", icon: MessageCircle, label: "Chat" },
-  { id: "agents", icon: Store, label: "Agents" },
+  { id: "agents", icon: Bot, label: "Agents" },
 ]
 
 export function TabBar({ active, onTabChange }: TabBarProps) {

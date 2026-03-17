@@ -1,7 +1,8 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { Package, File, ChevronLeft } from "lucide-react"
+import { Package, File } from "lucide-react"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
+import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { listSkills, getSkill } from "@/services/api-client"
@@ -107,15 +108,7 @@ function DetailView({ skillName, onBack }: { skillName: string; onBack: () => vo
   return (
     <>
       {/* Header */}
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ChevronLeft className="size-4" />
-          返回
-        </button>
-      </div>
+      <PageHeader title="返回" onBack={onBack} />
 
       {/* Content */}
       <ScrollArea className="flex-1">

@@ -1,13 +1,20 @@
 import { useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { ChevronLeft, MessageCircle, MoreVertical, Trash2, ChevronRight } from "lucide-react"
+import { MessageCircle, MoreVertical, Trash2, ChevronRight } from "lucide-react"
 import { deleteAgent, getChatSessions } from "@/services/api-client"
 import { Button } from "@/components/ui/button"
+import { PageHeader } from "@/components/ui/page-header"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import dayjs from "dayjs"
+import relativeTime from "dayjs/plugin/relativeTime"
+import "dayjs/locale/zh-cn"
 import { cn } from "@/lib/utils"
 import type { Agent } from "@/types"
+
+dayjs.extend(relativeTime)
+dayjs.locale("zh-cn")
 
 interface AgentDetailProps {
   agent: Agent
@@ -33,15 +40,6 @@ function getAvatarColor(id: string) {
 }
 
 
-function formatRelativeTime(timestamp: number): string {
-  const now = Date.now()
-  const diff = now - timestamp
-  if (diff < 60_000) return "刚刚"
-  if (diff < 3600_000) return `${Math.floor(diff / 60_000)} 分钟前`
-  if (diff < 86400_000) return `${Math.floor(diff / 3600_000)} 小时前`
-  return `${Math.floor(diff / 86400_000)} 天前`
-}
-
 export function AgentDetail({ agent, onBack, onDeleted }: AgentDetailProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -63,34 +61,26 @@ export function AgentDetail({ agent, onBack, onDeleted }: AgentDetailProps) {
   return (
     <div className="flex flex-1 flex-col overflow-hidden min-w-0">
       {/* Top bar */}
-      <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
-        {onBack ? (
-          <button
-            onClick={onBack}
-            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ChevronLeft className="size-5" />
-            返回
-          </button>
-        ) : (
-          <div />
-        )}
-
-        <DropdownMenu>
-          <DropdownMenuTrigger className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors outline-none">
-            <MoreVertical className="size-4" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              onClick={() => setDeleteOpen(true)}
-            >
-              <Trash2 className="size-4 mr-2" />
-              删除 Agent
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      <PageHeader
+        title={onBack ? agent.name : ""}
+        onBack={onBack}
+        actions={
+          <DropdownMenu>
+            <DropdownMenuTrigger className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors outline-none">
+              <MoreVertical className="size-4" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => setDeleteOpen(true)}
+              >
+                <Trash2 className="size-4 mr-2" />
+                删除 Agent
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        }
+      />
 
       {/* Delete confirmation dialog */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
@@ -217,7 +207,9 @@ function ShowcaseSection({ agentId }: { agentId: string }) {
               >
                 <div className="min-w-0 flex-1">
                   <span className="text-sm font-medium text-foreground line-clamp-1">{session.title}</span>
-                  <span className="text-[11px] text-muted-foreground mt-0.5 block">{session.messageCount} 条对话</span>
+                  <span className="text-[11px] text-muted-foreground mt-0.5 block">
+                    {session.messageCount} 条对话 · {dayjs(session.lastTimestamp).fromNow()}
+                  </span>
                 </div>
                 <ChevronRight className="size-4 shrink-0 text-muted-foreground/30" />
               </button>
@@ -229,146 +221,3 @@ function ShowcaseSection({ agentId }: { agentId: string }) {
   )
 }
 
-// ── Installed Skills ──
-
-function InstalledSkillsSection({ agentId }: { agentId: string }) {
-  const { data } = useQuery({
-    queryKey: ["agent-skills", agentId],
-    queryFn: () => getAgentSkills(agentId),
-  })
-  const installedSkills = data?.skills ?? []
-
-  if (installedSkills.length === 0) {
-    return (
-      <div className="space-y-3">
-        <h3 className="text-sm font-medium text-foreground">已安装技能</h3>
-        <p className="text-xs text-muted-foreground">暂无技能</p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-3">
-      <h3 className="text-sm font-medium text-foreground">已安装技能</h3>
-
-      <div className="space-y-2">
-        {installedSkills.map((skill) => (
-          <SkillCard key={skill.name} skill={skill} agentId={agentId} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function SkillCard({ skill, agentId }: { skill: { name: string; displayName: string; description: string; version: string }; agentId: string }) {
-  const [open, setOpen] = useState(false)
-
-  return (
-    <>
-      <button
-        onClick={() => setOpen(true)}
-        className="flex w-full items-center gap-3 rounded-xl border border-border p-3 text-left hover:bg-accent/50 transition-colors"
-      >
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-          <Package className="size-4" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-foreground">{skill.displayName}</span>
-            <span className="text-[10px] text-muted-foreground">v{skill.version}</span>
-          </div>
-          {skill.description && (
-            <p className="mt-0.5 text-xs text-muted-foreground truncate">{skill.description}</p>
-          )}
-        </div>
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground/40" />
-      </button>
-
-      {/* Skill detail + credential config dialog */}
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>{skill.displayName}</DialogTitle>
-            <DialogDescription>{skill.description}</DialogDescription>
-          </DialogHeader>
-          <SkillCredentialsForm agentId={agentId} skillName={skill.name} />
-        </DialogContent>
-      </Dialog>
-    </>
-  )
-}
-
-function SkillCredentialsForm({ agentId, skillName }: { agentId: string; skillName: string }) {
-  const queryClient = useQueryClient()
-  const [formValues, setFormValues] = useState<Record<string, string>>({})
-  const [dirty, setDirty] = useState(false)
-
-  const { data } = useQuery({
-    queryKey: ["credentials", agentId],
-    queryFn: () => getCredentials(agentId),
-    select: (d) => d.credentials,
-  })
-
-  const saveMutation = useMutation({
-    mutationFn: () => {
-      const creds: Record<string, string> = {}
-      for (const [key, value] of Object.entries(formValues)) {
-        if (value) creds[key] = value
-      }
-      return setCredentials(agentId, creds)
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["credentials", agentId] })
-      setFormValues({})
-      setDirty(false)
-    },
-  })
-
-  const fields = data ?? []
-
-  if (fields.length === 0) {
-    return (
-      <p className="text-xs text-muted-foreground py-2">
-        该技能无需配置凭证
-      </p>
-    )
-  }
-
-  return (
-    <div className="space-y-4 py-2">
-      <h4 className="text-sm font-medium">凭证配置</h4>
-      <div className="space-y-3">
-        {fields.map((field) => (
-          <div key={field.name} className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <label className="text-xs font-mono text-foreground">{field.name}</label>
-              {field.hasValue && !formValues[field.name] && (
-                <span className="text-[10px] text-emerald-600">已配置</span>
-              )}
-            </div>
-            <Input
-              type="password"
-              value={formValues[field.name] ?? ""}
-              onChange={(e) => {
-                setFormValues((prev) => ({ ...prev, [field.name]: e.target.value }))
-                setDirty(true)
-              }}
-              placeholder={field.hasValue ? "••••••（输入新值覆盖）" : "请输入"}
-              className="h-9 text-sm font-mono"
-            />
-          </div>
-        ))}
-      </div>
-      {dirty && (
-        <Button
-          size="sm"
-          className="w-full"
-          disabled={saveMutation.isPending}
-          onClick={() => saveMutation.mutate()}
-        >
-          {saveMutation.isPending ? "保存中..." : "保存"}
-        </Button>
-      )}
-    </div>
-  )
-}

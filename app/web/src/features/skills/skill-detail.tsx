@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { ChevronLeft, Download, File } from "lucide-react"
+import { Download, File } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { PageHeader } from "@/components/ui/page-header"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { getSkill, installSkill, listAgents } from "@/services/api-client"
 
@@ -53,17 +54,7 @@ export function SkillDetail({ skillName, onBack }: SkillDetailProps) {
   return (
     <div className="flex flex-1 flex-col overflow-y-auto">
       {/* Mobile back */}
-      {onBack && (
-        <div className="flex h-14 shrink-0 items-center border-b border-border px-2">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ChevronLeft className="size-5" />
-            返回
-          </button>
-        </div>
-      )}
+      {onBack && <PageHeader title="返回" onBack={onBack} />}
 
       <div className="flex flex-1 items-start justify-center px-6 py-12">
         <div className="w-full max-w-lg">

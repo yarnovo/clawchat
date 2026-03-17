@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo, useEffect } from "react"
+import { useRef, useState, useMemo } from "react"
 import { useForm } from "react-hook-form"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Search, Plus } from "lucide-react"
@@ -65,9 +65,19 @@ export function AgentList({
 
   const avatarUrl = `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(avatarSeed)}`
 
-  const { register, handleSubmit, reset, formState: { isValid } } = useForm<CreateAgentForm>({
+  const { register, handleSubmit, reset, watch, setValue, formState: { isValid } } = useForm<CreateAgentForm>({
     mode: "onChange",
   })
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false)
+  const [categoryHighlight, setCategoryHighlight] = useState(-1)
+  const categoryValue = watch("category") ?? ""
+  const categoryOptions = useMemo(
+    () => [...new Set(agents.map((a) => a.category).filter(Boolean))] as string[],
+    [agents],
+  )
+  const filteredCategories = categoryOptions.filter(
+    (cat) => cat.toLowerCase().includes(categoryValue.toLowerCase()),
+  )
 
   const grouped = useMemo(() => {
     const map = new Map<string, typeof agents>()
@@ -104,7 +114,7 @@ export function AgentList({
         className,
       )}
     >
-      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-sidebar-border px-3">
+      <div className="flex h-14 shrink-0 items-center gap-1.5 border-b border-sidebar-border px-3">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -181,7 +191,7 @@ export function AgentList({
             <DialogTitle>创建 Agent</DialogTitle>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit(onCreateSubmit)} className="flex flex-col gap-4 py-2">
+          <form onSubmit={handleSubmit(onCreateSubmit)} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium">
                 名称 <span className="text-destructive">*</span>
@@ -218,18 +228,63 @@ export function AgentList({
               <label className="text-sm font-medium">
                 分类 <span className="text-destructive">*</span>
               </label>
-              <Input
-                {...register("category", { required: true })}
-                placeholder="例如: 编程开发"
-                list="category-options"
-              />
-              <datalist id="category-options">
-                {[...new Set(agents.map((a) => a.category).filter(Boolean))].map(
-                  (cat) => (
-                    <option key={cat} value={cat} />
-                  ),
+              <div className="relative">
+                <Input
+                  {...register("category", { required: true })}
+                  placeholder="例如: 编程开发"
+                  autoComplete="off"
+                  onFocus={() => {
+                    setCategoryDropdownOpen(true)
+                    setCategoryHighlight(-1)
+                  }}
+                  onBlur={() => setTimeout(() => setCategoryDropdownOpen(false), 150)}
+                  onKeyDown={(e) => {
+                    if (!categoryDropdownOpen || filteredCategories.length === 0) return
+                    if (e.key === "ArrowDown") {
+                      e.preventDefault()
+                      setCategoryHighlight((i) => (i + 1) % filteredCategories.length)
+                    } else if (e.key === "ArrowUp") {
+                      e.preventDefault()
+                      setCategoryHighlight((i) => (i <= 0 ? filteredCategories.length - 1 : i - 1))
+                    } else if (e.key === "Enter" && categoryHighlight >= 0) {
+                      e.preventDefault()
+                      setValue("category", filteredCategories[categoryHighlight], { shouldValidate: true })
+                      setCategoryDropdownOpen(false)
+                      setCategoryHighlight(-1)
+                    } else if (e.key === "Escape") {
+                      setCategoryDropdownOpen(false)
+                      setCategoryHighlight(-1)
+                    }
+                  }}
+                  onChange={(e) => {
+                    register("category", { required: true }).onChange(e)
+                    setCategoryDropdownOpen(true)
+                    setCategoryHighlight(-1)
+                  }}
+                />
+                {categoryDropdownOpen && filteredCategories.length > 0 && (
+                  <div className="absolute top-full left-0 z-50 mt-1 w-full rounded-md border bg-popover p-1 shadow-md">
+                    {filteredCategories.map((cat, i) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        className={cn(
+                          "w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent",
+                          i === categoryHighlight && "bg-accent",
+                        )}
+                        onMouseDown={(e) => {
+                          e.preventDefault()
+                          setValue("category", cat, { shouldValidate: true })
+                          setCategoryDropdownOpen(false)
+                          setCategoryHighlight(-1)
+                        }}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
                 )}
-              </datalist>
+              </div>
             </div>
 
             <div className="flex flex-col gap-1.5">
