@@ -7,11 +7,11 @@ import { serve } from '@hono/node-server';
 import { cors } from 'hono/cors';
 import { sign } from 'hono/utils/jwt/jwt';
 import { setCookie } from 'hono/cookie';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { hash, compare } from 'bcryptjs';
 import { authMiddleware, type AuthEnv } from './middleware/auth.js';
 import { db } from './db/index.js';
-import { accounts } from './db/schema.js';
+import { accounts, agents } from './db/schema.js';
 import { agentsRoutes } from './routes/agents.js';
 import { messagesRoutes } from './routes/messages.js';
 import { skillsRoutes } from './routes/skills.js';
@@ -67,6 +67,14 @@ app.post('/api/auth/register', async (c) => {
     avatar: avatar ?? null,
   }).returning();
 
+  // Create default agent for the new user
+  await db.insert(agents).values({
+    ownerId: account.id,
+    name: account.name,
+    description: '',
+    isDefault: true,
+  });
+
   const token = await signToken(account.id, account.name);
   setTokenCookie(c, token);
   return c.json({ user: { id: account.id, name: account.name, username: account.username } });
@@ -108,10 +116,23 @@ app.use('*', authMiddleware());
 
 // Auth: get current user
 app.get('/api/auth/me', async (c) => {
-  const [account] = await db.select().from(accounts).where(eq(accounts.id, c.get('userId'))).limit(1);
+  const userId = c.get('userId');
+  const [account] = await db.select().from(accounts).where(eq(accounts.id, userId)).limit(1);
   if (!account) return c.json({ error: 'not found' }, 404);
+
+  const [defaultAgent] = await db.select({ id: agents.id })
+    .from(agents)
+    .where(and(eq(agents.ownerId, userId), eq(agents.isDefault, true)))
+    .limit(1);
+
   return c.json({
-    user: { id: account.id, name: account.name, username: account.username, avatar: account.avatar },
+    user: {
+      id: account.id,
+      name: account.name,
+      username: account.username,
+      avatar: account.avatar,
+      defaultAgentId: defaultAgent?.id ?? null,
+    },
   });
 });
 

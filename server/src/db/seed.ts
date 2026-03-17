@@ -173,6 +173,20 @@ async function seed() {
 
   console.log(`  Created user: ${user.username} (password: 123456)`);
 
+  // 创建用户的默认 self agent
+  const [selfAgent] = await db
+    .insert(agents)
+    .values({
+      ownerId: user.id,
+      name: user.name,
+      description: '我自己',
+      avatar: user.avatar,
+      isDefault: true,
+    })
+    .returning();
+
+  console.log(`  Created default agent: ${selfAgent.name} (id: ${selfAgent.id})`);
+
   // 创建示例 Agent
   const [agent] = await db
     .insert(agents)

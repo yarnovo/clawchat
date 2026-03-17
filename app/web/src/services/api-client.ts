@@ -63,7 +63,7 @@ export async function apiLogout(): Promise<void> {
 }
 
 export async function getMe(): Promise<{
-  user: { id: string; name: string; type: string }
+  user: { id: string; name: string; type: string; defaultAgentId: string | null }
 }> {
   return request('/auth/me')
 }

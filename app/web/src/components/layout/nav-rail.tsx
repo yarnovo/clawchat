@@ -6,6 +6,7 @@ import {
 } from "lucide-react"
 import { useNavigate } from "@tanstack/react-router"
 import { cn } from "@/lib/utils"
+import { useAuthStore } from "@/stores/auth-store"
 import { useUIStore } from "@/stores/ui-store"
 
 interface NavRailProps {
@@ -21,11 +22,13 @@ const navItems = [
 export function NavRail({ activePage, onNavigate }: NavRailProps) {
   const setSettingsOpen = useUIStore((s) => s.setSettingsOpen)
   const setSkillsOpen = useUIStore((s) => s.setSkillsOpen)
+  const defaultAgentId = useAuthStore((s) => s.defaultAgentId)
   const navigate = useNavigate()
 
   const handleSelfChat = () => {
+    if (!defaultAgentId) return
     onNavigate("chat")
-    navigate({ to: "/chat/$agentId", params: { agentId: "self" } })
+    navigate({ to: "/chat/$agentId", params: { agentId: defaultAgentId } })
   }
 
   return (

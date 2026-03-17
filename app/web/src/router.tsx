@@ -13,6 +13,7 @@ import { LoginPage } from '@/features/auth/login-page'
 import { RegisterPage } from '@/features/auth/register-page'
 import { useTheme } from '@/hooks/use-theme'
 import { getMe } from '@/services/api-client'
+import { useAuthStore } from '@/stores/auth-store'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,12 +24,19 @@ const queryClient = new QueryClient({
   },
 })
 
-/** Check auth by calling /api/auth/me — returns true if cookie is valid */
+let authChecked = false
+
 async function checkAuth(): Promise<boolean> {
+  // Already authenticated in this session — skip network request
+  if (authChecked && useAuthStore.getState().userId) return true
   try {
-    await getMe()
+    const { user } = await getMe()
+    useAuthStore.getState().setUser(user)
+    authChecked = true
     return true
   } catch {
+    authChecked = false
+    useAuthStore.getState().clear()
     return false
   }
 }

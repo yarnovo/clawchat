@@ -6,6 +6,7 @@ import {
   pgEnum,
   jsonb,
   integer,
+  boolean,
   customType,
 } from 'drizzle-orm/pg-core';
 
@@ -48,6 +49,7 @@ export const agents = pgTable('agents', {
   channelUrl: text('channel_url'),
   containerName: text('container_name'),
   currentSessionId: integer('current_session_id').notNull().default(1),
+  isDefault: boolean('is_default').notNull().default(false),
   config: jsonb('config').default({}),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

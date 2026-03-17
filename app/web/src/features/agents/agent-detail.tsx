@@ -61,7 +61,7 @@ export function AgentDetail({ agent, onBack, onDeleted }: AgentDetailProps) {
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto min-w-0">
+    <div className="flex flex-1 flex-col overflow-hidden min-w-0">
       {/* Top bar */}
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
         {onBack ? (
@@ -116,7 +116,8 @@ export function AgentDetail({ agent, onBack, onDeleted }: AgentDetailProps) {
         </DialogContent>
       </Dialog>
 
-      <div className="flex-1 px-6 py-10 max-w-xl mx-auto w-full">
+      <div className="flex-1 overflow-y-auto">
+      <div className="px-6 py-10 max-w-xl mx-auto w-full">
         {/* Hero */}
         <div className="flex flex-col items-center text-center mb-8">
           {agent.avatar ? (
@@ -154,6 +155,7 @@ export function AgentDetail({ agent, onBack, onDeleted }: AgentDetailProps) {
 
         {/* Showcase — grouped by tag */}
         <ShowcaseSection agentId={agent.id} />
+      </div>
       </div>
     </div>
   )
