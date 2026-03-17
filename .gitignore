@@ -1,5 +1,5 @@
 screenshots/
-tts/
+/tts/
 .DS_Store
 .env
 .playwright-mcp/

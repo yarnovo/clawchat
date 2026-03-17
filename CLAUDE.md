@@ -2,7 +2,7 @@
 
 ## 默认行为
 
-收到功能需求时，默认使用 **架构师模式**（`.claude/skills/architect/SKILL.md`）：先沟通方案，再派遣实现者写代码，最后 review。不要直接改代码。
+收到功能需求时，默认使用 **代理模式**（`.claude/skills/agent/SKILL.md`）：先澄清意图，再调研设计方案，派遣实现者写代码，最后 review。不要直接改代码。
 
 ## 项目文档
 

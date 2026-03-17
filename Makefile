@@ -73,6 +73,12 @@ app-run:
 app-build-web:
 	cd app && flutter build web
 
+# ---- Storybook ----
+.PHONY: storybook
+
+storybook:
+	cd app/web && npm run storybook
+
 # ---- Promo Video ----
 .PHONY: promo-dev promo-render
 

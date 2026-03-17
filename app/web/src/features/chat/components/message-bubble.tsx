@@ -16,23 +16,6 @@ function formatTime(timestamp: number): string {
   })
 }
 
-const AVATAR_COLORS = [
-  "bg-blue-500",
-  "bg-emerald-500",
-  "bg-orange-500",
-  "bg-purple-500",
-  "bg-pink-500",
-  "bg-cyan-500",
-  "bg-amber-600",
-  "bg-red-500",
-]
-
-function getAvatarColor(id: string) {
-  let hash = 0
-  for (const ch of id) hash = ((hash << 5) - hash + ch.charCodeAt(0)) | 0
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
-}
-
 // User avatar — same DiceBear style as agents
 const USER_AVATAR = 'https://api.dicebear.com/9.x/notionists/svg?seed=self'
 
@@ -48,22 +31,11 @@ export function MessageBubble({ message, agentAvatar, onRetry }: MessageBubblePr
       className={cn('flex gap-2.5', isUser ? 'flex-row-reverse' : 'flex-row')}
     >
       {/* Avatar — unified rounded-lg square style */}
-      {avatarSrc ? (
-        <img
-          src={avatarSrc}
-          alt=""
-          className="size-8 shrink-0 rounded-lg bg-muted object-cover mt-0.5"
-        />
-      ) : (
-        <div
-          className={cn(
-            "flex size-8 shrink-0 items-center justify-center rounded-lg text-white text-xs font-medium mt-0.5",
-            getAvatarColor(message.agentId),
-          )}
-        >
-          {isUser ? 'U' : 'A'}
-        </div>
-      )}
+      <img
+        src={avatarSrc || `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(message.agentId)}`}
+        alt=""
+        className="size-8 shrink-0 rounded-lg bg-muted object-cover mt-0.5"
+      />
 
       {/* Bubble + meta */}
       <div className={cn('flex max-w-[70%] min-w-0 flex-col gap-1', isUser ? 'items-end' : 'items-start')}>

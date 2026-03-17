@@ -13,3 +13,6 @@
 [submodule "skills"]
 	path = skills
 	url = git@github.com:yarnovo/skills.git
+[submodule "learn-claude-code"]
+	path = learn-claude-code
+	url = https://github.com/yarnovo/learn-claude-code.git
