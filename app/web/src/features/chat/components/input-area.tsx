@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useRef, type KeyboardEvent } from 'react'
 import TextareaAutosize from 'react-textarea-autosize'
-import { Square, Maximize2, Minimize2 } from 'lucide-react'
+import { Square, Camera, Mic } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -22,7 +22,6 @@ export function InputArea({
   disabled = false,
 }: InputAreaProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const [expanded, setExpanded] = useState(false)
   const canSend = value.trim().length > 0 && !loading && !disabled
 
   useEffect(() => {
@@ -44,61 +43,55 @@ export function InputArea({
   )
 
   return (
-    <div className="border-t border-border bg-background px-4 py-3">
-      {/* Input wrapper */}
-      <div className="relative">
+    <div className="bg-background px-4 py-3">
+      <div className="rounded-xl border border-border shadow-sm">
+        {/* Textarea */}
         <TextareaAutosize
           ref={textareaRef}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={disabled ? "Agent 未运行" : "输入消息..."}
-          minRows={expanded ? 8 : 2}
-          maxRows={expanded ? 16 : 6}
+          minRows={3}
+          maxRows={10}
           disabled={disabled}
           className={cn(
-            'w-full resize-none rounded-lg border border-input bg-background px-3 py-2.5 pr-9 text-sm leading-relaxed text-foreground',
+            'w-full resize-none bg-transparent px-4 pt-3 pb-2 text-sm leading-relaxed text-foreground',
             'placeholder:text-muted-foreground',
-            'focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring',
+            'focus:outline-none',
             'disabled:cursor-not-allowed disabled:opacity-50',
-            'transition-colors',
           )}
         />
 
-        {/* Expand/collapse toggle — top right corner */}
-        <button
-          type="button"
-          onClick={() => setExpanded(!expanded)}
-          className="absolute right-2 top-2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-        >
-          {expanded ? <Minimize2 className="size-3.5" /> : <Maximize2 className="size-3.5" />}
-        </button>
-      </div>
-
-      {/* Bottom bar */}
-      <div className="flex items-center justify-between mt-2">
-        <div className="flex items-center gap-1">
-          {loading && onStop && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onStop}
-              className="h-7 px-2"
+        {/* Footer */}
+        <div className="flex items-center justify-between px-4 pb-2.5">
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground transition-colors"
             >
-              <Square className="size-3.5 mr-1" />
-              停止
-            </Button>
-          )}
-        </div>
+              <Camera className="size-[18px]" />
+            </button>
+            <button
+              type="button"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Mic className="size-[18px]" />
+            </button>
+            {loading && onStop && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onStop}
+                className="h-7 px-2"
+              >
+                <Square className="size-3.5 mr-1" />
+                停止
+              </Button>
+            )}
+          </div>
 
-        <Button
-          size="sm"
-          onClick={onSend}
-          disabled={!canSend}
-          className="h-7 px-3"
-        >
-          发送
-        </Button>
+        </div>
       </div>
     </div>
   )

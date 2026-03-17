@@ -30,7 +30,7 @@ export function SkillList({ selectedSkillName, onSkillSelect, className }: Skill
     : skills
 
   return (
-    <div className={cn("flex w-72 flex-col border-r border-border bg-background", className)}>
+    <div className={cn("flex h-full w-[280px] shrink-0 flex-col bg-sidebar border-r border-sidebar-border", className)}>
       {/* Header with search */}
       <div className="flex h-14 shrink-0 items-center border-b border-border px-3">
         <div className="relative flex-1">

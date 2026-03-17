@@ -74,8 +74,6 @@ export function MessageBubble({ message, agentAvatar, onRetry }: MessageBubblePr
               ? 'bg-chat-user text-chat-user-foreground'
               : 'bg-card text-card-foreground shadow-sm',
             isSending && 'opacity-50',
-            isError && !isUser && 'border border-destructive/30 bg-destructive/5',
-            isError && isUser && 'bg-destructive/80',
           )}
         >
           {isUser ? (
@@ -99,10 +97,10 @@ export function MessageBubble({ message, agentAvatar, onRetry }: MessageBubblePr
             <button
               type="button"
               onClick={() => onRetry?.(message.id)}
-              className="inline-flex items-center gap-1 text-destructive hover:text-destructive/80"
+              className="inline-flex items-center gap-1 text-destructive/70 hover:text-destructive"
             >
               <RotateCw className="size-3" />
-              Retry
+              发送失败，点击重试
             </button>
           )}
         </div>

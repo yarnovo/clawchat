@@ -1,6 +1,8 @@
 import { useState } from "react"
 import { SkillList } from "@/features/skills/skill-list"
 import { SkillDetail } from "@/features/skills/skill-detail"
+import { EmptyState } from "@/components/ui/empty-state"
+import { Package } from "lucide-react"
 import { useMediaQuery } from "@/hooks/use-media-query"
 
 export default function SkillsPage() {
@@ -38,9 +40,7 @@ export default function SkillsPage() {
       ) : (
         <div className="flex flex-1 flex-col">
           <div className="h-14 shrink-0 border-b border-border" />
-          <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground/60">
-            选择一个技能查看详情
-          </div>
+          <EmptyState icon={Package} text="选择一个技能查看详情" />
         </div>
       )}
     </div>
