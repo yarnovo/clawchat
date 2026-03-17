@@ -26,8 +26,8 @@ export function computeCanSave(
 ): boolean {
   for (const e of entries) {
     const k = e.key.trim()
-    // 空行（key 和 value 都没填）阻止保存
-    if (!k && !e.value && !e.existing) return false
+    // 空行（key 和 value 都没填）跳过
+    if (!k && !e.value && !e.existing) continue
     // key 必须合法
     if (k && validateEnvVarName(k) !== undefined) return false
     // 新行/修改行必须 key + value 都填

@@ -11,14 +11,6 @@ const config: CapacitorConfig = {
     cleartext: true,
   },
   plugins: {
-    StatusBar: {
-      overlaysWebView: true,
-      style: 'DARK',
-    },
-    SplashScreen: {
-      launchAutoHide: true,
-      launchShowDuration: 0,
-    },
     Keyboard: {
       resize: 'native',
       resizeOnFullScreen: true,

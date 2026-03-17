@@ -3,21 +3,27 @@ VERSION := $(shell cat VERSION)
 # ---- 开发 ----
 .PHONY: dev dev-stop logs
 
-# 本地开发：Docker DB + 本地后端 + Vite 前端
+# 本地开发：Docker DB + 后端 + Vite 前端
 dev:
 	docker compose up -d
 	cd server && pnpm dev &
-	cd app && pnpm dev &
+	cd app/web && pnpm dev --host &
 	@echo ""
 	@echo "  Database: postgres://clawchat:clawchat@localhost:5432/clawchat"
-	@echo "  Server:   http://localhost:3000 (local)"
+	@echo "  Server:   http://localhost:3000"
 	@echo "  Frontend: http://localhost:5173 (Vite)"
+	@echo "  Mobile:   Capacitor 连接 Vite dev server"
+	@echo "  Desktop:  make desktop-dev 单独启动"
 	@echo ""
 
 dev-stop:
 	docker compose down
 	-pkill -f "vite" 2>/dev/null
-	@echo "Stopped"
+	-pkill -f "tsx.*server" 2>/dev/null
+	-pkill -f "pnpm dev" 2>/dev/null
+	-lsof -ti:3000 | xargs kill -9 2>/dev/null
+	-lsof -ti:5173 | xargs kill -9 2>/dev/null
+	@echo "Stopped all (DB + Server + Vite)"
 
 logs:
 	docker compose logs -f

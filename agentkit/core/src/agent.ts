@@ -6,7 +6,7 @@
  * bash 是内置的唯一工具，不对外暴露 Tool 接口。
  * 所有其他能力通过 Skill 的 prompt + scripts 提供。
  */
-import { execSync } from 'child_process';
+import { spawn, type ChildProcess } from 'child_process';
 import type { LLMProvider, ChatMessage, ToolDefinition } from './llm.js';
 import type { ChatSession } from './session.js';
 import { InMemorySession } from './session.js';
@@ -48,6 +48,7 @@ export class Agent {
   private onText?: AgentOptions['onText'];
   private inbox: ChatMessage[] = [];
   private abortController: AbortController | null = null;
+  private childProcess: ChildProcess | null = null;
 
   constructor(options: AgentOptions) {
     this.llm = options.llm;
@@ -78,6 +79,72 @@ export class Agent {
   /** Abort the current run */
   abort(): void {
     this.abortController?.abort();
+    this.childProcess?.kill('SIGTERM');
+  }
+
+  private execBash(command: string, signal: AbortSignal): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const child = spawn('bash', ['-c', command], { stdio: ['pipe', 'pipe', 'pipe'] });
+      this.childProcess = child;
+
+      let stdout = '';
+      let stderr = '';
+      let outputSize = 0;
+      const MAX_OUTPUT = 1024 * 1024; // 1MB
+      const TIMEOUT = 30_000;
+
+      const timer = setTimeout(() => {
+        child.kill('SIGTERM');
+      }, TIMEOUT);
+
+      const onAbort = () => { child.kill('SIGTERM'); };
+      signal.addEventListener('abort', onAbort);
+
+      child.stdout!.on('data', (chunk: Buffer) => {
+        outputSize += chunk.length;
+        if (outputSize > MAX_OUTPUT) {
+          child.kill('SIGTERM');
+          return;
+        }
+        stdout += chunk.toString();
+      });
+
+      child.stderr!.on('data', (chunk: Buffer) => {
+        outputSize += chunk.length;
+        if (outputSize > MAX_OUTPUT) {
+          child.kill('SIGTERM');
+          return;
+        }
+        stderr += chunk.toString();
+      });
+
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        signal.removeEventListener('abort', onAbort);
+        this.childProcess = null;
+
+        if (signal.aborted) {
+          const err = new Error('Aborted');
+          (err as any).stderr = 'Aborted';
+          reject(err);
+        } else if (code !== 0) {
+          const err = new Error(`Process exited with code ${code}`);
+          (err as any).stderr = stderr;
+          reject(err);
+        } else {
+          resolve(stdout.slice(0, 10_000));
+        }
+      });
+
+      child.on('error', (err) => {
+        clearTimeout(timer);
+        signal.removeEventListener('abort', onAbort);
+        this.childProcess = null;
+        reject(err);
+      });
+
+      child.stdin!.end();
+    });
   }
 
   async run(userMessage: string): Promise<string> {
@@ -137,7 +204,7 @@ export class Agent {
 
           // execute
           try {
-            content = execSync(command, { encoding: 'utf-8', timeout: 30000, maxBuffer: 1024 * 1024 }).slice(0, 10000);
+            content = await this.execBash(command, signal);
           } catch (err: any) {
             content = `Error: ${err.stderr || err.message}`.slice(0, 5000);
             isError = true;

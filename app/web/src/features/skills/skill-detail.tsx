@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Download, File } from "lucide-react"
 import { useState } from "react"
+import { useScrolled } from "@/hooks/use-scrolled"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { Button } from "@/components/ui/button"
 import { PageHeader } from "@/components/ui/page-header"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -14,6 +16,7 @@ interface SkillDetailProps {
 export function SkillDetail({ skillName, onBack }: SkillDetailProps) {
   const queryClient = useQueryClient()
   const [selectedAgentId, setSelectedAgentId] = useState<string>("")
+  const [scrollRef, scrolled] = useScrolled()
 
   const { data: skillData, isLoading } = useQuery({
     queryKey: ["skill", skillName],
@@ -52,9 +55,9 @@ export function SkillDetail({ skillName, onBack }: SkillDetailProps) {
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto">
+    <ScrollArea viewportRef={scrollRef} className="flex flex-1 flex-col">
       {/* Mobile back */}
-      {onBack && <PageHeader title="返回" onBack={onBack} />}
+      {onBack && <PageHeader title="返回" onBack={onBack} scrolled={scrolled} />}
 
       <div className="flex flex-1 items-start justify-center px-6 py-12">
         <div className="w-full max-w-lg">
@@ -136,6 +139,6 @@ export function SkillDetail({ skillName, onBack }: SkillDetailProps) {
           )}
         </div>
       </div>
-    </div>
+    </ScrollArea>
   )
 }

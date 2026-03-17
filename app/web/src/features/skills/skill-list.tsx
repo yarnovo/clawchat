@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { Package, Search } from "lucide-react"
 import { useState } from "react"
 import { Input } from "@/components/ui/input"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { listSkills } from "@/services/api-client"
 import { cn } from "@/lib/utils"
 import { EmptyState } from "@/components/ui/empty-state"
@@ -48,7 +49,7 @@ export function SkillList({ selectedSkillName, onSkillSelect, className }: Skill
       {!isLoading && filtered.length === 0 ? (
         <EmptyState text={search ? "没有匹配的技能" : "暂无技能"} />
       ) : (
-      <div className="flex-1 overflow-y-auto">
+      <ScrollArea className="flex-1">
         {isLoading && (
           <div className="px-4 py-8 text-center text-xs text-muted-foreground/60">
             加载中...
@@ -63,7 +64,7 @@ export function SkillList({ selectedSkillName, onSkillSelect, className }: Skill
             onClick={() => onSkillSelect(skill.name)}
           />
         ))}
-      </div>
+      </ScrollArea>
       )}
     </div>
   )

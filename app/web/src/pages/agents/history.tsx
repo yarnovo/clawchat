@@ -1,15 +1,18 @@
 import { useQuery } from "@tanstack/react-query"
-import { useParams, useNavigate, useSearch } from "@tanstack/react-router"
+import { useParams, useSearch } from "@tanstack/react-router"
 import { PageHeader } from "@/components/ui/page-header"
+import { useScrolled } from "@/hooks/use-scrolled"
 import { MessageList } from "@/features/chat/components"
 import { getAgent, getSessionMessages } from "@/services/api-client"
+import { useAnimatedBack } from "@/hooks/use-back-navigation"
 
 export default function AgentHistoryPage() {
   const { agentId } = useParams({ strict: false }) as { agentId: string }
-  const navigate = useNavigate()
+  const animatedBack = useAnimatedBack()
   const search = useSearch({ strict: false }) as { session?: number; title?: string }
   const sessionId = search.session ?? 1
   const title = search.title
+  const [scrollRef, scrolled] = useScrolled()
 
   const { data: agentData } = useQuery({
     queryKey: ["agent", agentId],
@@ -28,9 +31,10 @@ export default function AgentHistoryPage() {
     <div className="flex flex-1 flex-col min-w-0 overflow-hidden bg-background">
       <PageHeader
         title={title || agent?.name || "返回"}
-        onBack={() => navigate({ to: "/agents/$agentId", params: { agentId } })}
+        onBack={animatedBack}
+        scrolled={scrolled}
       />
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div ref={scrollRef} className="flex-1 flex flex-col overflow-hidden">
         {msgs.length === 0 ? (
           <div className="flex-1" />
         ) : (

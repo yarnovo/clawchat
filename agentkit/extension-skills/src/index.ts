@@ -5,7 +5,7 @@
  */
 import fs from 'fs';
 import path from 'path';
-import { spawnSync } from 'child_process';
+import { spawn } from 'child_process';
 import type { Extension, AgenticContext, HookResult } from '@agentkit/agentic';
 
 // ---- Skill 类型 ----
@@ -81,20 +81,30 @@ function loadAllSkills(workDir: string, builtinDir?: string): Skill[] {
 
 // ---- Hook 执行 ----
 
-function runHook(scriptPath: string, context: Record<string, unknown>, workDir: string): HookResult {
-  try {
-    const r = spawnSync('bash', [scriptPath], {
-      input: JSON.stringify(context),
-      encoding: 'utf-8',
-      timeout: 10_000,
-      cwd: workDir,
+async function runHookAsync(scriptPath: string, context: Record<string, unknown>, workDir: string): Promise<HookResult> {
+  return new Promise((resolve) => {
+    const child = spawn('bash', [scriptPath], { stdio: ['pipe', 'pipe', 'pipe'], cwd: workDir });
+
+    let stderr = '';
+    const timer = setTimeout(() => { child.kill('SIGTERM'); }, 10_000);
+
+    child.stderr!.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
+
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      if (code === 0) resolve({ allowed: true });
+      else if (code === 2) resolve({ allowed: false, reason: stderr.trim() || 'Blocked' });
+      else resolve({ allowed: true });
     });
-    if (r.status === 0) return { allowed: true };
-    if (r.status === 2) return { allowed: false, reason: r.stderr?.trim() || 'Blocked' };
-    return { allowed: true };
-  } catch {
-    return { allowed: true };
-  }
+
+    child.on('error', () => {
+      clearTimeout(timer);
+      resolve({ allowed: true });
+    });
+
+    child.stdin!.write(JSON.stringify(context));
+    child.stdin!.end();
+  });
 }
 
 // ---- Plugin ----
@@ -139,7 +149,7 @@ export function skillsExtension(opts: SkillsPluginOptions = {}): Extension {
 
       for (const s of skills) {
         for (const h of s.hooks.filter(h => h.event === 'setup')) {
-          runHook(h.path, { event: 'setup', skill: s.name, workDir }, workDir);
+          await runHookAsync(h.path, { event: 'setup', skill: s.name, workDir }, workDir);
         }
       }
 
@@ -151,7 +161,7 @@ export function skillsExtension(opts: SkillsPluginOptions = {}): Extension {
     teardown: async () => {
       for (const s of skills) {
         for (const h of s.hooks.filter(h => h.event === 'teardown')) {
-          runHook(h.path, { event: 'teardown', skill: s.name, workDir }, workDir);
+          await runHookAsync(h.path, { event: 'teardown', skill: s.name, workDir }, workDir);
         }
       }
     },
@@ -167,7 +177,7 @@ export function skillsExtension(opts: SkillsPluginOptions = {}): Extension {
     preBash: async (command) => {
       for (const s of skills) {
         for (const h of s.hooks.filter(h => h.event === 'pre-tool')) {
-          const result = runHook(h.path, { event: 'pre-bash', skill: s.name, workDir, command }, workDir);
+          const result = await runHookAsync(h.path, { event: 'pre-bash', skill: s.name, workDir, command }, workDir);
           if (!result.allowed) return result;
         }
       }
@@ -177,7 +187,7 @@ export function skillsExtension(opts: SkillsPluginOptions = {}): Extension {
     postBash: async (command, output, isError) => {
       for (const s of skills) {
         for (const h of s.hooks.filter(h => h.event === 'post-tool')) {
-          runHook(h.path, { event: 'post-bash', skill: s.name, workDir, command, output, isError }, workDir);
+          await runHookAsync(h.path, { event: 'post-bash', skill: s.name, workDir, command, output, isError }, workDir);
         }
       }
     },

@@ -8,3 +8,6 @@ backups/
 # Node.js services
 **/node_modules/
 **/dist/
+
+# Rust / Tauri
+app/desktop/src-tauri/target/

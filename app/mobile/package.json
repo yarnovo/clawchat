@@ -10,12 +10,10 @@
     "dev": "cap run"
   },
   "dependencies": {
-    "@capacitor/android": "^8",
-    "@capacitor/cli": "^8",
-    "@capacitor/core": "^8",
-    "@capacitor/ios": "^8",
-    "@capacitor/status-bar": "^8",
-    "@capacitor/splash-screen": "^8",
-    "@capacitor/keyboard": "^8"
+    "@capacitor/android": "8.0.1",
+    "@capacitor/cli": "8.0.1",
+    "@capacitor/core": "8.0.1",
+    "@capacitor/ios": "8.0.1",
+    "@capacitor/keyboard": "8.0.1"
   }
 }

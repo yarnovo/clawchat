@@ -90,7 +90,7 @@ export function ConversationList({
       </div>
 
       {sortedAgents.length === 0 ? (
-        <EmptyState action={{ label: "去创建 Agent", onClick: () => navigate({ to: "/agents" }) }} />
+        <EmptyState text="暂无对话" action={{ label: "去创建 Agent", onClick: () => navigate({ to: "/agents" }) }} />
       ) : (
       <ScrollArea className="flex-1">
         <div className="flex flex-col">

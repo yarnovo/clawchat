@@ -57,6 +57,25 @@ describe('computeCanSave', () => {
     expect(computeCanSave(entries, initialKeys, initialNotes)).toBe(true)
   })
 
+  it('ignores empty rows and allows save when there are real changes', () => {
+    const entries = [
+      { key: 'NEW_KEY', value: 'val', existing: false },
+      { key: '', value: '', existing: false },
+      { key: '', value: '', existing: false },
+    ]
+    const initialKeys = new Set<string>()
+    expect(computeCanSave(entries, initialKeys)).toBe(true)
+  })
+
+  it('returns false when only empty rows exist (no real changes)', () => {
+    const entries = [
+      { key: '', value: '', existing: false },
+      { key: '', value: '', existing: false },
+    ]
+    const initialKeys = new Set<string>()
+    expect(computeCanSave(entries, initialKeys)).toBe(false)
+  })
+
   it('still detects new entries regardless of notes', () => {
     const entries = [{ key: 'NEW_KEY', value: 'val', existing: false }]
     const initialKeys = new Set<string>()

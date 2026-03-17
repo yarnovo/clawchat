@@ -5,7 +5,6 @@ import { Search, Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -14,6 +13,7 @@ import {
   ResponsiveDialogFooter,
 } from "@/components/ui/responsive-dialog"
 import { cn } from "@/lib/utils"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { EmptyState } from "@/components/ui/empty-state"
 import { listAgents, createAgent } from "@/services/api-client"
 
@@ -116,7 +116,7 @@ export function AgentList({
       </div>
 
       {agents.length === 0 ? (
-        <EmptyState action={{ label: "创建 Agent", onClick: () => setDialogOpen(true) }} />
+        <EmptyState text="还没有 Agent" action={{ label: "创建 Agent", onClick: () => setDialogOpen(true) }} />
       ) : (
       <ScrollArea className="flex-1">
         <div className="flex flex-col">
@@ -135,7 +135,7 @@ export function AgentList({
                     key={agent.id}
                     onClick={() => onAgentSelect?.(agent.id)}
                     className={cn(
-                      "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
+                      "flex w-full items-center gap-3 px-3 py-3 text-left transition-colors",
                       "hover:bg-sidebar-accent/60",
                       isSelected && "bg-sidebar-accent",
                     )}
@@ -143,9 +143,9 @@ export function AgentList({
                     <img
                       src={agent.avatar || `https://api.dicebear.com/9.x/notionists/svg?seed=${encodeURIComponent(agent.name)}`}
                       alt={agent.name}
-                      className="size-9 shrink-0 rounded-lg bg-muted object-cover"
+                      className="size-10 shrink-0 rounded-lg bg-muted object-cover"
                     />
-                    <span className="truncate text-sm text-sidebar-foreground">
+                    <span className="truncate text-sm font-medium text-sidebar-foreground">
                       {agent.name}
                     </span>
                   </button>
@@ -172,7 +172,6 @@ export function AgentList({
               <Input
                 {...register("name", { required: true })}
                 placeholder="例如: MyBot"
-                autoFocus
               />
             </div>
 

@@ -1,5 +1,6 @@
 import { ChevronLeft } from "lucide-react"
 import type { ReactNode } from "react"
+import { cn } from "@/lib/utils"
 
 interface PageHeaderProps {
   title: string
@@ -7,11 +8,15 @@ interface PageHeaderProps {
   status?: string
   children?: ReactNode
   actions?: ReactNode
+  scrolled?: boolean
 }
 
-export function PageHeader({ title, onBack, status, children, actions }: PageHeaderProps) {
+export function PageHeader({ title, onBack, status, children, actions, scrolled }: PageHeaderProps) {
   return (
-    <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
+    <div className={cn(
+      "flex h-14 shrink-0 items-center justify-between border-b px-4 transition-colors duration-200",
+      scrolled ? "border-border" : "border-transparent",
+    )}>
       <div className="flex min-w-0 flex-1 items-center">
         {onBack ? (
           <button

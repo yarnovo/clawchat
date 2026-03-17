@@ -2,14 +2,43 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Agent } from '../agent.js';
 import { InMemorySession } from '../session.js';
 import type { LLMProvider, LLMResponse, ChatMessage, ToolDefinition } from '../llm.js';
+import { EventEmitter } from 'events';
 
 // ─── Mock child_process ──────────────────────────────────────────────
+
+interface MockChild extends EventEmitter {
+  stdin: { end: ReturnType<typeof vi.fn> };
+  stdout: EventEmitter;
+  stderr: EventEmitter;
+  kill: ReturnType<typeof vi.fn>;
+}
+
+function createMockChild(stdout = '', exitCode = 0, stderr = ''): MockChild {
+  const child = new EventEmitter() as MockChild;
+  child.stdin = { end: vi.fn() };
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  child.kill = vi.fn(() => {
+    // Simulate kill → close with non-zero code
+    process.nextTick(() => child.emit('close', 1));
+  });
+
+  // Emit data and close on next tick to simulate async behavior
+  process.nextTick(() => {
+    if (stdout) child.stdout.emit('data', Buffer.from(stdout));
+    if (stderr) child.stderr.emit('data', Buffer.from(stderr));
+    process.nextTick(() => child.emit('close', exitCode));
+  });
+
+  return child;
+}
+
 vi.mock('child_process', () => ({
-  execSync: vi.fn(() => 'mock stdout'),
+  spawn: vi.fn(),
 }));
 
-import { execSync } from 'child_process';
-const mockExecSync = vi.mocked(execSync);
+import { spawn } from 'child_process';
+const mockSpawn = vi.mocked(spawn);
 
 // ─── Helper: create mock LLM ────────────────────────────────────────
 function createMockLLM(responses: LLMResponse[]): LLMProvider {
@@ -110,7 +139,7 @@ describe('Agent constructor', () => {
 // ─── Agent.run — text only (no tool calls) ───────────────────────────
 describe('Agent.run — text response', () => {
   beforeEach(() => {
-    mockExecSync.mockClear();
+    mockSpawn.mockClear();
   });
 
   it('returns text from LLM when no tool calls', async () => {
@@ -135,8 +164,8 @@ describe('Agent.run — text response', () => {
 // ─── Agent.run — bash tool calls ─────────────────────────────────────
 describe('Agent.run — bash tool calls', () => {
   beforeEach(() => {
-    mockExecSync.mockReset();
-    mockExecSync.mockReturnValue('file1.txt\nfile2.txt');
+    mockSpawn.mockReset();
+    mockSpawn.mockImplementation(() => createMockChild('file1.txt\nfile2.txt') as any);
   });
 
   it('executes bash and feeds result back to LLM', async () => {
@@ -152,18 +181,14 @@ describe('Agent.run — bash tool calls', () => {
     const agent = new Agent({ llm });
     const result = await agent.run('list files');
 
-    expect(mockExecSync).toHaveBeenCalledWith('ls', {
-      encoding: 'utf-8',
-      timeout: 30000,
-      maxBuffer: 1024 * 1024,
-    });
+    expect(mockSpawn).toHaveBeenCalledWith('bash', ['-c', 'ls'], expect.objectContaining({
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }));
     expect(result).toBe('Here are your files.');
   });
 
-  it('handles execSync throwing an error', async () => {
-    const err = new Error('command failed');
-    (err as any).stderr = 'permission denied';
-    mockExecSync.mockImplementation(() => { throw err; });
+  it('handles bash command error (non-zero exit)', async () => {
+    mockSpawn.mockImplementation(() => createMockChild('', 1, 'permission denied') as any);
 
     const llm = createMockLLM([
       {
@@ -180,10 +205,17 @@ describe('Agent.run — bash tool calls', () => {
     expect(result).toBe('Failed.');
   });
 
-  it('handles execSync error without stderr (uses message)', async () => {
-    const err = new Error('spawn failed');
-    // no stderr property
-    mockExecSync.mockImplementation(() => { throw err; });
+  it('handles spawn error (uses message)', async () => {
+    // Simulate spawn error event
+    const child = new EventEmitter() as MockChild;
+    child.stdin = { end: vi.fn() };
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = vi.fn();
+    process.nextTick(() => {
+      child.emit('error', new Error('spawn failed'));
+    });
+    mockSpawn.mockReturnValue(child as any);
 
     const llm = createMockLLM([
       {
@@ -201,7 +233,7 @@ describe('Agent.run — bash tool calls', () => {
 
   it('truncates long output to 10000 chars', async () => {
     const longOutput = 'x'.repeat(20000);
-    mockExecSync.mockReturnValue(longOutput);
+    mockSpawn.mockImplementation(() => createMockChild(longOutput) as any);
 
     const llm = createMockLLM([
       {
@@ -226,8 +258,8 @@ describe('Agent.run — bash tool calls', () => {
 // ─── onBeforeBash hook ───────────────────────────────────────────────
 describe('onBeforeBash hook', () => {
   beforeEach(() => {
-    mockExecSync.mockReset();
-    mockExecSync.mockReturnValue('ok');
+    mockSpawn.mockReset();
+    mockSpawn.mockImplementation(() => createMockChild('ok') as any);
   });
 
   it('allows execution when hook returns allowed: true', async () => {
@@ -246,7 +278,7 @@ describe('onBeforeBash hook', () => {
     await agent.run('say hi');
 
     expect(onBeforeBash).toHaveBeenCalledWith('echo hi');
-    expect(mockExecSync).toHaveBeenCalledOnce();
+    expect(mockSpawn).toHaveBeenCalledOnce();
   });
 
   it('blocks execution when hook returns allowed: false', async () => {
@@ -266,7 +298,7 @@ describe('onBeforeBash hook', () => {
     const result = await agent.run('delete all');
 
     expect(onBeforeBash).toHaveBeenCalledWith('rm -rf /');
-    expect(mockExecSync).not.toHaveBeenCalled();
+    expect(mockSpawn).not.toHaveBeenCalled();
     expect(result).toBe('Understood, blocked.');
 
     // The session should contain a tool message with blocked reason
@@ -294,18 +326,18 @@ describe('onBeforeBash hook', () => {
     const msgs = session.getMessages();
     const toolMsg = msgs.find(m => m.role === 'tool');
     expect(toolMsg!.content).toBe('Blocked: undefined');
-    expect(mockExecSync).not.toHaveBeenCalled();
+    expect(mockSpawn).not.toHaveBeenCalled();
   });
 });
 
 // ─── onAfterBash hook ────────────────────────────────────────────────
 describe('onAfterBash hook', () => {
   beforeEach(() => {
-    mockExecSync.mockReset();
+    mockSpawn.mockReset();
   });
 
   it('is called after successful execution', async () => {
-    mockExecSync.mockReturnValue('success output');
+    mockSpawn.mockImplementation(() => createMockChild('success output') as any);
     const onAfterBash = vi.fn(async () => {});
 
     const llm = createMockLLM([
@@ -324,9 +356,7 @@ describe('onAfterBash hook', () => {
   });
 
   it('is called after failed execution with isError=true', async () => {
-    const err = new Error('fail');
-    (err as any).stderr = 'some error';
-    mockExecSync.mockImplementation(() => { throw err; });
+    mockSpawn.mockImplementation(() => createMockChild('', 1, 'some error') as any);
 
     const onAfterBash = vi.fn(async () => {});
 
@@ -393,7 +423,7 @@ describe('onText callback', () => {
   });
 
   it('is not called during tool call rounds, only on final text', async () => {
-    mockExecSync.mockReturnValue('ok');
+    mockSpawn.mockImplementation(() => createMockChild('ok') as any);
     const onText = vi.fn();
 
     const llm = createMockLLM([
@@ -417,8 +447,8 @@ describe('onText callback', () => {
 // ─── Max rounds limit ────────────────────────────────────────────────
 describe('max rounds limit', () => {
   beforeEach(() => {
-    mockExecSync.mockReset();
-    mockExecSync.mockReturnValue('ok');
+    mockSpawn.mockReset();
+    mockSpawn.mockImplementation(() => createMockChild('ok') as any);
   });
 
   it('returns max rounds message when limit is hit', async () => {
@@ -482,8 +512,8 @@ describe('unknown tool name', () => {
     expect(toolMsg!.content).toBe('Unknown tool: python');
   });
 
-  it('does not call execSync for unknown tools', async () => {
-    mockExecSync.mockClear();
+  it('does not call spawn for unknown tools', async () => {
+    mockSpawn.mockClear();
 
     const llm = createMockLLM([
       {
@@ -497,15 +527,15 @@ describe('unknown tool name', () => {
     const agent = new Agent({ llm });
     await agent.run('test');
 
-    expect(mockExecSync).not.toHaveBeenCalled();
+    expect(mockSpawn).not.toHaveBeenCalled();
   });
 });
 
 // ─── Multiple tool calls in one response ─────────────────────────────
 describe('multiple tool calls in single response', () => {
   beforeEach(() => {
-    mockExecSync.mockReset();
-    mockExecSync.mockReturnValue('output');
+    mockSpawn.mockReset();
+    mockSpawn.mockImplementation(() => createMockChild('output') as any);
   });
 
   it('processes all tool calls sequentially', async () => {
@@ -526,7 +556,7 @@ describe('multiple tool calls in single response', () => {
     const result = await agent.run('run two');
 
     expect(result).toBe('Both done.');
-    expect(mockExecSync).toHaveBeenCalledTimes(2);
+    expect(mockSpawn).toHaveBeenCalledTimes(2);
 
     const toolMsgs = session.getMessages().filter(m => m.role === 'tool');
     expect(toolMsgs).toHaveLength(2);
@@ -535,7 +565,7 @@ describe('multiple tool calls in single response', () => {
   });
 
   it('handles mix of bash and unknown tools', async () => {
-    mockExecSync.mockReturnValue('bash output');
+    mockSpawn.mockImplementation(() => createMockChild('bash output') as any);
 
     const llm = createMockLLM([
       {
@@ -631,8 +661,8 @@ describe('index.ts exports', () => {
 // ─── Assistant message with tool_calls includes content ──────────────
 describe('assistant message with tool_calls', () => {
   beforeEach(() => {
-    mockExecSync.mockReset();
-    mockExecSync.mockReturnValue('result');
+    mockSpawn.mockReset();
+    mockSpawn.mockImplementation(() => createMockChild('result') as any);
   });
 
   it('preserves assistant content alongside tool_calls in session', async () => {
@@ -673,5 +703,44 @@ describe('assistant message with tool_calls', () => {
 
     const assistantMsgs = session.getMessages().filter(m => m.role === 'assistant');
     expect(assistantMsgs[0].content).toBe('');
+  });
+});
+
+// ─── Abort kills child process ───────────────────────────────────────
+describe('abort during bash execution', () => {
+  it('kills child process and returns [Aborted]', async () => {
+    // Create a child that doesn't auto-close — waits for kill
+    const child = new EventEmitter() as MockChild;
+    child.stdin = { end: vi.fn() };
+    child.stdout = new EventEmitter();
+    child.stderr = new EventEmitter();
+    child.kill = vi.fn(() => {
+      // Simulate: kill triggers close with signal.aborted = true
+      process.nextTick(() => child.emit('close', 1));
+    });
+
+    mockSpawn.mockReturnValue(child as any);
+
+    const llm = createMockLLM([
+      {
+        content: null,
+        tool_calls: [{ id: 'tc1', name: 'bash', arguments: '{"command":"sleep 100"}' }],
+        finish_reason: 'tool_calls',
+      },
+      { content: 'after abort', tool_calls: [], finish_reason: 'stop' },
+    ]);
+
+    const agent = new Agent({ llm });
+    const runPromise = agent.run('long task');
+
+    // Wait a tick for spawn to be called, then abort
+    await new Promise(r => setTimeout(r, 0));
+    agent.abort();
+
+    const result = await runPromise;
+
+    // The error from execBash is caught, then signal.aborted check at top of loop returns [Aborted]
+    expect(child.kill).toHaveBeenCalled();
+    expect(result).toContain('Aborted');
   });
 });

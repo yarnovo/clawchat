@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from "react"
+import { useScrolled } from "@/hooks/use-scrolled"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { useNavigate } from "@tanstack/react-router"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { MessageCircle, MoreVertical, Trash2, ChevronRight, Settings2, Plus } from "lucide-react"
@@ -39,6 +41,8 @@ export function AgentDetail({ agent, onBack, onDeleted }: AgentDetailProps) {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [envOpen, setEnvOpen] = useState(false)
 
+  const [scrollRef, scrolled] = useScrolled()
+
   const deleteMutation = useMutation({
     mutationFn: () => deleteAgent(agent.id),
     onSuccess: () => {
@@ -58,6 +62,7 @@ export function AgentDetail({ agent, onBack, onDeleted }: AgentDetailProps) {
       <PageHeader
         title={onBack ? agent.name : ""}
         onBack={onBack}
+        scrolled={scrolled}
         actions={
           <DropdownMenu>
             <DropdownMenuTrigger className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors outline-none">
@@ -107,7 +112,7 @@ export function AgentDetail({ agent, onBack, onDeleted }: AgentDetailProps) {
       {/* Env vars dialog */}
       <EnvVarsDialog agentId={agent.id} open={envOpen} onOpenChange={setEnvOpen} />
 
-      <div className="flex-1 overflow-y-auto">
+      <ScrollArea viewportRef={scrollRef} className="flex-1">
       <div className="px-6 py-10 max-w-xl mx-auto w-full">
         {/* Hero */}
         <div className="flex flex-col items-center text-center mb-8">
@@ -136,7 +141,7 @@ export function AgentDetail({ agent, onBack, onDeleted }: AgentDetailProps) {
         {/* Showcase — grouped by tag */}
         <ShowcaseSection agentId={agent.id} />
       </div>
-      </div>
+      </ScrollArea>
     </div>
   )
 }

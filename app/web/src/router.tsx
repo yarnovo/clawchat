@@ -127,8 +127,8 @@ const agentDetailRoute = createRoute({
 })
 
 const agentHistoryRoute = createRoute({
-  getParentRoute: () => agentsRoute,
-  path: '/$agentId/history',
+  getParentRoute: () => agentDetailRoute,
+  path: '/history',
   component: lazyRouteComponent(() => import('./pages/agents/history')),
 })
 
@@ -139,7 +139,7 @@ const routeTree = rootRoute.addChildren([
   authLayout.addChildren([
     indexRoute,
     chatRoute.addChildren([agentChatRoute]),
-    agentsRoute.addChildren([agentHistoryRoute, agentDetailRoute]),
+    agentsRoute.addChildren([agentDetailRoute.addChildren([agentHistoryRoute])]),
   ]),
 ])
 

@@ -5,6 +5,7 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { PageHeader } from "@/components/ui/page-header"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useScrolled } from "@/hooks/use-scrolled"
 import { listSkills, getSkill } from "@/services/api-client"
 import type { Skill } from "@/types"
 
@@ -18,7 +19,7 @@ export function SkillMarketplaceDialog({ open, onOpenChange }: SkillMarketplaceD
 
   return (
     <Dialog open={open} onOpenChange={(v) => { onOpenChange(v); if (!v) setSelectedName(null) }}>
-      <DialogContent className="max-w-2xl h-[70vh] p-0 gap-0 flex flex-col">
+      <DialogContent className="max-w-2xl h-[70vh] max-h-[70vh] p-0 gap-0 flex flex-col overflow-hidden">
         {selectedName ? (
           <DetailView
             skillName={selectedName}
@@ -57,7 +58,7 @@ function ListView({ onSelect }: { onSelect: (name: string) => void }) {
       </div>
 
       {/* List */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         {isLoading && (
           <div className="flex items-center justify-center py-16 text-xs text-muted-foreground/60">
             加载中...
@@ -98,6 +99,7 @@ function SkillCard({ skill, onClick }: { skill: Skill; onClick: () => void }) {
 }
 
 function DetailView({ skillName, onBack }: { skillName: string; onBack: () => void }) {
+  const [scrollRef, scrolled] = useScrolled()
   const { data: skillData, isLoading } = useQuery({
     queryKey: ["skill", skillName],
     queryFn: () => getSkill(skillName),
@@ -108,10 +110,10 @@ function DetailView({ skillName, onBack }: { skillName: string; onBack: () => vo
   return (
     <>
       {/* Header */}
-      <PageHeader title="返回" onBack={onBack} />
+      <PageHeader title="返回" onBack={onBack} scrolled={scrolled} />
 
       {/* Content */}
-      <ScrollArea className="flex-1">
+      <ScrollArea viewportRef={scrollRef} className="flex-1 min-h-0">
         {isLoading ? (
           <div className="flex items-center justify-center py-16 text-xs text-muted-foreground/60">
             加载中...
