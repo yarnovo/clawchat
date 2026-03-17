@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import AdmZip from 'adm-zip';
 import { hash } from 'bcryptjs';
 import { db } from './index.js';
-import { accounts, agents, skills } from './schema.js';
+import { accounts, agents, skills, messages, agentSkills } from './schema.js';
 
 const BUILTINS_DIR = join(process.cwd(), '..', 'agentkit', 'extension-skills', 'builtins');
 
@@ -179,8 +179,9 @@ async function seed() {
     .values({
       ownerId: user.id,
       name: 'Assistant',
-      description: '通用 AI 助手',
+      description: '通用 AI 助手，擅长代码审查、性能优化和工具函数编写。支持 TypeScript、React、Node.js 等技术栈。',
       category: 'general',
+      config: { video: '/demo-agent.mp4' },
     })
     .returning();
 
@@ -227,6 +228,88 @@ async function seed() {
 
     console.log(`  Created skill: ${extra.displayName}`);
   }
+
+  // 预装技能到 Agent
+  const preinstalled = ['web', 'tasks', 'credentials', 'code-review'];
+  for (const name of preinstalled) {
+    await db.insert(agentSkills).values({ agentId: agent.id, skillName: name });
+  }
+  console.log(`  Installed ${preinstalled.length} skills to agent`);
+
+  // 创建模拟聊天记录 — 按问题类型分组
+  const sessions = [
+    {
+      sessionId: 1,
+      tag: '代码审查',
+      messages: [
+        { role: 'user' as const, content: '请帮我分析一下这段代码有什么问题', offset: -86400_000 * 2 },
+        { role: 'assistant' as const, content: '好的，请把代码发给我，我会从安全性、性能和可维护性三个方面来分析。', offset: -86400_000 * 2 + 5000 },
+        { role: 'user' as const, content: '```typescript\nconst data = await fetch(url)\nconst json = data.json()\nconsole.log(json)\n```', offset: -86400_000 * 2 + 30_000 },
+        { role: 'assistant' as const, content: '这段代码有两个问题：\n\n1. `data.json()` 返回的是 Promise，需要 `await`\n2. 没有错误处理，`fetch` 可能失败\n\n建议改为：\n```typescript\ntry {\n  const res = await fetch(url)\n  if (!res.ok) throw new Error(`HTTP ${res.status}`)\n  const json = await res.json()\n  console.log(json)\n} catch (err) {\n  console.error("请求失败:", err)\n}\n```', offset: -86400_000 * 2 + 35_000 },
+      ],
+    },
+    {
+      sessionId: 2,
+      tag: '性能优化',
+      messages: [
+        { role: 'user' as const, content: '怎么处理并发请求？', offset: -86400_000 },
+        { role: 'assistant' as const, content: '处理并发请求常用两种方式：\n\n**Promise.all** — 全部并行，一个失败全部失败\n**Promise.allSettled** — 全部并行，各自独立', offset: -86400_000 + 8000 },
+        { role: 'user' as const, content: '如果有 100 个请求怎么限制并发数？', offset: -86400_000 + 60_000 },
+        { role: 'assistant' as const, content: '可以用 p-limit 库限制并发数，或者手写一个简单的并发池。', offset: -86400_000 + 68_000 },
+      ],
+    },
+    {
+      sessionId: 3,
+      tag: '工具函数',
+      messages: [
+        { role: 'user' as const, content: '帮我写一个 debounce 函数', offset: -3600_000 },
+        { role: 'assistant' as const, content: '```typescript\nfunction debounce<T extends (...args: any[]) => void>(\n  fn: T, ms: number\n): T {\n  let timer: ReturnType<typeof setTimeout>\n  return ((...args: any[]) => {\n    clearTimeout(timer)\n    timer = setTimeout(() => fn(...args), ms)\n  }) as T\n}\n```', offset: -3600_000 + 10_000 },
+      ],
+    },
+    {
+      sessionId: 4,
+      tag: '代码审查',
+      messages: [
+        { role: 'user' as const, content: '这个 SQL 查询为什么很慢？\n```sql\nSELECT * FROM users WHERE email LIKE "%@gmail.com"\n```', offset: -86400_000 * 3 },
+        { role: 'assistant' as const, content: '前缀通配符 `%@gmail.com` 无法使用索引，会全表扫描。建议用反转索引或者单独存储域名字段。', offset: -86400_000 * 3 + 6000 },
+      ],
+    },
+    {
+      sessionId: 5,
+      tag: '工具函数',
+      messages: [
+        { role: 'user' as const, content: '写一个深拷贝函数，要支持循环引用', offset: -86400_000 * 4 },
+        { role: 'assistant' as const, content: '用 WeakMap 追踪已拷贝的对象来处理循环引用：\n```typescript\nfunction deepClone<T>(obj: T, seen = new WeakMap()): T { ... }\n```', offset: -86400_000 * 4 + 8000 },
+      ],
+    },
+    {
+      sessionId: 6,
+      tag: '性能优化',
+      messages: [
+        { role: 'user' as const, content: 'React 列表渲染太慢了怎么优化？', offset: -86400_000 * 5 },
+        { role: 'assistant' as const, content: '三个方向：虚拟列表（react-window）、React.memo 避免重渲染、useMemo 缓存计算结果。', offset: -86400_000 * 5 + 5000 },
+      ],
+    },
+  ];
+
+  let totalMessages = 0;
+  const now = Date.now();
+  for (const session of sessions) {
+    for (const msg of session.messages) {
+      await db.insert(messages).values({
+        agentId: agent.id,
+        userId: user.id,
+        sessionId: session.sessionId,
+        tag: session.tag,
+        role: msg.role,
+        content: msg.content,
+        createdAt: new Date(now + msg.offset),
+      });
+      totalMessages++;
+    }
+  }
+
+  console.log(`  Created ${totalMessages} chat messages in ${sessions.length} sessions`);
 
   console.log('Seed complete.');
   process.exit(0);

@@ -37,7 +37,7 @@ export function AppShell({ children }: AppShellProps) {
 
   const isInChat = !!activeAgentId
   const isChatPage = !!matchRoute({ to: "/chat", fuzzy: true })
-  const isAgentsPage = !!matchRoute({ to: "/agents" })
+  const isAgentsPage = !!matchRoute({ to: "/agents", fuzzy: true })
 
   const activeTab: "chat" | "agents" = isAgentsPage ? "agents" : "chat"
 

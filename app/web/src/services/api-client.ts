@@ -1,4 +1,4 @@
-import type { Agent, Skill, SkillDetail, CredentialKey } from '@/types'
+import type { Agent, Message, Skill, SkillDetail, CredentialKey } from '@/types'
 
 const BASE_URL = '/api'
 
@@ -127,6 +127,30 @@ export async function newSession(
   return request(`/agents/${agentId}/sessions/new`, { method: 'POST' })
 }
 
+// ---------- Chat History ----------
+
+export interface ChatSessionSummary {
+  sessionId: number
+  title: string
+  tag: string | null
+  messageCount: number
+  lastMessage: string
+  lastTimestamp: number
+}
+
+export async function getChatSessions(
+  agentId: string,
+): Promise<{ sessions: ChatSessionSummary[] }> {
+  return request(`/agents/${agentId}/history`)
+}
+
+export async function getSessionMessages(
+  agentId: string,
+  sessionId: number,
+): Promise<{ messages: Message[] }> {
+  return request(`/agents/${agentId}/history/${sessionId}`)
+}
+
 // ---------- Skills ----------
 
 export async function listSkills(): Promise<{ skills: Skill[] }> {
@@ -155,6 +179,22 @@ export async function uninstallSkill(
     method: 'DELETE',
     body: JSON.stringify({ agentId }),
   })
+}
+
+// ---------- Agent Skills ----------
+
+export interface InstalledSkill {
+  name: string
+  displayName: string
+  description: string
+  version: string
+  installedAt: string
+}
+
+export async function getAgentSkills(
+  agentId: string,
+): Promise<{ skills: InstalledSkill[] }> {
+  return request(`/agents/${agentId}/skills`)
 }
 
 // ---------- Credentials ----------

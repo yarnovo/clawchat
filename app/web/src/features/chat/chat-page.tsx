@@ -64,13 +64,13 @@ export function ChatPage({ agentId }: ChatPageProps) {
   }, [])
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-background">
       <ChatHeader
         name={agent?.name ?? ''}
         avatar={agent?.avatar}
         isTyping={isTyping}
       />
-      <div className="flex-1 flex flex-col overflow-hidden bg-background">
+      <div className="flex-1 flex flex-col overflow-hidden">
         {messages.length === 0 ? (
           <div className="flex-1" />
         ) : (

@@ -66,13 +66,13 @@ export function MessageBubble({ message, agentAvatar, onRetry }: MessageBubblePr
       )}
 
       {/* Bubble + meta */}
-      <div className={cn('flex max-w-[70%] flex-col gap-1', isUser ? 'items-end' : 'items-start')}>
+      <div className={cn('flex max-w-[70%] min-w-0 flex-col gap-1', isUser ? 'items-end' : 'items-start')}>
         <div
           className={cn(
-            'relative rounded-lg px-3 py-2.5',
+            'relative rounded-lg px-3 py-2.5 overflow-hidden max-w-full',
             isUser
               ? 'bg-chat-user text-chat-user-foreground'
-              : 'bg-card text-card-foreground shadow-sm',
+              : 'bg-muted text-foreground',
             isSending && 'opacity-50',
           )}
         >

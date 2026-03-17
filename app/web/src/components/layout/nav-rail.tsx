@@ -1,6 +1,6 @@
 import {
   MessageCircle,
-  Store,
+  Bot,
   Package,
   Settings,
 } from "lucide-react"
@@ -15,7 +15,7 @@ interface NavRailProps {
 
 const navItems = [
   { id: "chat" as const, icon: MessageCircle },
-  { id: "agents" as const, icon: Store },
+  { id: "agents" as const, icon: Bot },
 ] as const
 
 export function NavRail({ activePage, onNavigate }: NavRailProps) {

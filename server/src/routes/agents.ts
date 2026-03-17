@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/index.js';
-import { agents } from '../db/schema.js';
+import { agents, agentSkills, skills } from '../db/schema.js';
 import { startAgent, stopAgent } from '../services/agent-lifecycle.js';
 import type { AuthEnv } from '../middleware/auth.js';
 
@@ -122,6 +122,41 @@ app.post('/:id/stop', async (c) => {
     const message = err instanceof Error ? err.message : String(err);
     return c.json({ error: `Failed to stop: ${message}` }, 500);
   }
+});
+
+/** Get installed skills for an agent */
+app.get('/:id/skills', async (c) => {
+  const userId = c.get('userId');
+  const agentId = c.req.param('id');
+
+  const [agent] = await db
+    .select()
+    .from(agents)
+    .where(and(eq(agents.id, agentId), eq(agents.ownerId, userId)));
+
+  if (!agent) return c.json({ error: 'Agent not found' }, 404);
+
+  const rows = await db
+    .select({
+      skillName: agentSkills.skillName,
+      installedAt: agentSkills.installedAt,
+      displayName: skills.displayName,
+      description: skills.description,
+      version: skills.version,
+    })
+    .from(agentSkills)
+    .leftJoin(skills, eq(agentSkills.skillName, skills.name))
+    .where(eq(agentSkills.agentId, agentId));
+
+  return c.json({
+    skills: rows.map((r) => ({
+      name: r.skillName,
+      displayName: r.displayName || r.skillName,
+      description: r.description || '',
+      version: r.version || '',
+      installedAt: r.installedAt,
+    })),
+  });
 });
 
 /** Set credentials for an agent */

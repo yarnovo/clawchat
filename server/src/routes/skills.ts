@@ -5,7 +5,7 @@ import { mkdir, rm, access, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import AdmZip from 'adm-zip';
 import { db } from '../db/index.js';
-import { agents, skills } from '../db/schema.js';
+import { agents, skills, agentSkills } from '../db/schema.js';
 import { workspacePath } from '../orchestrator/index.js';
 import type { AuthEnv } from '../middleware/auth.js';
 
@@ -217,6 +217,14 @@ app.post('/:name/install', async (c) => {
     await writeFile(filePath, entry.getData());
   }
 
+  // Record in agent_skills (upsert)
+  const existing = await db.select().from(agentSkills)
+    .where(and(eq(agentSkills.agentId, parsed.data.agentId), eq(agentSkills.skillName, skillName)))
+    .limit(1);
+  if (existing.length === 0) {
+    await db.insert(agentSkills).values({ agentId: parsed.data.agentId, skillName });
+  }
+
   return c.json({ installed: true, skill: skillName }, 201);
 });
 
@@ -239,6 +247,10 @@ app.delete('/:name/uninstall', async (c) => {
   } catch {
     return c.json({ error: 'Skill not installed' }, 404);
   }
+
+  // Remove from agent_skills
+  await db.delete(agentSkills)
+    .where(and(eq(agentSkills.agentId, parsed.data.agentId), eq(agentSkills.skillName, skillName)));
 
   return c.json({ uninstalled: true, skill: skillName });
 });

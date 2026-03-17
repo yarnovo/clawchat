@@ -43,7 +43,7 @@ export function InputArea({
   )
 
   return (
-    <div className="bg-background px-4 py-3">
+    <div className="px-4 py-3">
       <div className="rounded-xl border border-border shadow-sm">
         {/* Textarea */}
         <TextareaAutosize

@@ -1,37 +1,39 @@
-import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { Outlet, useNavigate, useParams } from "@tanstack/react-router"
 import { AgentList } from "@/components/layout/agent-list"
-import { AgentDetail } from "@/features/agents/agent-detail"
-import { EmptyState } from "@/components/ui/empty-state"
 import { listAgents } from "@/services/api-client"
 import { useMediaQuery } from "@/hooks/use-media-query"
 
 export default function AgentsPage() {
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const navigate = useNavigate()
+  const params = useParams({ strict: false }) as { agentId?: string }
+  const agentId = params.agentId ?? null
+
   const { data } = useQuery({
     queryKey: ["agents"],
     queryFn: () => listAgents(),
   })
   const agents = data?.agents ?? []
-  const selectedAgent = agents.find((a) => a.id === selectedId) ?? null
   const isDesktop = useMediaQuery("(min-width: 768px)")
+
+  const handleSelect = (id: string) => {
+    navigate({ to: "/agents/$agentId", params: { agentId: id } })
+  }
+
+  const handleBack = () => {
+    navigate({ to: "/agents" })
+  }
 
   // Mobile: toggle between list and detail
   if (!isDesktop) {
-    if (selectedAgent) {
-      return (
-        <AgentDetail
-          agent={selectedAgent}
-          onBack={() => setSelectedId(null)}
-          onDeleted={() => setSelectedId(null)}
-        />
-      )
+    if (agentId) {
+      return <Outlet />
     }
     return (
       <AgentList
         className="w-full border-r-0"
-        selectedAgentId={selectedId}
-        onAgentSelect={setSelectedId}
+        selectedAgentId={agentId}
+        onAgentSelect={handleSelect}
       />
     )
   }
@@ -40,12 +42,12 @@ export default function AgentsPage() {
   return (
     <div className="flex h-full">
       <AgentList
-        selectedAgentId={selectedId}
-        onAgentSelect={setSelectedId}
+        selectedAgentId={agentId}
+        onAgentSelect={handleSelect}
       />
 
-      {selectedAgent ? (
-        <AgentDetail agent={selectedAgent} onDeleted={() => setSelectedId(null)} />
+      {agentId ? (
+        <Outlet />
       ) : (
         <div className="flex-1 bg-background" />
       )}

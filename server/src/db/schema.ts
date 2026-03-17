@@ -53,6 +53,32 @@ export const agents = pgTable('agents', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+export const messageRoleEnum = pgEnum('message_role', ['user', 'assistant']);
+
+export const messages = pgTable('messages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  agentId: uuid('agent_id')
+    .notNull()
+    .references(() => agents.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => accounts.id),
+  sessionId: integer('session_id').notNull().default(1),
+  tag: text('tag'),
+  role: messageRoleEnum('role').notNull(),
+  content: text('content').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const agentSkills = pgTable('agent_skills', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  agentId: uuid('agent_id')
+    .notNull()
+    .references(() => agents.id, { onDelete: 'cascade' }),
+  skillName: text('skill_name').notNull(),
+  installedAt: timestamp('installed_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const skills = pgTable('skills', {
   id: uuid('id').primaryKey().defaultRandom(),
   name: text('name').notNull().unique(),

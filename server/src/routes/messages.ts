@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, asc } from 'drizzle-orm';
 import { db } from '../db/index.js';
-import { agents } from '../db/schema.js';
+import { agents, messages } from '../db/schema.js';
 import type { AuthEnv } from '../middleware/auth.js';
 
 const app = new Hono<AuthEnv>();
@@ -127,6 +127,81 @@ app.get('/:agentId/info', async (c) => {
   const upstream = await fetch(`${result.agent.channelUrl}/api/info`);
   const data = await upstream.json();
   return c.json(data, upstream.status as any);
+});
+
+/** Get chat sessions summary for an agent */
+app.get('/:agentId/history', async (c) => {
+  const userId = c.get('userId');
+  const agentId = c.req.param('agentId');
+
+  const [agent] = await db
+    .select()
+    .from(agents)
+    .where(and(eq(agents.id, agentId), eq(agents.ownerId, userId)));
+
+  if (!agent) return c.json({ error: 'Agent not found' }, 404);
+
+  const rows = await db
+    .select()
+    .from(messages)
+    .where(eq(messages.agentId, agentId))
+    .orderBy(asc(messages.createdAt));
+
+  // Group by sessionId
+  const sessionMap = new Map<number, typeof rows>();
+  for (const row of rows) {
+    if (!sessionMap.has(row.sessionId)) sessionMap.set(row.sessionId, []);
+    sessionMap.get(row.sessionId)!.push(row);
+  }
+
+  const sessions = [...sessionMap.entries()].map(([sessionId, msgs]) => {
+    const last = msgs[msgs.length - 1];
+    const firstUser = msgs.find((m) => m.role === 'user');
+    const title = firstUser ? firstUser.content.slice(0, 50) : `会话 ${sessionId}`;
+    const tag = msgs[0].tag || null;
+    return {
+      sessionId,
+      title,
+      tag,
+      messageCount: msgs.length,
+      lastMessage: last.content,
+      lastTimestamp: new Date(last.createdAt).getTime(),
+    };
+  }).sort((a, b) => b.lastTimestamp - a.lastTimestamp);
+
+  return c.json({ sessions });
+});
+
+/** Get messages for a specific session */
+app.get('/:agentId/history/:sessionId', async (c) => {
+  const userId = c.get('userId');
+  const agentId = c.req.param('agentId');
+  const sessionId = parseInt(c.req.param('sessionId'));
+
+  const [agent] = await db
+    .select()
+    .from(agents)
+    .where(and(eq(agents.id, agentId), eq(agents.ownerId, userId)));
+
+  if (!agent) return c.json({ error: 'Agent not found' }, 404);
+
+  const rows = await db
+    .select()
+    .from(messages)
+    .where(and(eq(messages.agentId, agentId), eq(messages.sessionId, sessionId)))
+    .orderBy(asc(messages.createdAt));
+
+  return c.json({
+    messages: rows.map((m) => ({
+      id: m.id,
+      agentId: m.agentId,
+      sessionId: m.sessionId,
+      role: m.role,
+      content: m.content,
+      status: 'complete',
+      timestamp: new Date(m.createdAt).getTime(),
+    })),
+  });
 });
 
 export { app as messagesRoutes };

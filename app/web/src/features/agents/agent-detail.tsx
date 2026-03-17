@@ -1,10 +1,9 @@
 import { useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { ChevronLeft, MessageCircle, Key, Plus, X, Save, MoreVertical, Trash2 } from "lucide-react"
-import { getCredentials, setCredentials, deleteAgent } from "@/services/api-client"
+import { ChevronLeft, MessageCircle, MoreVertical, Trash2, ChevronRight } from "lucide-react"
+import { deleteAgent, getChatSessions } from "@/services/api-client"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { cn } from "@/lib/utils"
@@ -33,36 +32,20 @@ function getAvatarColor(id: string) {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
 }
 
-const statusConfig: Record<string, { color: string; label: string }> = {
-  running: { color: "bg-emerald-500", label: "运行中" },
-  starting: { color: "bg-amber-500", label: "启动中..." },
-  stopped: { color: "bg-gray-400", label: "已停止" },
-  error: { color: "bg-red-500", label: "异常" },
-  created: { color: "bg-gray-400", label: "未启动" },
-}
 
-const SKILL_LABELS: Record<string, string> = {
-  "code-review": "代码审查",
-  debugging: "调试",
-  refactoring: "重构",
-  translation: "翻译",
-  proofreading: "校对",
-  "data-analysis": "数据分析",
-  visualization: "可视化",
-  copywriting: "文案写作",
-  blog: "博客",
-  "ui-review": "UI 审查",
-  accessibility: "无障碍",
-  docker: "Docker",
-  "ci-cd": "CI/CD",
-  monitoring: "监控",
+function formatRelativeTime(timestamp: number): string {
+  const now = Date.now()
+  const diff = now - timestamp
+  if (diff < 60_000) return "刚刚"
+  if (diff < 3600_000) return `${Math.floor(diff / 60_000)} 分钟前`
+  if (diff < 86400_000) return `${Math.floor(diff / 3600_000)} 小时前`
+  return `${Math.floor(diff / 86400_000)} 天前`
 }
 
 export function AgentDetail({ agent, onBack, onDeleted }: AgentDetailProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [deleteOpen, setDeleteOpen] = useState(false)
-  const { color, label } = statusConfig[agent.status] ?? statusConfig.created
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteAgent(agent.id),
@@ -78,7 +61,7 @@ export function AgentDetail({ agent, onBack, onDeleted }: AgentDetailProps) {
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-y-auto">
+    <div className="flex flex-1 flex-col overflow-y-auto min-w-0">
       {/* Top bar */}
       <div className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
         {onBack ? (
@@ -115,7 +98,7 @@ export function AgentDetail({ agent, onBack, onDeleted }: AgentDetailProps) {
           <DialogHeader>
             <DialogTitle>删除 Agent</DialogTitle>
             <DialogDescription>
-              确定要删除 "{agent.name}" 吗？此操作不可撤销。
+              确定要删除 &ldquo;{agent.name}&rdquo; 吗？此操作不可撤销。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -133,124 +116,192 @@ export function AgentDetail({ agent, onBack, onDeleted }: AgentDetailProps) {
         </DialogContent>
       </Dialog>
 
-      <div className="flex flex-1 items-start justify-center px-6 py-12">
-      <div className="w-full max-w-md">
-        {/* Header: Avatar + Name */}
-        <div className="flex items-center gap-4">
+      <div className="flex-1 px-6 py-10 max-w-xl mx-auto w-full">
+        {/* Hero */}
+        <div className="flex flex-col items-center text-center mb-8">
           {agent.avatar ? (
             <img
               src={agent.avatar}
               alt={agent.name}
-              className="size-16 shrink-0 rounded-xl bg-muted object-cover"
+              className="size-20 rounded-2xl bg-muted object-cover mb-4"
             />
           ) : (
             <div
               className={cn(
-                "flex size-16 shrink-0 items-center justify-center rounded-xl text-white text-2xl font-semibold",
+                "flex size-20 items-center justify-center rounded-2xl text-white text-3xl font-bold mb-4",
                 getAvatarColor(agent.id),
               )}
             >
               {agent.name.charAt(0)}
             </div>
           )}
-          <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-foreground">
-              {agent.name}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              ID: {agent.id}
-            </p>
-          </div>
-        </div>
-
-        {/* Divider */}
-        <div className="my-5 border-t border-border" />
-
-        {/* Info rows */}
-        <div className="space-y-3.5">
-          <div className="flex items-center">
-            <span className="w-16 shrink-0 text-sm text-muted-foreground">
-              状态
-            </span>
-            <div className="flex items-center gap-1.5">
-              <span className={cn("size-2 rounded-full", color)} />
-              <span className="text-sm text-foreground">{label}</span>
-            </div>
-          </div>
-
-          <div className="flex items-start">
-            <span className="w-16 shrink-0 text-sm text-muted-foreground pt-0.5">
-              简介
-            </span>
-            <span className="text-sm text-foreground">
-              {agent.description}
-            </span>
-          </div>
-
-          {agent.skills?.length > 0 && (
-          <div className="flex items-start">
-            <span className="w-16 shrink-0 text-sm text-muted-foreground pt-0.5">
-              技能
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {agent.skills.map((skill) => (
-                <span
-                  key={skill}
-                  className="inline-flex items-center rounded-full bg-muted px-2.5 py-0.5 text-xs text-muted-foreground"
-                >
-                  {SKILL_LABELS[skill] ?? skill}
-                </span>
-              ))}
-            </div>
-          </div>
+          <h2 className="text-xl font-bold text-foreground">{agent.name}</h2>
+          {agent.description && (
+            <p className="text-sm text-muted-foreground mt-1 max-w-sm">{agent.description}</p>
           )}
-
-          {agent.resourceProfile && (
-          <div className="flex items-center">
-            <span className="w-16 shrink-0 text-sm text-muted-foreground">
-              配置
-            </span>
-            <span className="text-sm text-foreground">
-              {agent.resourceProfile}
-            </span>
-          </div>
-          )}
-        </div>
-
-        {/* Divider */}
-        <div className="my-5 border-t border-border" />
-
-        {/* Action buttons */}
-        <div className="flex justify-center gap-8">
-          <button
+          <Button
             onClick={handleStartChat}
-            className="flex flex-col items-center gap-1.5 text-primary hover:text-primary/80 transition-colors"
+            size="sm"
+            className="mt-4"
           >
-            <div className="flex size-12 items-center justify-center rounded-full border border-border">
-              <MessageCircle className="size-5" />
-            </div>
-            <span className="text-xs">发消息</span>
-          </button>
-
+            <MessageCircle className="size-4 mr-1.5" />
+            开始对话
+          </Button>
         </div>
 
-        {/* Divider */}
-        <div className="my-5 border-t border-border" />
+        {/* Video intro */}
+        {agent.config?.video && <VideoSection url={agent.config.video} />}
 
-        {/* Credentials section */}
-        <CredentialsSection agentId={agent.id} />
-      </div>
+        {/* Showcase — grouped by tag */}
+        <ShowcaseSection agentId={agent.id} />
       </div>
     </div>
   )
 }
 
-function CredentialsSection({ agentId }: { agentId: string }) {
-  const queryClient = useQueryClient()
-  const [entries, setEntries] = useState<{ key: string; value: string }[]>([])
-  const [hasEdits, setHasEdits] = useState(false)
+// ── Video Section ──
 
-  const { data, isLoading } = useQuery({
+function VideoSection({ url }: { url: string }) {
+  return (
+    <div className="mb-8">
+      <div className="overflow-hidden rounded-xl border border-border bg-black aspect-video">
+        <video
+          src={url}
+          controls
+          preload="metadata"
+          className="w-full h-full object-contain"
+          poster={`${url}#t=0.5`}
+        />
+      </div>
+    </div>
+  )
+}
+
+// ── Showcase Section (按 tag 分组) ──
+
+function ShowcaseSection({ agentId }: { agentId: string }) {
+  const navigate = useNavigate()
+  const { data } = useQuery({
+    queryKey: ["chat-sessions", agentId],
+    queryFn: () => getChatSessions(agentId),
+  })
+  const sessions = data?.sessions ?? []
+
+  if (sessions.length === 0) return null
+
+  // Group by tag
+  const grouped = new Map<string, typeof sessions>()
+  for (const s of sessions) {
+    const tag = s.tag || "其他"
+    if (!grouped.has(tag)) grouped.set(tag, [])
+    grouped.get(tag)!.push(s)
+  }
+
+  return (
+    <div className="space-y-6">
+      {[...grouped.entries()].map(([tag, tagSessions]) => (
+        <div key={tag} className="space-y-3">
+          <h3 className="text-sm font-medium text-muted-foreground">{tag}</h3>
+          <div className="grid gap-2">
+            {tagSessions.map((session) => (
+              <button
+                key={session.sessionId}
+                onClick={() => navigate({
+                  to: "/agents/$agentId/history",
+                  params: { agentId },
+                  search: { session: session.sessionId, title: session.title },
+                })}
+                className="flex items-center gap-3 rounded-xl border border-border px-4 py-3 text-left hover:bg-accent/50 transition-colors"
+              >
+                <div className="min-w-0 flex-1">
+                  <span className="text-sm font-medium text-foreground line-clamp-1">{session.title}</span>
+                  <span className="text-[11px] text-muted-foreground mt-0.5 block">{session.messageCount} 条对话</span>
+                </div>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground/30" />
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Installed Skills ──
+
+function InstalledSkillsSection({ agentId }: { agentId: string }) {
+  const { data } = useQuery({
+    queryKey: ["agent-skills", agentId],
+    queryFn: () => getAgentSkills(agentId),
+  })
+  const installedSkills = data?.skills ?? []
+
+  if (installedSkills.length === 0) {
+    return (
+      <div className="space-y-3">
+        <h3 className="text-sm font-medium text-foreground">已安装技能</h3>
+        <p className="text-xs text-muted-foreground">暂无技能</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <h3 className="text-sm font-medium text-foreground">已安装技能</h3>
+
+      <div className="space-y-2">
+        {installedSkills.map((skill) => (
+          <SkillCard key={skill.name} skill={skill} agentId={agentId} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function SkillCard({ skill, agentId }: { skill: { name: string; displayName: string; description: string; version: string }; agentId: string }) {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="flex w-full items-center gap-3 rounded-xl border border-border p-3 text-left hover:bg-accent/50 transition-colors"
+      >
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+          <Package className="size-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-foreground">{skill.displayName}</span>
+            <span className="text-[10px] text-muted-foreground">v{skill.version}</span>
+          </div>
+          {skill.description && (
+            <p className="mt-0.5 text-xs text-muted-foreground truncate">{skill.description}</p>
+          )}
+        </div>
+        <ChevronRight className="size-4 shrink-0 text-muted-foreground/40" />
+      </button>
+
+      {/* Skill detail + credential config dialog */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{skill.displayName}</DialogTitle>
+            <DialogDescription>{skill.description}</DialogDescription>
+          </DialogHeader>
+          <SkillCredentialsForm agentId={agentId} skillName={skill.name} />
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}
+
+function SkillCredentialsForm({ agentId, skillName }: { agentId: string; skillName: string }) {
+  const queryClient = useQueryClient()
+  const [formValues, setFormValues] = useState<Record<string, string>>({})
+  const [dirty, setDirty] = useState(false)
+
+  const { data } = useQuery({
     queryKey: ["credentials", agentId],
     queryFn: () => getCredentials(agentId),
     select: (d) => d.credentials,
@@ -259,124 +310,62 @@ function CredentialsSection({ agentId }: { agentId: string }) {
   const saveMutation = useMutation({
     mutationFn: () => {
       const creds: Record<string, string> = {}
-      for (const e of entries) {
-        if (e.key.trim()) creds[e.key.trim()] = e.value
-      }
-      // Merge with existing keys that weren't edited
-      if (data) {
-        for (const existing of data) {
-          if (!creds[existing.name] && existing.hasValue) {
-            creds[existing.name] = '' // keep key, empty means unchanged on server
-          }
-        }
+      for (const [key, value] of Object.entries(formValues)) {
+        if (value) creds[key] = value
       }
       return setCredentials(agentId, creds)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["credentials", agentId] })
-      setEntries([])
-      setHasEdits(false)
+      setFormValues({})
+      setDirty(false)
     },
   })
 
-  const existingKeys = data ?? []
+  const fields = data ?? []
 
-  const addEntry = () => {
-    setEntries([...entries, { key: "", value: "" }])
-    setHasEdits(true)
-  }
-
-  const removeEntry = (index: number) => {
-    setEntries(entries.filter((_, i) => i !== index))
-    setHasEdits(entries.length > 1)
-  }
-
-  const updateEntry = (index: number, field: "key" | "value", val: string) => {
-    const next = [...entries]
-    next[index] = { ...next[index], [field]: val }
-    setEntries(next)
-    setHasEdits(true)
+  if (fields.length === 0) {
+    return (
+      <p className="text-xs text-muted-foreground py-2">
+        该技能无需配置凭证
+      </p>
+    )
   }
 
   return (
-    <div id="credentials-section" className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium">凭证配置</h3>
-        <button
-          onClick={addEntry}
-          className="flex items-center gap-1 text-xs text-primary hover:text-primary/80"
-        >
-          <Plus className="size-3.5" />
-          添加
-        </button>
+    <div className="space-y-4 py-2">
+      <h4 className="text-sm font-medium">凭证配置</h4>
+      <div className="space-y-3">
+        {fields.map((field) => (
+          <div key={field.name} className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-mono text-foreground">{field.name}</label>
+              {field.hasValue && !formValues[field.name] && (
+                <span className="text-[10px] text-emerald-600">已配置</span>
+              )}
+            </div>
+            <Input
+              type="password"
+              value={formValues[field.name] ?? ""}
+              onChange={(e) => {
+                setFormValues((prev) => ({ ...prev, [field.name]: e.target.value }))
+                setDirty(true)
+              }}
+              placeholder={field.hasValue ? "••••••（输入新值覆盖）" : "请输入"}
+              className="h-9 text-sm font-mono"
+            />
+          </div>
+        ))}
       </div>
-
-      {isLoading && (
-        <p className="text-xs text-muted-foreground">加载中...</p>
-      )}
-
-      {/* Existing keys */}
-      {existingKeys.length > 0 && (
-        <div className="space-y-1.5">
-          {existingKeys.map((cred) => (
-            <div key={cred.name} className="flex items-center gap-2 text-xs">
-              <Key className="size-3.5 shrink-0 text-muted-foreground" />
-              <span className="font-mono text-foreground">{cred.name}</span>
-              <span className="text-muted-foreground">
-                {cred.hasValue ? "已配置" : "未配置"}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {existingKeys.length === 0 && entries.length === 0 && !isLoading && (
-        <p className="text-xs text-muted-foreground">
-          暂无凭证，点击"添加"配置 API Key
-        </p>
-      )}
-
-      {/* New entries form */}
-      {entries.length > 0 && (
-        <div className="space-y-2">
-          {entries.map((entry, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <Input
-                value={entry.key}
-                onChange={(e) => updateEntry(i, "key", e.target.value)}
-                placeholder="KEY_NAME"
-                className="h-8 text-xs font-mono flex-1"
-              />
-              <Input
-                value={entry.value}
-                onChange={(e) => updateEntry(i, "value", e.target.value)}
-                placeholder="值"
-                type="password"
-                className="h-8 text-xs flex-1"
-              />
-              <button
-                onClick={() => removeEntry(i)}
-                className="shrink-0 text-muted-foreground hover:text-destructive"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
-          ))}
-
-          <Button
-            size="sm"
-            className="w-full"
-            disabled={saveMutation.isPending || !hasEdits}
-            onClick={() => saveMutation.mutate()}
-          >
-            <Save className="size-3.5 mr-1.5" />
-            {saveMutation.isPending ? "保存中..." : "保存凭证"}
-          </Button>
-
-          {saveMutation.isSuccess && (
-            <p className="text-xs text-emerald-600">保存成功</p>
-          )}
-        </div>
+      {dirty && (
+        <Button
+          size="sm"
+          className="w-full"
+          disabled={saveMutation.isPending}
+          onClick={() => saveMutation.mutate()}
+        >
+          {saveMutation.isPending ? "保存中..." : "保存"}
+        </Button>
       )}
     </div>
   )
