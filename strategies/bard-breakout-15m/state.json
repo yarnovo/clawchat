@@ -1,26 +1,29 @@
 {
-  "last_updated": "2026-03-18T14:44:58Z",
+  "last_updated": "2026-03-18T14:59:58Z",
   "indicators": {
     "closes": [
       0.7072,
-      0.6877
+      0.6877,
+      0.7209
     ],
     "highs": [
       0.74,
-      0.7284
+      0.7284,
+      0.7519
     ],
     "lows": [
       0.6945,
-      0.685
+      0.685,
+      0.6853
     ]
   },
   "candle_aggregator": {
-    "open": 0.6878,
-    "high": 0.6878,
-    "low": 0.6878,
-    "close": 0.6878,
-    "volume": 111.0,
-    "window_start": 1773845100000
+    "open": 0.7204,
+    "high": 0.7204,
+    "low": 0.7204,
+    "close": 0.7204,
+    "volume": 11.0,
+    "window_start": 1773846000000
   },
   "trade_stats": {
     "total": 0,

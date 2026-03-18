@@ -125,6 +125,36 @@
 盈利降到 +$14 → 自动平仓，保住 $14
 ```
 
+## trade.json
+
+交易员手动干预指令，hft-engine 文件监听热更新。
+
+```json
+{
+  "action": "hold",
+  "params": {},
+  "note": "",
+  "updated_at": "2026-03-18T14:00:00Z",
+  "executed_at": null
+}
+```
+
+### action 枚举
+
+| action | 类型 | params | 说明 |
+|--------|------|--------|------|
+| `hold` | 持续 | — | 默认，放行策略信号 |
+| `pause` | 持续 | — | 阻止开新仓，不平现有仓 |
+| `resume` | 持续 | — | 取消 pause |
+| `stop` | 一次性 | — | 平所有仓 + 进入 pause |
+| `close_all` | 一次性 | — | 平所有仓 |
+| `close_long` | 一次性 | — | 平多仓 |
+| `close_short` | 一次性 | — | 平空仓 |
+| `add` | 一次性 | `{ "percent": 30, "direction": "long" }` | 加仓 |
+| `reduce` | 一次性 | `{ "percent": 50 }` | 减仓 |
+
+一次性指令执行后自动回 `hold`，写 `executed_at`。文件不存在 = `hold`。
+
 ## 目录结构
 
 ```
@@ -132,6 +162,7 @@ strategies/
 └── {name}/
     ├── strategy.json    ← 引擎读
     ├── risk.json        ← 风控读
+    ├── trade.json       ← 交易员写（手动干预指令，引擎监听）
     ├── state.json       ← 引擎写（运行时状态，重启恢复）
     └── backtest.md      ← 回测报告（人看）
 ```

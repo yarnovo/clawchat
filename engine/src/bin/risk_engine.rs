@@ -601,7 +601,8 @@ fn today_start_ts() -> u64 {
     day_secs * 1000
 }
 
-/// 记录平仓到 risk_state 并持久化
+/// 记录平仓到 risk_state 并持久化（降级后暂不使用，保留备用）
+#[allow(dead_code)]
 fn record_close_and_save(risk_state: &mut RiskEngineState, strategy_name: &str, pnl: f64) {
     let today = today_start_ts();
     {
@@ -630,7 +631,7 @@ async fn check_position_risk(
     pos: &TrackedPosition,
     risk_map: &RiskMap,
     hwm: &mut HighWaterMarks,
-    exchange: &Exchange,
+    _exchange: &Exchange,
     total_balance: f64,
     risk_state: &mut RiskEngineState,
 ) -> Option<String> {
@@ -679,49 +680,29 @@ async fn check_position_risk(
         }
     }
 
-    // ── 1. 单笔止损 ──
+    // ── 1. 单笔止损（已降级：仅告警，hft-engine 负责平仓）──
     if capital > 0.0 && pnl < 0.0 {
         let loss_ratio = -pnl / capital;
         if loss_ratio >= risk_cfg.max_loss_per_trade {
             tracing::warn!(
-                "[STOP LOSS] [{strategy_name}] {norm_sym} {} loss=${pnl:.4} ({:.2}% >= {:.2}%)",
+                "[STOP LOSS ALERT] [{strategy_name}] {norm_sym} {} loss=${pnl:.4} ({:.2}% >= {:.2}%) — hft-engine handles close",
                 pos.position_side,
                 loss_ratio * 100.0,
                 risk_cfg.max_loss_per_trade * 100.0
             );
-            match exchange.close_position(norm_sym, pos.position_amt).await {
-                Ok(_) => {
-                    tracing::info!("  {norm_sym} closed (stop loss)");
-                    record_close_and_save(risk_state, strategy_name, pnl);
-                    hwm.remove(&key);
-                    save_high_water(hwm);
-                    return Some(norm_sym.clone());
-                }
-                Err(e) => tracing::error!("  {norm_sym} close failed: {e}"),
-            }
         }
     }
 
-    // ── 2. 单笔止盈 ──
+    // ── 2. 单笔止盈（已降级：仅告警，hft-engine 负责平仓）──
     if capital > 0.0 && pnl > 0.0 {
         let profit_ratio = pnl / capital;
         if profit_ratio >= risk_cfg.max_profit_per_trade {
             tracing::warn!(
-                "[TAKE PROFIT] [{strategy_name}] {norm_sym} {} profit=${pnl:.4} ({:.2}% >= {:.2}%)",
+                "[TAKE PROFIT ALERT] [{strategy_name}] {norm_sym} {} profit=${pnl:.4} ({:.2}% >= {:.2}%) — hft-engine handles close",
                 pos.position_side,
                 profit_ratio * 100.0,
                 risk_cfg.max_profit_per_trade * 100.0
             );
-            match exchange.close_position(norm_sym, pos.position_amt).await {
-                Ok(_) => {
-                    tracing::info!("  {norm_sym} closed (take profit)");
-                    record_close_and_save(risk_state, strategy_name, pnl);
-                    hwm.remove(&key);
-                    save_high_water(hwm);
-                    return Some(norm_sym.clone());
-                }
-                Err(e) => tracing::error!("  {norm_sym} close failed: {e}"),
-            }
         }
     }
 
@@ -738,7 +719,7 @@ async fn check_position_risk(
         }
     }
 
-    // ── 4. 高水位利润保护 ──
+    // ── 4. 高水位利润保护（已降级：仅告警，hft-engine 负责平仓）──
     if pnl > 0.0 {
         let prev_hwm = *hwm.get(&key).unwrap_or(&0.0);
         if pnl > prev_hwm {
@@ -751,19 +732,9 @@ async fn check_position_risk(
             let protection_line = current_hwm * (1.0 - risk_cfg.max_drawdown_stop);
             if pnl <= protection_line {
                 tracing::warn!(
-                    "[PROFIT PROTECT] [{strategy_name}] {norm_sym} {} hwm=+${current_hwm:.4} → +${pnl:.4}",
+                    "[PROFIT PROTECT ALERT] [{strategy_name}] {norm_sym} {} hwm=+${current_hwm:.4} → +${pnl:.4} — hft-engine handles close",
                     pos.position_side
                 );
-                match exchange.close_position(norm_sym, pos.position_amt).await {
-                    Ok(_) => {
-                        tracing::info!("  {norm_sym} closed (profit protection)");
-                        record_close_and_save(risk_state, strategy_name, pnl);
-                        hwm.remove(&key);
-                        save_high_water(hwm);
-                        return Some(norm_sym.clone());
-                    }
-                    Err(e) => tracing::error!("  {norm_sym} close failed: {e}"),
-                }
             }
         }
     } else if hwm.contains_key(&key) {
