@@ -18,10 +18,10 @@
     "days": 30,
     "return_pct": 235.63,
     "sharpe": 8.01,
-    "max_drawdown_pct": 17.40,
+    "max_drawdown_pct": 17.4,
     "trades": 23,
     "win_rate": 0.478,
     "profit_factor": 5.09
   },
-  "status": "pending"
+  "status": "approved"
 }
