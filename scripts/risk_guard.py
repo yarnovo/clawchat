@@ -15,16 +15,95 @@ from futures_exchange import get_futures_exchange, get_positions, close_all
 
 INTERVAL = 30  # 秒
 EQUITY_CSV = Path(__file__).parent.parent / "reports" / "equity.csv"
+HIGH_WATER_FILE = Path(__file__).parent.parent / "reports" / "high_water.json"
 ENGINE_REGISTRY = Path("/tmp/hft-engines.json")
 STRATEGIES_DIR = Path(__file__).parent.parent / "strategies"
 
 running = True
+high_water_marks = {}  # "{symbol}:{side}" → max_pnl_seen
 
 
 def handle_signal(signum, frame):
     global running
     print(f"\n  收到信号 {signum}，正在退出...")
     running = False
+
+
+def load_high_water():
+    """从 reports/high_water.json 恢复高水位记录"""
+    global high_water_marks
+    try:
+        if HIGH_WATER_FILE.exists():
+            high_water_marks = json.loads(HIGH_WATER_FILE.read_text())
+    except Exception:
+        high_water_marks = {}
+
+
+def save_high_water():
+    """持久化高水位到 reports/high_water.json"""
+    try:
+        HIGH_WATER_FILE.parent.mkdir(parents=True, exist_ok=True)
+        HIGH_WATER_FILE.write_text(json.dumps(high_water_marks, indent=2))
+    except Exception as e:
+        print(f"  高水位写入失败: {e}")
+
+
+def check_profit_protection(exchange, positions, risk_by_symbol):
+    """高水位利润保护：从最高盈利回撤超过阈值自动平仓。
+    返回被平仓的 symbol 列表。
+    """
+    closed = []
+    hwm_updated = False
+
+    for p in positions:
+        sym = p.get("symbol", "")
+        side = p.get("side", "")
+        pnl = float(p.get("unrealizedPnl", 0) or 0)
+        key = f"{sym}:{side}"
+
+        # 只对正利润生效
+        if pnl <= 0:
+            continue
+
+        # 获取该持仓的风控配置
+        raw_sym = sym.replace("/", "").replace(":USDT", "")
+        risk = risk_by_symbol.get(raw_sym, DEFAULT_RISK)
+        dd_stop = risk.get("max_drawdown_stop", DEFAULT_RISK.get("max_drawdown_stop", 0.30))
+        strategy_name = risk.get("name", "unknown")
+
+        # 更新高水位
+        prev_hwm = high_water_marks.get(key, 0)
+        if pnl > prev_hwm:
+            high_water_marks[key] = pnl
+            hwm_updated = True
+
+        hwm = high_water_marks.get(key, 0)
+
+        # 高水位 > 0 时才检查利润保护
+        if hwm <= 0:
+            continue
+
+        # 保护线 = hwm * (1 - max_drawdown_stop)
+        protection_line = hwm * (1 - dd_stop)
+
+        if pnl <= protection_line:
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f"  [{now}] [PROFIT PROTECT] [{strategy_name}] {sym} {side} "
+                  f"从高水位 +${hwm:.4f} 回撤到 +${pnl:.4f}，保护利润平仓")
+            try:
+                close_all(exchange, sym)
+                print(f"    {sym} 已平仓")
+                closed.append(sym)
+                # 清除该持仓的高水位
+                high_water_marks.pop(key, None)
+                hwm_updated = True
+            except Exception as e:
+                print(f"    {sym} 平仓失败: {e}")
+
+    if hwm_updated:
+        save_high_water()
+
+    return closed
 
 
 def append_equity(timestamp, equity, unrealized_pnl, num_positions, detail):
@@ -165,6 +244,17 @@ def run_check(exchange):
             "strategy": strategy,
         })
 
+    # 高水位利润保护（在记录权益和常规止损之前检查）
+    profit_protected = check_profit_protection(exchange, positions, risk_by_symbol)
+
+    # 清理不再存在的持仓的高水位记录
+    active_keys = {f"{p.get('symbol', '')}:{p.get('side', '')}" for p in positions}
+    stale = [k for k in high_water_marks if k not in active_keys]
+    if stale:
+        for k in stale:
+            del high_water_marks[k]
+        save_high_water()
+
     # 记录权益曲线（含持仓明细）
     append_equity(now, equity, unrealized, num_pos, detail)
 
@@ -202,9 +292,14 @@ def main():
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
 
+    load_high_water()
+
     print(f"\n{'='*60}")
     print(f"  风控守护进程启动  间隔={INTERVAL}s")
     print(f"  权益曲线: {EQUITY_CSV}")
+    print(f"  高水位: {HIGH_WATER_FILE}")
+    if high_water_marks:
+        print(f"  恢复 {len(high_water_marks)} 个高水位记录")
     print(f"{'='*60}\n")
 
     exchange = get_futures_exchange()
