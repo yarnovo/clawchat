@@ -19,13 +19,13 @@
   "backtest": {
     "days": 14,
     "return_pct": 42.35,
-    "sharpe": 10.90,
+    "sharpe": 10.9,
     "max_drawdown_pct": 5.61,
     "trades": 46,
     "win_rate": 0.543,
     "profit_factor": 1.93
   },
-  "status": "pending",
+  "status": "approved",
   "lifecycle": {
     "created": "2026-03-19"
   }
