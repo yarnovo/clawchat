@@ -6,7 +6,7 @@
 
 ## 待做（策略生命周期）
 
-- [ ] risk-engine 自动更新 strategy status：实盘表现差 → 自动改 status=suspended
+- [ ] 实盘表现差时 team-lead 决策 suspend（risk-engine 只负责风控，不改 strategy status）
 - [ ] 实盘评估机制：自动对比实盘表现 vs 回测表现
 - [ ] 自动淘汰规则：实盘连续 3 天低于回测 30% → suspend
 - [ ] 生命周期状态：discovery → backtest → approved → live → degraded → suspended → archived

@@ -161,6 +161,11 @@ TeamCreate(team_name="clawchat")
 - **risk.json 由你决定**：止盈止损阈值根据策略特性设不同值（scalping 紧、趋势宽）
 - 需要技术支持告诉 team-lead，engineer 会实现
 
+**可创建多个 strategist 并行找策略**（如 strategist + strategist2），分工不同方向：
+- strategist：新币种开拓 + 投资组合分散
+- strategist2：调参优化 + 均值回归
+- 更多：按需创建（name 用纯字母数字，不能有连字符）
+
 **risk spawn prompt 要点：**
 - `make check` 风控检查 + 确认 risk.json 就位
 - 审核新策略的 risk.json 是否合理
