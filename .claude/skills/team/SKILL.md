@@ -204,9 +204,9 @@ make status   # 一屏看全局
 3. 决策 & 行动：
    ┌─ 策略亏钱 → 改 status=suspended → watcher 自动停引擎
    ├─ 策略赚钱 → 保持
-   ├─ 策略不够 → 让 strategist 找新的
+   ├─ 策略不够 / 有空闲资金 → 让 strategist 找新策略（别让他闲着）
    ├─ 新策略类型 → 让 engineer Rust 实现
-   ├─ 风控规则需调整 → 让 risk 更新 risk.json
+   ├─ 风控规则需调整 → 让 strategist 更新 risk.json
    ├─ 成员需要技术支持 → 派 engineer 实现
    ├─ 守护挂了 → 重启
    └─ 异常 → 协调团队处理
