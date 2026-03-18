@@ -1,5 +1,5 @@
 ---
-name: trade
+name: trade-config
 description: 交易指令编写规范 — trade.json 格式和 action 说明
 user-invocable: true
 ---
