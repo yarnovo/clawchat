@@ -9,10 +9,12 @@ from unittest import mock
 import pytest
 
 from clawchat.cmd_status import (
+    _engine_health_counts,
     _format_updated,
     _load_last_trade_by_strategy,
     _load_signals_by_strategy,
     _read_state_summary,
+    _today_realized_pnl,
 )
 
 
@@ -187,3 +189,106 @@ def test_read_state_summary_no_signals_no_trades(tmp_path):
     result = _read_state_summary(d)
     assert "signals=0" in result
     assert "last_trade=-" in result
+
+
+# ── _today_realized_pnl ─────────────────────────────────────
+
+
+def test_today_realized_pnl_no_file(tmp_path):
+    with mock.patch("clawchat.cmd_status.TRADES_FILE", tmp_path / "nope.jsonl"):
+        assert _today_realized_pnl() == 0.0
+
+
+def test_today_realized_pnl_no_today_trades(tmp_path):
+    f = tmp_path / "trades.jsonl"
+    f.write_text(json.dumps({"strategy": "s", "symbol": "X", "ts": "2020-01-01T00:00:00Z", "side": "buy", "price": "100", "qty": "1"}))
+    with mock.patch("clawchat.cmd_status.TRADES_FILE", f):
+        assert _today_realized_pnl() == 0.0
+
+
+def test_today_realized_pnl_paired_trade(tmp_path):
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    f = tmp_path / "trades.jsonl"
+    lines = [
+        json.dumps({"strategy": "s", "symbol": "BTC", "ts": f"{today}T10:00:00Z", "side": "buy", "price": "100", "qty": "1"}),
+        json.dumps({"strategy": "s", "symbol": "BTC", "ts": f"{today}T11:00:00Z", "side": "sell", "price": "110", "qty": "1"}),
+    ]
+    f.write_text("\n".join(lines))
+    with mock.patch("clawchat.cmd_status.TRADES_FILE", f):
+        pnl = _today_realized_pnl()
+    assert abs(pnl - 10.0) < 0.01  # bought 100, sold 110 = +10
+
+
+def test_today_realized_pnl_short_trade(tmp_path):
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    f = tmp_path / "trades.jsonl"
+    lines = [
+        json.dumps({"strategy": "s", "symbol": "ETH", "ts": f"{today}T10:00:00Z", "side": "sell", "price": "200", "qty": "2"}),
+        json.dumps({"strategy": "s", "symbol": "ETH", "ts": f"{today}T11:00:00Z", "side": "buy", "price": "190", "qty": "2"}),
+    ]
+    f.write_text("\n".join(lines))
+    with mock.patch("clawchat.cmd_status.TRADES_FILE", f):
+        pnl = _today_realized_pnl()
+    assert abs(pnl - 20.0) < 0.01  # shorted 200, covered 190 = +20
+
+
+def test_today_realized_pnl_unpaired_no_pnl(tmp_path):
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    f = tmp_path / "trades.jsonl"
+    f.write_text(json.dumps({"strategy": "s", "symbol": "X", "ts": f"{today}T10:00:00Z", "side": "buy", "price": "100", "qty": "1"}))
+    with mock.patch("clawchat.cmd_status.TRADES_FILE", f):
+        assert _today_realized_pnl() == 0.0
+
+
+# ── _engine_health_counts ───────────────────────────────────
+
+
+def test_engine_health_no_strategies(tmp_path):
+    with mock.patch("clawchat.cmd_status.STRATEGIES_DIR", tmp_path / "nope"):
+        online, stale = _engine_health_counts()
+    assert online == 0
+    assert stale == 0
+
+
+def test_engine_health_mixed(tmp_path):
+    strategies = tmp_path / "strategies"
+    strategies.mkdir()
+
+    # online strategy
+    d1 = strategies / "online-strat"
+    d1.mkdir()
+    ts_recent = (datetime.now(timezone.utc) - timedelta(minutes=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    (d1 / "strategy.json").write_text(json.dumps({"status": "approved"}))
+    (d1 / "state.json").write_text(json.dumps({"last_updated": ts_recent}))
+
+    # stale strategy
+    d2 = strategies / "stale-strat"
+    d2.mkdir()
+    ts_old = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    (d2 / "strategy.json").write_text(json.dumps({"status": "active"}))
+    (d2 / "state.json").write_text(json.dumps({"last_updated": ts_old}))
+
+    # suspended strategy (should be ignored)
+    d3 = strategies / "suspended-strat"
+    d3.mkdir()
+    (d3 / "strategy.json").write_text(json.dumps({"status": "suspended"}))
+    (d3 / "state.json").write_text(json.dumps({"last_updated": ts_recent}))
+
+    with mock.patch("clawchat.cmd_status.STRATEGIES_DIR", strategies):
+        online, stale = _engine_health_counts()
+    assert online == 1
+    assert stale == 1
+
+
+def test_engine_health_no_state_file(tmp_path):
+    strategies = tmp_path / "strategies"
+    strategies.mkdir()
+    d = strategies / "no-state"
+    d.mkdir()
+    (d / "strategy.json").write_text(json.dumps({"status": "approved"}))
+    # no state.json
+
+    with mock.patch("clawchat.cmd_status.STRATEGIES_DIR", strategies):
+        online, stale = _engine_health_counts()
+    assert online == 0
+    assert stale == 0  # no state.json = skipped (not stale)

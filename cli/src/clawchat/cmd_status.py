@@ -14,10 +14,12 @@ from clawchat._paths import PROJECT_ROOT, STRATEGIES_DIR, RECORDS_DIR
 EQUITY_CSV = RECORDS_DIR / "equity.csv"
 TRADES_FILE = RECORDS_DIR / "trades.jsonl"
 SIGNALS_FILE = RECORDS_DIR / "signals.jsonl"
+HIGH_WATER_FILE = RECORDS_DIR / "high_water.json"
 
 # ANSI 颜色
 _RED = "\033[31m"
 _GREEN = "\033[32m"
+_YELLOW = "\033[33m"
 _RESET = "\033[0m"
 _STALE_MINUTES = 10
 
@@ -145,6 +147,147 @@ def show_watcher():
     alive = is_process_alive("strategy_watcher.py")
     status = "RUNNING" if alive else "STOPPED"
     print(f"  策略监听: [{status}]")
+
+
+def _today_realized_pnl():
+    """从 trades.jsonl 计算今日已实现 PnL（配对 buy/sell）"""
+    if not TRADES_FILE.exists():
+        return 0.0
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    trades_by_strat_sym = defaultdict(list)
+    try:
+        for line in TRADES_FILE.read_text().strip().split("\n"):
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+                ts = rec.get("ts", "")
+                if not ts.startswith(today):
+                    continue
+                key = (rec.get("strategy", ""), rec.get("symbol", ""))
+                trades_by_strat_sym[key].append(rec)
+            except Exception:
+                pass
+    except Exception:
+        return 0.0
+
+    total_pnl = 0.0
+    for _key, today_trades in trades_by_strat_sym.items():
+        pos = None
+        for t in today_trades:
+            side = t.get("side", "").lower()
+            price = float(t.get("price", 0) or 0)
+            qty = float(t.get("qty", 0) or 0)
+            if price == 0:
+                continue
+            if pos is None:
+                pos = {"side": side, "price": price, "qty": qty}
+                continue
+            if pos["side"] == side:
+                total_qty = pos["qty"] + qty
+                if total_qty > 0:
+                    pos["price"] = (pos["price"] * pos["qty"] + price * qty) / total_qty
+                    pos["qty"] = total_qty
+                continue
+            close_qty = min(pos["qty"], qty)
+            if pos["side"] == "buy":
+                total_pnl += (price - pos["price"]) * close_qty
+            else:
+                total_pnl += (pos["price"] - price) * close_qty
+            remaining = pos["qty"] - close_qty
+            if remaining > 0:
+                pos["qty"] = remaining
+            elif qty > close_qty:
+                pos = {"side": side, "price": price, "qty": qty - close_qty}
+            else:
+                pos = None
+    return total_pnl
+
+
+def _engine_health_counts():
+    """统计引擎在线/超时数量（基于 state.json last_updated）"""
+    online = 0
+    stale = 0
+    if not STRATEGIES_DIR.exists():
+        return online, stale
+    now_utc = datetime.now(timezone.utc)
+    for d in STRATEGIES_DIR.iterdir():
+        sf = d / "strategy.json"
+        st = d / "state.json"
+        if not sf.exists() or not st.exists():
+            continue
+        try:
+            cfg = json.loads(sf.read_text())
+            if cfg.get("status") not in ("approved", "active"):
+                continue
+            state = json.loads(st.read_text())
+            updated = state.get("last_updated", "")
+            if not updated:
+                stale += 1
+                continue
+            dt = datetime.fromisoformat(updated.replace("Z", "+00:00"))
+            age_min = (now_utc - dt).total_seconds() / 60
+            if age_min >= _STALE_MINUTES:
+                stale += 1
+            else:
+                online += 1
+        except Exception:
+            stale += 1
+    return online, stale
+
+
+def show_today_overview():
+    section("今日概览")
+
+    # 1. PnL: realized (trades.jsonl) + unrealized (equity.csv)
+    realized = _today_realized_pnl()
+    unrealized = 0.0
+    equity_now = 0.0
+    if EQUITY_CSV.exists():
+        try:
+            with open(EQUITY_CSV) as f:
+                rows = list(csv.DictReader(f))
+            if rows:
+                last = rows[-1]
+                unrealized = float(last.get("unrealized_pnl", 0) or 0)
+                equity_now = float(last.get("equity", 0) or 0)
+        except Exception:
+            pass
+
+    total_pnl = realized + unrealized
+    sign_t = "+" if total_pnl >= 0 else ""
+    sign_r = "+" if realized >= 0 else ""
+    sign_u = "+" if unrealized >= 0 else ""
+    color = _GREEN if total_pnl >= 0 else _RED
+    print(f"  今日 PnL: {color}{sign_t}${total_pnl:.2f}{_RESET} (realized {sign_r}${realized:.2f}, unrealized {sign_u}${unrealized:.2f})")
+
+    # 2. 高水位 / 当前权益 / 回撤（从 equity.csv 历史取最大 equity）
+    equity_hwm = 0.0
+    if EQUITY_CSV.exists():
+        try:
+            with open(EQUITY_CSV) as f:
+                for row in csv.DictReader(f):
+                    eq = float(row.get("equity", 0) or 0)
+                    if eq > equity_hwm:
+                        equity_hwm = eq
+        except Exception:
+            pass
+
+    if equity_hwm > 0 and equity_now > 0:
+        drawdown_pct = (equity_now - equity_hwm) / equity_hwm * 100 if equity_now < equity_hwm else 0.0
+        dd_color = _RED if drawdown_pct < -5 else _YELLOW if drawdown_pct < 0 else _GREEN
+        print(f"  高水位: ${equity_hwm:.2f}  当前: ${equity_now:.2f}  回撤: {dd_color}{drawdown_pct:.2f}%{_RESET}")
+    elif equity_now > 0:
+        print(f"  当前权益: ${equity_now:.2f}")
+    else:
+        print(f"  (权益数据不足)")
+
+    # 3. 引擎健康
+    online, stale_count = _engine_health_counts()
+    engine_str = f"  引擎: {online} 在线"
+    if stale_count > 0:
+        engine_str += f", {_RED}{stale_count} 超时{_RESET}"
+    print(engine_str)
 
 
 def show_strategies():
@@ -398,6 +541,7 @@ def main():
     print(f"\n  ClawChat 全局状态  {now()}")
     print(f"  {'='*50}")
 
+    show_today_overview()
     show_engines()
     show_account()
     show_positions()

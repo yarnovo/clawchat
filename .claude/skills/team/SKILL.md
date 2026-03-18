@@ -50,7 +50,7 @@ WebSocket 实时接收行情（aggTrade + depth + markPrice），30 秒超时自
 | 成员 | 产出 | 消费者 |
 |------|------|--------|
 | **quant** | 量化专家：业务分析+策略评审+风控建议+报告（对标 architect 的业务角色，只分析不跑回测） | team-lead + strategist 参考 |
-| **strategist** | 策略研发：**专门跑回测找策略**（batch-backtest + grid-search），动手执行 | 核心产出角色 |
+| **strategist** | 策略研发：专门跑回测找策略（batch-backtest + grid-search），动手执行 | 核心产出角色 |
 | **trader** | 交易员：通过 trade.json 控制引擎（加仓/减仓/暂停/平仓） | 引擎文件监听执行 |
 | **risk** | 风控：审核 risk.json、监控风控状态 | 风控引擎执行 |
 | **engineer** | 开发：Rust 引擎 + Python CLI 代码实现 | 引擎/CLI |
@@ -63,7 +63,7 @@ WebSocket 实时接收行情（aggTrade + depth + markPrice），30 秒超时自
 
 ## 策略配置
 
-格式规范见 [engine/SCHEMA.md](engine/SCHEMA.md)。
+格式规范见 [/strategy-config skill](/strategy-config skill)。
 
 ### 目录结构
 
@@ -86,7 +86,7 @@ quant 产出 → status=pending → team-lead review → status=approved → wat
 
 ### 准入标准
 
-定义在 `scripts/criteria.py`（唯一源头），文档见 `engine/SCHEMA.md`。**不要在其他地方重复定义标准数字，引用这两个文件。**
+定义在 `scripts/criteria.py`（唯一源头），文档见 `/strategy-config skill`。**不要在其他地方重复定义标准数字，引用这两个文件。**
 
 ## 风控体系
 
@@ -146,7 +146,7 @@ TeamCreate(team_name="clawchat")
 
 **quant spawn prompt 要点：**
 - 检查 strategies/ 已有策略 + `make scan` 扫描市场
-- 格式规范见 engine/SCHEMA.md
+- 格式规范见 /strategy-config skill
 - 产出策略写 **status=pending**（不能写 approved，由 team-lead review 后批准）
 - **risk.json 由你决定**：止盈止损阈值根据策略特性设不同值（scalping 紧、趋势宽）
 - 需要技术支持告诉 team-lead，engineer 会实现
@@ -162,9 +162,9 @@ TeamCreate(team_name="clawchat")
 - `make build` 编译引擎 + 检查系统
 - 等待 team-lead 派发技术任务
 - **不要修改 TODO.md**，完成任务向 team-lead 汇报，由 team-lead review 后更新
-- 代码改动必须同步更新 engine/SCHEMA.md 文档
+- 代码改动必须同步更新 /strategy-config skill 文档
 
-- 代码改动必须同步更新 engine/SCHEMA.md 文档
+- 代码改动必须同步更新 /strategy-config skill 文档
 
 **所有成员 spawn prompt 通用规则：**
 - 不要修改 TODO.md（只有 team-lead 维护）
@@ -238,9 +238,10 @@ quant 提交策略后，team-lead 必须验证：
 1. make status — 全局状态
 2. 评估策略表现 — 分析盈亏
 3. 读 TODO.md — 检查待办，空闲成员派活：
+   ├─ strategist 空闲 → 派跑回测找策略
    ├─ engineer 空闲 → 派 TODO 里下一个 P0 技术任务
-   ├─ quant 空闲 → 派找策略/review/报告
    ├─ trader 空闲 → 派检查持仓/加仓评估
+   ├─ quant 空闲 → 派分析/评审/报告
    ├─ architect 空闲 → 派设计待做方案
    └─ qa 空闲 → 派验证最新改动
 4. 决策 & 行动：
