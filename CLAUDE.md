@@ -8,10 +8,8 @@ cd cli && uv run clawchat --help
 ```
 
 **Rust 交易引擎**：自动接收行情、计算信号、执行交易。
-```bash
-make build   # 编译
-make hft     # 运行
-```
+
+**Makefile**：运维命令入口，`make help` 查看完整列表。
 
 ## 配置
 

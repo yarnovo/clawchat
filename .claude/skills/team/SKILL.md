@@ -55,6 +55,7 @@ WebSocket 实时接收行情（aggTrade + depth + markPrice），30 秒超时自
 | **risk** | 风控：审核 risk.json、监控风控状态 | 风控引擎执行 |
 | **engineer** | 开发：Rust 引擎 + Python CLI 代码实现 | 引擎/CLI |
 | **architect** | 架构师：技术方案设计（只设计不实现） | team-lead 讨论后派 engineer |
+| **devops** | 运维工程师：引擎监控、异常修复、日志排查、重启 | 引擎稳定运行 |
 | **qa** | 质量保障：测试验证、回归检查 | team-lead review 前先过 qa |
 
 > **技术支持**：quant 和 risk 如需新脚本/工具/数据支持，告诉 team-lead，team-lead 派 engineer 实现。
@@ -240,6 +241,7 @@ quant 提交策略后，team-lead 必须验证：
 3. 读 TODO.md — 检查待办，空闲成员派活：
    ├─ strategist 空闲 → 派跑回测找策略
    ├─ engineer 空闲 → 派 TODO 里下一个 P0 技术任务
+   ├─ devops 空闲 → 派运维检查（引擎/行情/K线）
    ├─ trader 空闲 → 派检查持仓/加仓评估
    ├─ quant 空闲 → 派分析/评审/报告
    ├─ architect 空闲 → 派设计待做方案
@@ -248,7 +250,7 @@ quant 提交策略后，team-lead 必须验证：
    ├─ 策略亏钱 → suspend
    ├─ 策略赚钱 → trader 评估加仓
    ├─ 空闲资金 → quant 找新策略
-   └─ 引擎异常 → engineer 修 / watcher 重启
+   └─ 引擎异常 → devops 排查修复
 ```
 
 ### 策略表现评估
