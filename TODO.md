@@ -2,7 +2,7 @@
 
 ## 进行中
 
-- [ ] engineer: backtest.py 支持 --params 自定义参数
+- [x] backtest.py 支持 --params 自定义参数（team-lead 自己做了）
 - [ ] strategist: NTRN trend 5m 3x 上架 + 旧策略处理建议
 
 ## 待做（策略生命周期）
