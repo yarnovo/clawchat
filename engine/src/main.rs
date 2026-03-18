@@ -3,7 +3,7 @@ use hft_engine::exchange::{self, Exchange};
 use hft_engine::state::{EngineState, TradeStats};
 use hft_engine::strategy::{
     BollingerStrategy, BreakoutStrategy, CandleAggregator, MACDStrategy, MarketMaker,
-    RSIStrategy, ScalpingStrategy, Signal, Strategy, TrendFollower,
+    MeanReversionStrategy, RSIStrategy, ScalpingStrategy, Signal, Strategy, TrendFollower,
 };
 use hft_engine::types::{MarketEvent, OrderType as StratOrderType, Side as StratSide};
 use hft_engine::ws_feed::{start_feed, FeedConfig};
@@ -178,6 +178,14 @@ fn create_strategy(config: &Config) -> Box<dyn Strategy> {
                 Box::new(MACDStrategy::from_params(sym, qty, p))
             } else {
                 Box::new(MACDStrategy::new(sym, qty))
+            }
+        }
+        "mean_reversion" => {
+            tracing::info!("using MeanReversion strategy");
+            if has_params {
+                Box::new(MeanReversionStrategy::from_params(sym, qty, p))
+            } else {
+                Box::new(MeanReversionStrategy::new(sym, qty))
             }
         }
         _ => {

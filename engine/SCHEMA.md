@@ -39,7 +39,7 @@
 | 字段 | 必填 | 说明 |
 |------|------|------|
 | `name` | 是 | 策略唯一标识，与目录名一致 |
-| `engine_strategy` | 是 | 引擎策略类型：`mm` / `default` / `scalping` / `breakout` / `rsi` / `bollinger` / `macd` |
+| `engine_strategy` | 是 | 引擎策略类型：`mm` / `default` / `scalping` / `breakout` / `rsi` / `bollinger` / `macd` / `mean_reversion` |
 | `symbol` | 是 | 交易对，引擎格式如 `PIPPINUSDT`（也接受 `PIPPIN/USDT` 自动转换） |
 | `timeframe` | 是 | K 线周期：`1m` / `5m` / `15m` / `1h` / `4h`（也可用 `timeframe_ms` 毫秒） |
 | `leverage` | 是 | 杠杆倍数 |
@@ -59,6 +59,7 @@
 | `rsi` | rsi_period, rsi_oversold, rsi_overbought, trend_ema | 14, 25, 75, 50 |
 | `bollinger` | bb_period, num_std, trend_ema | 20, 2.5, 50 |
 | `macd` | fast_period, slow_period, signal_period, trend_ema, atr_period, atr_sl | 12, 26, 9, 200, 14, 2.0 |
+| `mean_reversion` | ema_period, std_period, entry_std, atr_period, atr_sl | 50, 50, 2.0, 14, 2.0 |
 
 ### 策略准入标准
 

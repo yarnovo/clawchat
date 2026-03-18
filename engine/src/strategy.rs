@@ -1403,6 +1403,174 @@ impl Strategy for MACDStrategy {
     }
 }
 
+// ══════════════════════════════════════════════════════════════
+// 均值回归策略 — 价格偏离 EMA 超过 N 个标准差反向开仓，回归均线平仓
+// ══════════════════════════════════════════════════════════════
+
+struct MeanRevPosition {
+    side: Side,
+    sl: f64,
+}
+
+pub struct MeanReversionStrategy {
+    pub symbol: String,
+    pub order_qty: f64,
+    ema_period: usize,
+    std_period: usize,
+    entry_std: f64,
+    atr_period: usize,
+    atr_sl: f64,
+    closes: Vec<f64>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
+    pos: Option<MeanRevPosition>,
+}
+
+impl MeanReversionStrategy {
+    pub fn new(symbol: &str, order_qty: f64) -> Self {
+        Self {
+            symbol: symbol.to_string(),
+            order_qty,
+            ema_period: 50,
+            std_period: 50,
+            entry_std: 2.0,
+            atr_period: 14,
+            atr_sl: 2.0,
+            closes: Vec::new(),
+            highs: Vec::new(),
+            lows: Vec::new(),
+            pos: None,
+        }
+    }
+
+    pub fn from_params(symbol: &str, order_qty: f64, params: &HashMap<String, f64>) -> Self {
+        Self {
+            symbol: symbol.to_string(),
+            order_qty,
+            ema_period: params.get("ema_period").copied().unwrap_or(50.0) as usize,
+            std_period: params.get("std_period").copied().unwrap_or(50.0) as usize,
+            entry_std: params.get("entry_std").copied().unwrap_or(2.0),
+            atr_period: params.get("atr_period").copied().unwrap_or(14.0) as usize,
+            atr_sl: params.get("atr_sl").copied().unwrap_or(2.0),
+            closes: Vec::new(),
+            highs: Vec::new(),
+            lows: Vec::new(),
+            pos: None,
+        }
+    }
+}
+
+impl Strategy for MeanReversionStrategy {
+    fn export_state(&self) -> serde_json::Value {
+        serde_json::json!({
+            "closes": self.closes,
+            "highs": self.highs,
+            "lows": self.lows,
+        })
+    }
+
+    fn restore_state(&mut self, state: &serde_json::Value) {
+        if let Some(arr) = state.get("closes").and_then(|v| v.as_array()) {
+            self.closes = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        if let Some(arr) = state.get("highs").and_then(|v| v.as_array()) {
+            self.highs = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        if let Some(arr) = state.get("lows").and_then(|v| v.as_array()) {
+            self.lows = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        tracing::info!(candles = self.closes.len(), "MeanReversion state restored");
+    }
+
+    fn on_candle(&mut self, candle: &Candle) -> Option<Signal> {
+        self.closes.push(candle.close);
+        self.highs.push(candle.high);
+        self.lows.push(candle.low);
+
+        let n = self.closes.len();
+        let warmup = self.ema_period.max(self.std_period).max(self.atr_period + 1);
+        if n < warmup {
+            return Some(Signal::None);
+        }
+
+        let ema = ema_from_slice(&self.closes, self.ema_period)?;
+        let atr = atr_from_slices(&self.highs, &self.lows, &self.closes, self.atr_period)?;
+
+        // 计算标准差：最近 std_period 根收盘价的标准差
+        let window = &self.closes[n - self.std_period..];
+        let mean: f64 = window.iter().sum::<f64>() / self.std_period as f64;
+        let variance: f64 =
+            window.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / self.std_period as f64;
+        let std = variance.sqrt();
+        if std < 1e-12 {
+            return Some(Signal::None);
+        }
+
+        let deviation = (candle.close - ema) / std;
+
+        // 持仓中
+        if let Some(ref pos) = self.pos {
+            let exit = match pos.side {
+                // 做多：价格回到 EMA 或触发止损
+                Side::Buy => candle.close >= ema || candle.close <= pos.sl,
+                // 做空：价格回到 EMA 或触发止损
+                Side::Sell => candle.close <= ema || candle.close >= pos.sl,
+            };
+            if exit {
+                let close_side = match pos.side {
+                    Side::Buy => Side::Sell,
+                    Side::Sell => Side::Buy,
+                };
+                self.pos = None;
+                return Some(Signal::Order(OrderRequest {
+                    symbol: self.symbol.clone(),
+                    side: close_side,
+                    order_type: OrderType::Market,
+                    qty: self.order_qty,
+                    price: None,
+                }));
+            }
+            return Some(Signal::None);
+        }
+
+        // 做多：价格远低于均值（偏离 < -N 个标准差）
+        if deviation < -self.entry_std {
+            self.pos = Some(MeanRevPosition {
+                side: Side::Buy,
+                sl: candle.close - atr * self.atr_sl,
+            });
+            return Some(Signal::Order(OrderRequest {
+                symbol: self.symbol.clone(),
+                side: Side::Buy,
+                order_type: OrderType::Market,
+                qty: self.order_qty,
+                price: None,
+            }));
+        }
+
+        // 做空：价格远高于均值（偏离 > N 个标准差）
+        if deviation > self.entry_std {
+            self.pos = Some(MeanRevPosition {
+                side: Side::Sell,
+                sl: candle.close + atr * self.atr_sl,
+            });
+            return Some(Signal::Order(OrderRequest {
+                symbol: self.symbol.clone(),
+                side: Side::Sell,
+                order_type: OrderType::Market,
+                qty: self.order_qty,
+                price: None,
+            }));
+        }
+
+        Some(Signal::None)
+    }
+
+    fn name(&self) -> &str {
+        "MeanReversion"
+    }
+}
+
 /// 计算止损/止盈价格
 pub fn calc_sl_tp(entry: f64, atr: f64, is_long: bool, sl_mult: f64, tp_mult: f64) -> (f64, f64) {
     if is_long {

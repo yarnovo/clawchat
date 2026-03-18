@@ -2,6 +2,8 @@
   "name": "ban-bollinger-5m",
   "max_loss_per_trade": 0.05,
   "max_daily_loss": 0.15,
-  "max_drawdown_warning": 0.20,
-  "max_drawdown_stop": 0.30
+  "max_drawdown_warning": 0.15,
+  "max_drawdown_stop": 0.25,
+  "max_profit_per_trade": 0.25,
+  "max_profit_total": 0.40
 }

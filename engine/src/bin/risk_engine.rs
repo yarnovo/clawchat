@@ -28,9 +28,6 @@ const BINANCE_FSTREAM_WS: &str = "wss://fstream.binance.com";
 const CONFIG_RELOAD_SECS: u64 = 60;
 /// listenKey keepalive 间隔（分钟）
 const KEEPALIVE_MINUTES: u64 = 20;
-/// 复利倍数上限
-const COMPOUND_MAX_MULTIPLIER: f64 = 2.0;
-
 // ── 风控事件 ─────────────────────────────────────────────────
 
 #[derive(Debug)]
@@ -210,7 +207,7 @@ fn save_high_water(hwm: &HighWaterMarks) {
 /// 计算动态 order_qty 并写入 /tmp/dynamic_qty.json
 /// hft-engine 读取此文件获取实时调整后的下单量
 ///
-/// order_qty = base_qty × min(equity / initial_capital, 2.0)
+/// order_qty = base_qty × (equity / initial_capital)
 fn update_dynamic_qty(risk_map: &RiskMap, equity: f64) {
     let mut qty_map: serde_json::Map<String, serde_json::Value> = serde_json::Map::new();
 
@@ -218,7 +215,7 @@ fn update_dynamic_qty(risk_map: &RiskMap, equity: f64) {
         if cfg.capital <= 0.0 || cfg.base_qty <= 0.0 {
             continue;
         }
-        let multiplier = (equity / cfg.capital).min(COMPOUND_MAX_MULTIPLIER);
+        let multiplier = equity / cfg.capital;
         let dynamic_qty = cfg.base_qty * multiplier;
 
         qty_map.insert(

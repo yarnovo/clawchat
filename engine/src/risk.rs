@@ -572,7 +572,7 @@ mod tests {
 
     /// Helper: compute compound qty using the same formula as risk-engine
     fn compound_qty(base_qty: f64, equity: f64, capital: f64) -> f64 {
-        let multiplier = (equity / capital).min(2.0);
+        let multiplier = equity / capital;
         base_qty * multiplier
     }
 
@@ -591,10 +591,10 @@ mod tests {
     }
 
     #[test]
-    fn compound_equity_capped_at_2x() {
-        // equity $500, capital $200 → capped at 2x
+    fn compound_equity_high_multiplier() {
+        // equity $500, capital $200 → 2.5x (no cap)
         let qty = compound_qty(100.0, 500.0, 200.0);
-        assert!((qty - 200.0).abs() < f64::EPSILON);
+        assert!((qty - 250.0).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -605,8 +605,8 @@ mod tests {
     }
 
     #[test]
-    fn compound_equity_exactly_2x() {
-        // equity $400, capital $200 → exactly 2x
+    fn compound_equity_2x() {
+        // equity $400, capital $200 → 2x
         let qty = compound_qty(100.0, 400.0, 200.0);
         assert!((qty - 200.0).abs() < f64::EPSILON);
     }

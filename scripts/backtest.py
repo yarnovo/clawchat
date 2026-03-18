@@ -19,6 +19,7 @@
 import argparse
 import math
 import sys
+import time
 from datetime import datetime
 from futures_exchange import get_futures_exchange
 
@@ -813,6 +814,86 @@ class VWAPRevertStrategy(Strategy):
         return None
 
 
+class MeanReversionStrategy(Strategy):
+    """
+    均值回归策略
+
+    原理：
+    - 计算 EMA 作为均值线
+    - 计算价格偏离 EMA 的标准差
+    - 偏离超过 N 个标准差 → 反向开仓（价格会回归均值）
+    - 价格回到 EMA 附近 → 平仓
+    - ATR 止损保护
+
+    适合震荡行情。
+    """
+    def __init__(self, ema_period=50, std_period=50, entry_std=2.0, atr_period=14, atr_sl=2.0):
+        self.ema_period = ema_period
+        self.std_period = std_period
+        self.entry_std = entry_std
+        self.atr_period = atr_period
+        self.atr_sl = atr_sl
+        self.closes = []
+        self.highs = []
+        self.lows = []
+        self._pos = None
+
+    def on_candle(self, open, high, low, close, volume):
+        self.closes.append(close)
+        self.highs.append(high)
+        self.lows.append(low)
+
+        ema = _ema(self.closes, self.ema_period)
+        atr = _atr(self.highs, self.lows, self.closes, self.atr_period)
+        if ema is None or atr is None:
+            return None
+
+        # 计算标准差：最近 std_period 根的 close 与 EMA 的偏离
+        n = min(self.std_period, len(self.closes))
+        if n < self.ema_period:
+            return None
+        recent = self.closes[-n:]
+        mean = sum(recent) / len(recent)
+        variance = sum((c - mean) ** 2 for c in recent) / len(recent)
+        std = variance ** 0.5
+        if std == 0:
+            return None
+
+        deviation = (close - ema) / std  # 偏离标准差数
+
+        # 持仓中
+        if self._pos:
+            if self._pos['side'] == 'long':
+                # 止盈：价格回到 EMA（偏离 < 0.3 标准差）
+                if close >= ema:
+                    self._pos = None
+                    return 'sell'
+                # 止损
+                if close <= self._pos['entry'] - atr * self.atr_sl:
+                    self._pos = None
+                    return 'sell'
+            else:
+                if close <= ema:
+                    self._pos = None
+                    return 'buy'
+                if close >= self._pos['entry'] + atr * self.atr_sl:
+                    self._pos = None
+                    return 'buy'
+            return None
+
+        # 做多：价格远低于均值（偏离 < -N 个标准差）
+        if deviation < -self.entry_std:
+            self._pos = {'side': 'long', 'entry': close}
+            return 'buy'
+
+        # 做空：价格远高于均值（偏离 > N 个标准差）
+        if deviation > self.entry_std:
+            self._pos = {'side': 'short', 'entry': close}
+            return 'sell'
+
+        return None
+
+
 STRATEGIES = {
     'trend': TrendFollowStrategy,
     'trend_fast': TrendFastStrategy,
@@ -825,13 +906,14 @@ STRATEGIES = {
     'rsi': RSIStrategy,
     'bollinger': BollingerStrategy,
     'grid': GridStrategy,
+    'mean_reversion': MeanReversionStrategy,
 }
 
 
 # ─── 回测引擎 ───
 
 def fetch_candles(symbol, timeframe, days):
-    """从币安拉历史 K 线数据"""
+    """从币安拉历史 K 线数据（endTime 向前翻页，确保拿到完整历史）"""
     exchange = get_futures_exchange()
     candles_per_day = {
         '1m': 1440, '5m': 288, '15m': 96,
@@ -840,19 +922,25 @@ def fetch_candles(symbol, timeframe, days):
     cpd = candles_per_day.get(timeframe, 24)
     total = days * cpd
 
-    # 币安单次最多 1000 根，需要分页
+    # 用 endTime 向前翻页：从当前时间往回拉，每次 1000 根
     all_candles = []
-    since = None
-    while len(all_candles) < total:
-        limit = min(1000, total - len(all_candles))
-        batch = exchange.fetch_ohlcv(symbol, timeframe, since=since, limit=limit)
+    end_time = int(time.time() * 1000)  # 当前时间戳(ms)
+    remaining = total
+
+    while remaining > 0:
+        limit = min(1000, remaining)
+        batch = exchange.fetch_ohlcv(
+            symbol, timeframe, limit=limit,
+            params={'endTime': end_time}
+        )
         if not batch:
             break
-        all_candles.extend(batch)
-        # 下一批从最后一根的下一个时间戳开始
-        since = batch[-1][0] + 1
+        all_candles = batch + all_candles  # 前插保持时间顺序
+        remaining -= len(batch)
+        # 下一批的 endTime = 本批最早一根的时间戳 - 1
+        end_time = batch[0][0] - 1
         if len(batch) < limit:
-            break
+            break  # 没有更早的数据了
 
     return all_candles[-total:] if len(all_candles) > total else all_candles
 
