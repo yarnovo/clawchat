@@ -175,6 +175,12 @@ TeamCreate(team_name="clawchat")
 - `make build` 编译引擎 + 检查系统
 - 等待 team-lead 派发技术任务
 - **不要修改 TODO.md**，完成任务向 team-lead 汇报，由 team-lead review 后更新
+- 代码改动必须同步更新 engine/SCHEMA.md 文档
+
+**可创建多个 engineer 并行做任务**（如 engineer + engineer2），team-lead 协调分工：
+- engineer：风控引擎 + 核心功能
+- engineer2：工具脚本 + 辅助功能
+- 更多：按需创建（name 用纯字母数字）
 
 **所有成员 spawn prompt 通用规则：**
 - 不要修改 TODO.md（只有 team-lead 维护）
