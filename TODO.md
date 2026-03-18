@@ -10,8 +10,8 @@
 
 - [ ] 创建 3 个 skill（strategy.json / trade.json / risk.json 编写规范）
 - [ ] CLI Python 测试用例（cli/tests/）
-- [ ] 修复 trade.json params 字段名不一致（percent vs ratio）+ direction 未实现
-- [ ] risk.json 热更新（当前改了要重启引擎）
+- [x] 修复 trade.json params percent + direction（QA1 验证通过）
+- [x] risk.json 热更新 start_risk_watcher（QA1 验证通过）
 - [ ] suspended 策略的 trade.json 怎么执行？（没引擎监听）
 
 ## 待做（策略生命周期）
