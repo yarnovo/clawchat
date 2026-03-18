@@ -1,13 +1,10 @@
-screenshots/
-/tts/
 .DS_Store
 .env
 .playwright-mcp/
-backups/
-
-# Node.js services
-**/node_modules/
-**/dist/
-
-# Rust / Tauri
-app/desktop/src-tauri/target/
+node_modules/
+binance-cli/
+__pycache__/
+*.pyc
+venv/
+.venv/
+data/
