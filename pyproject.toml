@@ -7,4 +7,5 @@ dependencies = [
     "ccxt>=4.5.44",
     "agentmail>=0.4.7",
     "httpx[socks]>=0.28.1",
+    "binance-connector>=3.12.0",
 ]
