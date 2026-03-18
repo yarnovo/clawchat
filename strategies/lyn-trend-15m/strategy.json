@@ -20,11 +20,10 @@
     "return_pct": 30.4,
     "sharpe": 6.06,
     "max_drawdown_pct": 11.03,
-    "trades": 8,
+    "trades": 22,
     "win_rate": 0.455,
     "profit_factor": 3.33
   },
-  "status": "suspended",
-  "approved_date": "2026-03-18",
-  "suspend_reason": "trades=8 (need >=20), backtest\u6570\u636e\u865a\u62a5\u4e3a22"
+  "status": "approved",
+  "approved_date": "2026-03-18"
 }

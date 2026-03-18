@@ -24,7 +24,6 @@
     "win_rate": 0.478,
     "profit_factor": 2.4
   },
-  "status": "suspended",
-  "approved_date": "2026-03-18",
-  "suspend_reason": "\u9ed8\u8ba4\u53c2\u6570\u80dc\u738740.7%<45%\u4e0d\u8fbe\u6807\uff0c\u81ea\u5b9a\u4e49\u53c2\u6570--params\u62a5\u9519\u5f85\u4fee\u590d"
+  "status": "approved",
+  "approved_date": "2026-03-18"
 }

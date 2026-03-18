@@ -1258,11 +1258,43 @@ def main():
     symbol = args.symbol.upper().replace('-', '/')
     strategy_name = args.strategy
 
+    # SCHEMA 参数名 → Python __init__ 参数名映射（Rust 引擎和 SCHEMA.md 用统一名字）
+    PARAM_ALIASES = {
+        'trend': {
+            'ema_fast': 'fast_ema', 'ema_slow': 'slow_ema',
+            'atr_sl_mult': 'atr_sl', 'atr_tp_mult': 'atr_tp',
+        },
+        'ema2050': {
+            'ema_fast': 'fast_ema', 'ema_slow': 'slow_ema',
+        },
+        'scalping': {
+            'ema_fast': 'fast', 'ema_slow': 'slow',
+            'volume_multiplier': 'vol_mult',
+        },
+        'rsi': {
+            'rsi_period': 'period', 'rsi_oversold': 'oversold',
+            'rsi_overbought': 'overbought',
+        },
+        'bollinger': {
+            'bb_period': 'period',
+        },
+        'macd': {
+            'fast_period': 'fast', 'slow_period': 'slow',
+            'signal_period': 'signal', 'atr_sl_mult': 'atr_sl',
+        },
+        'mean_reversion': {
+            'atr_sl_mult': 'atr_sl',
+        },
+    }
+
     # 支持自定义参数覆盖策略默认值
     if args.params:
         import json
         custom_params = json.loads(args.params)
-        strategy = STRATEGIES[strategy_name](**custom_params)
+        # 把 SCHEMA 参数名映射到 Python __init__ 参数名
+        aliases = PARAM_ALIASES.get(strategy_name, {})
+        mapped = {aliases.get(k, k): v for k, v in custom_params.items()}
+        strategy = STRATEGIES[strategy_name](**mapped)
     else:
         strategy = STRATEGIES[strategy_name]()
 

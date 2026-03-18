@@ -4,7 +4,7 @@ export BASH_ENV := .env
 ROOT := $(shell pwd)
 PY := cd $(ROOT)/scripts && uv run python
 
-.PHONY: install clean watch account scan backtest pnl strategy-pnl check watcher status build hft risk-engine transfer help
+.PHONY: install clean watch account scan backtest pnl strategy-pnl compare check watcher status build hft risk-engine transfer help
 
 # === Setup ===
 
@@ -50,6 +50,9 @@ status: ## Global status dashboard (engines/account/positions/risk/strategies)
 
 strategy-pnl: ## P&L by strategy (from trades.jsonl)
 	@$(PY) strategy_pnl.py
+
+compare: ## Live vs backtest compare (STRATEGY=)
+	@$(PY) live_vs_backtest.py $(STRATEGY)
 
 # === Engine (Rust) ===
 
