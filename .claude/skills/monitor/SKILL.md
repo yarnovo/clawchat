@@ -1,6 +1,6 @@
 ---
 name: monitor
-description: 定时行情监控 - 配合 /loop 使用，检查持仓和市场状况
+description: 行情监控 - 检查持仓和市场状况
 user-invocable: true
 ---
 
@@ -9,10 +9,9 @@ user-invocable: true
 ## 执行
 
 ```bash
-source .env && cd scripts
-uv run python market.py watch
-uv run python market.py account
-uv run python grid.py status
+make watch
+make account
+make status
 ```
 
 - 24h 涨跌超过 5% 特别标注

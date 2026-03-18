@@ -1,19 +1,19 @@
 ---
 name: create-sub-account
-description: 通过币安 API 创建虚拟子账户
+description: 创建币安虚拟子账户
 user-invocable: true
 ---
 
-# 创建币安子账户
+# 创建子账户
 
 ## 执行
 
 ```bash
-source .env && cd scripts && uv run python projects.py create <name> --fund <amount>
+make project-create NAME=<name> FUND=<amount>
 ```
 
 ## 查看已有
 
 ```bash
-source .env && cd scripts && uv run python projects.py list
+make projects
 ```
