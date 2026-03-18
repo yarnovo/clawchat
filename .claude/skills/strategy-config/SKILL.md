@@ -54,7 +54,38 @@ strategist 产出策略时需要写 2 个配置文件。
 | sizing_mode | 否 | percent（百分比）或 fixed（固定量），默认 fixed |
 | params | 是 | 策略参数，不同策略不同，见 SCHEMA.md |
 | backtest | 是 | 回测指标，必须真实可复现 |
+| lifecycle | 否 | 生命周期时间戳（见下表），引擎忽略此字段 |
 | status | 是 | **只能写 pending**，team-lead 审核后改 approved |
+
+### lifecycle 字段
+
+| 字段 | 说明 |
+|------|------|
+| created | 策略创建日期 |
+| approved | 审批通过日期 |
+| probation_end | 试运行结束日期（approved 后 7 天自动升级 active 时写入） |
+| last_review | 上次 `clawchat review` 评估日期 |
+| next_review | 下次评估日期 |
+| degraded_since | 首次进入 degraded 状态日期（恢复后自动清除） |
+
+### status 状态流转
+
+```
+pending → approved → active → degraded → suspended
+                ↑                  ↓
+                └──── 恢复 ────────┘
+```
+
+| 状态 | 说明 | 引擎是否运行 |
+|------|------|-------------|
+| pending | 等待 team-lead 审核 | 否 |
+| approved | 审核通过，试运行期（7 天） | 是 |
+| active | 试运行达标，正式运行 | 是 |
+| suspended | 暂停（手动或自动降级） | 否 |
+
+自动转换（`clawchat review` 执行）：
+- **approved → active**：7 天后实盘达标（ROI>0%、WR>=回测80%、DD<回测1.5x、>=10笔）
+- **degraded → suspended**：degraded 持续 7 天未恢复
 
 ### 准入标准
 
@@ -91,9 +122,26 @@ strategist 产出策略时需要写 2 个配置文件。
 
 ```
 strategies/{name}/
-├── strategy.json  ← 引擎读
-├── risk.json      ← 风控读
-├── trade.json     ← 交易员写（见 /trade skill）
-├── state.json     ← 引擎写（运行时状态）
-└── backtest.md    ← 回测报告
+├── strategy.json    ← 引擎读（含 lifecycle）
+├── risk.json        ← 风控读
+├── trade.json       ← 交易员写（见 /trade skill）
+├── state.json       ← 引擎写（运行时状态）
+├── performance.json ← clawchat review 写（实盘评估结果）
+└── backtest.md      ← 回测报告
 ```
+
+## performance.json
+
+`clawchat review` 自动生成，记录实盘评估结果。
+
+```json
+{
+  "strategy": "ntrn-trend-fast-5m",
+  "reviewed_at": "2026-03-19T10:00:00Z",
+  "health": "healthy",
+  "live": { "roi": 5.2, "win_rate": 57.1, "profit_factor": 2.15, "max_drawdown_pct": 8.3, "sharpe": 3.42 },
+  "backtest": { "return_pct": 10.0, "win_rate": 0.5, "profit_factor": 2.0, "max_drawdown_pct": 15.0 }
+}
+```
+
+health 值：`healthy` / `warning` / `degraded` / `no_data` / `no_backtest`

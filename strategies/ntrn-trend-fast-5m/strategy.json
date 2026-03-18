@@ -4,7 +4,7 @@
   "symbol": "NTRNUSDT",
   "timeframe": "5m",
   "timeframe_ms": 300000,
-  "leverage": 3,
+  "leverage": 2,
   "order_qty": 10,
   "position_size": 0.3,
   "capital": 200,
