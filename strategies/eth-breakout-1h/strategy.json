@@ -1,0 +1,17 @@
+{
+  "name": "eth-breakout-1h",
+  "symbol": "ETH/USDT",
+  "strategy": "breakout",
+  "timeframe": "1h",
+  "market": "binance_futures",
+  "leverage": 5,
+  "position_size": 0.3,
+  "capital": 200,
+  "fees": {
+    "taker": 0.0004,
+    "maker": 0.0002
+  },
+  "slippage": 0.0005,
+  "status": "approved",
+  "approved_date": "2026-03-18"
+}
