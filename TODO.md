@@ -12,22 +12,13 @@
 
 ## 进行中
 
-- [ ] quant: 报告引擎业务需求（需要哪些报告 + 频率 + 指标）
-- [ ] strategist: SUI trend 15m 策略创建（已达标）+ floki 优化
-- [ ] engineer2: 报告引擎（Report Engine）实现
-- [ ] engineer: risk.json max_unrealized_loss 实现（architect 设计完成）
+- [ ] strategist: floki-trend-15m 参数优化（胜率需 >50%，盈亏比需 >2）
+- [ ] devops: 币安 API IP 白名单需加 202.8.9.242（REST API -2015 错误）
 
 ## 待做（P0）
 
-### records/
-- [ ] funding_rate_history.csv — 资金费率记录
-
-### CLI
-- [ ] `clawchat funding` — 资金费率查看
-
 ### 配置扩展
-- [ ] risk.json: max_correlation_exposure（相关策略合并敞口）
-- [ ] risk.json: max_unrealized_loss（未实现亏损上限）
+- [ ] risk.json: max_correlation_exposure（architect 方案已完成，待实现 — portfolio.rs 共享文件）
 
 ### 业务扩展（quant 建议）
 - [ ] P0: 闲置资金活期理财（Earn API，$113 闲钱）
@@ -71,3 +62,9 @@
 - [x] risk.json 扩展方案设计（architect 完成：max_unrealized_loss + max_correlation_exposure）
 - [x] SUI trend 15m 策略发现、验证、批准上架（第 7 个运行策略）
 - [x] clawchat funding CLI + funding_rate_history.csv 引擎记录（engineer2 完成，413 tests）
+- [x] risk.json max_unrealized_loss 实现（engineer 完成，6 新测试）
+- [x] 报告引擎实现（engineer2 完成，13 新测试，cmd_report.py 删除）
+- [x] NTRN ema2050 5m 策略上架（ROI 166%, Sharpe 9.99）
+- [x] BARD RSI 5m 策略上架（ROI 115%, Sharpe 7.03）
+- [x] FET trend 15m 策略上架（ROI 46.8%, Sharpe 5.16）
+- [x] 报告引擎业务需求（quant 给了业务扩展分析替代）
