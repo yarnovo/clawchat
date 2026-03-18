@@ -132,9 +132,16 @@ def show_positions():
 
 def show_risk():
     section("风控")
-    guard_alive = is_process_alive("risk_guard.py")
-    status = "RUNNING" if guard_alive else "STOPPED"
-    print(f"  风控守护: [{status}]")
+    rust_alive = is_process_alive("risk-engine")
+    py_alive = is_process_alive("risk_guard.py")
+    if rust_alive:
+        print(f"  Rust risk-engine:  [RUNNING]")
+    else:
+        print(f"  Rust risk-engine:  [STOPPED]")
+    if py_alive:
+        print(f"  Python risk_guard: [RUNNING]")
+    else:
+        print(f"  Python risk_guard: [STOPPED]")
 
     # 最近一次 equity 记录
     if EQUITY_CSV.exists():
