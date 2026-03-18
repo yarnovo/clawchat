@@ -9,6 +9,8 @@ from futures_exchange import get_futures_exchange, get_positions, close_all
 # ── 风控阈值 ──────────────────────────────────────────────
 MAX_LOSS_PER_POSITION = -0.05   # 单笔最大亏损 -5%
 MAX_LOSS_TOTAL = -0.10          # 总计最大亏损 -10%
+MAX_PROFIT_PER_POSITION = 0.10  # 单笔盈利 +10% 自动止盈
+MAX_PROFIT_TOTAL = 0.20         # 总利润 +20% 全部止盈
 MAX_POSITION_RATIO = 0.30       # 单币种最大仓位占比 30%
 MIN_LIQUIDATION_DISTANCE = 0.10 # 强平距离最小 10%
 MAX_LEVERAGE = 20               # 最大杠杆
@@ -47,6 +49,12 @@ def check_positions(exchange):
             if loss_ratio < MAX_LOSS_PER_POSITION:
                 alerts.append(f"STOP LOSS: {sym} {side} 亏损 {loss_ratio:.1%} 超过阈值 {MAX_LOSS_PER_POSITION:.0%}")
 
+        # 检查 1b: 单笔止盈
+        if total_equity > 0:
+            profit_ratio = pnl / total_equity
+            if profit_ratio > MAX_PROFIT_PER_POSITION:
+                alerts.append(f"TAKE PROFIT: {sym} {side} 盈利 +{profit_ratio:.1%} 超过阈值 +{MAX_PROFIT_PER_POSITION:.0%}")
+
         # 检查 2: 仓位占比
         if total_equity > 0:
             position_ratio = abs(notional) / total_equity
@@ -71,7 +79,13 @@ def check_positions(exchange):
     if total_equity > 0:
         total_loss_ratio = total_unrealized / total_equity
         if total_loss_ratio < MAX_LOSS_TOTAL:
-            alerts.append(f"总亏损触发: 亏损 {total_loss_ratio:.1%} 超过阈值 {MAX_LOSS_TOTAL:.0%}")
+            alerts.append(f"STOP LOSS 总亏损触发: 亏损 {total_loss_ratio:.1%} 超过阈值 {MAX_LOSS_TOTAL:.0%}")
+
+    # 检查 6: 总止盈
+    if total_equity > 0:
+        total_profit_ratio = total_unrealized / total_equity
+        if total_profit_ratio > MAX_PROFIT_TOTAL:
+            alerts.append(f"TAKE PROFIT 总止盈触发: 盈利 +{total_profit_ratio:.1%} 超过阈值 +{MAX_PROFIT_TOTAL:.0%}")
 
     status = 'ALERT' if alerts else ('WARNING' if warnings else 'OK')
     return {
@@ -114,9 +128,9 @@ def show_check(exchange, auto_stop=False):
     if not result['alerts'] and not result['warnings']:
         print(f"\n  所有检查通过")
 
-    # 自动止损
+    # 自动止损/止盈
     if auto_stop and result['alerts']:
-        print(f"\n  --- 自动止损执行 ---")
+        print(f"\n  --- 自动平仓执行 ---")
         positions = get_positions(exchange)
         for p in positions:
             sym = p['symbol']
