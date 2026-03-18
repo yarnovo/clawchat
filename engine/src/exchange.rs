@@ -508,4 +508,47 @@ impl Exchange {
 
         self.signed_post("/fapi/v1/order", &params).await
     }
+
+    // -- User Data Stream (listenKey) ---------------------------------------
+
+    /// Create a listenKey for user data stream.
+    /// Returns the listenKey string.
+    pub async fn create_listen_key(&self) -> Result<String, ExchangeError> {
+        let url = format!("{}/fapi/v1/listenKey", self.base_url);
+        let resp = self
+            .client
+            .post(&url)
+            .header("X-MBX-APIKEY", &self.api_key)
+            .send()
+            .await?;
+        let body: serde_json::Value = resp.json().await?;
+        body.get("listenKey")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .ok_or_else(|| ExchangeError::Api {
+                code: -1,
+                msg: "no listenKey in response".to_string(),
+            })
+    }
+
+    /// Keepalive a listenKey (must be called every 30 minutes).
+    pub async fn keepalive_listen_key(&self, listen_key: &str) -> Result<(), ExchangeError> {
+        let url = format!("{}/fapi/v1/listenKey", self.base_url);
+        self.client
+            .put(&url)
+            .header("X-MBX-APIKEY", &self.api_key)
+            .query(&[("listenKey", listen_key)])
+            .send()
+            .await?;
+        Ok(())
+    }
+
+    /// Get base URL for WebSocket (derive from REST base URL).
+    pub fn ws_base_url(&self) -> String {
+        if self.base_url.contains("testnet") {
+            "wss://stream.binancefuture.com".to_string()
+        } else {
+            "wss://fstream.binance.com".to_string()
+        }
+    }
 }
