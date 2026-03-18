@@ -1,5 +1,5 @@
 ---
-name: create-team
+name: create-research-team
 description: 创建策略研发团队 — 招聘 searcher + strategy-dev 并行搜索
 user-invocable: true
 ---
