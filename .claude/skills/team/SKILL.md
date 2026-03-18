@@ -1,12 +1,26 @@
 ---
 name: team
-description: 启动运营 — 1 个团队 3 人（策略+风控+技术），Rust 引擎自动交易，心跳驱动
+description: 启动运营 — 3 人团队，Rust 引擎自动交易 + 风控守护，心跳驱动
 user-invocable: true
 ---
 
 # 启动运营团队
 
-`/team` 创建 1 个团队、3 个成员，交易总监以 1 分钟心跳驱动。Rust 引擎自动交易，无需交易员。
+`/team` 创建 3 人团队，交易总监（team-lead）心跳驱动。代码自动交易和止损，人负责研究和实现。
+
+## 核心闭环
+
+```
+strategist 发现策略（Python 回测）
+       ↓
+engineer 实现策略（Rust 代码）
+       ↓
+Rust 引擎自动交易
+       ↓
+risk 定义风控规则 → engineer 实现守护代码
+       ↓
+risk_guard.py 自动止损
+```
 
 ## 架构
 
@@ -14,44 +28,42 @@ user-invocable: true
          ┌─────────────┐
          │  交易总监     │
          │ (team-lead)  │
-         │  心跳驱动     │
+         │ 心跳+交易员   │
          └──────┬──────┘
-                │
-      TeamCreate("clawchat")
                 │
      ┌──────────┼──────────┐
      ▼          ▼          ▼
  strategist    risk     engineer
-  策略研发     风控监控   系统+引擎
-     │                     │
-     └── strategies/ ──→ Rust 引擎（自动交易）
+  策略研发     风控规则   代码实现
+     │          │          │
+     │  Python  │  规则    │  Rust/Python
+     │  回测    │  定义    │  实现
+     ▼          ▼          ▼
+ strategies/  check.py  engine/
+ approved/    风控守护   strategy.rs
 ```
 
-> **引擎自动交易：** Rust HFT 引擎接收行情 → 计算信号 → 自动下单，无需人工干预。
+> **team-lead = 交易总监 + 交易员**：启停引擎、划转资金、收集状态、协调团队、汇报 CEO。
 
-## 成员
+## 成员职责
 
-| 成员 | 职责 |
-|------|------|
-| **strategist** | 扫描市场、回测验证、优化参数、撰写策略文件 |
-| **risk** | 实时风控、止损监控、仓位检查、审核策略合规 |
-| **engineer** | 编译引擎、启停引擎、系统监控、故障排查 |
+| 成员 | 产出 | 消费者 |
+|------|------|--------|
+| **strategist** | 策略参数（Python 回测验证） | engineer 实现到 Rust |
+| **risk** | 风控规则（止损阈值等） | engineer 实现到守护代码 |
+| **engineer** | Rust 策略代码 + 风控守护代码 | 引擎/守护进程自动执行 |
 
-## 研发流程
+## 引擎支持的策略
 
-1. `make scan` 扫描高波动币种
-2. `make backtest` 批量回测（币种 × 策略 × 周期 × 杠杆）
-3. 筛选：净利润 > 0、夏普 > 1、回撤 < 20%、交易 ≥ 3 笔
-4. 通过的写入 `strategies/approved/{symbol}-{strategy}-{timeframe}.md`
-
-### 策略文件格式
-
-每个 approved 文件包含：
-- 基本信息（交易对/策略/周期/杠杆）
-- 信号模型（入场/出场条件）
-- 参数设置
-- 资金管理（仓位 ≤ 30%、止损规则）
-- 回测结果
+```bash
+# Rust 引擎 (engine/target/release/hft-engine)
+--strategy mm          # MarketMaker 做市
+--strategy default     # TrendFollower EMA 交叉
+--strategy scalping    # EMA + RSI + 放量
+--strategy breakout    # N 周期高低点突破
+--strategy rsi         # RSI 超买超卖
+--strategy bollinger   # 布林带均值回归
+```
 
 ## 执行
 
@@ -71,10 +83,28 @@ TeamCreate(team_name="clawchat")
 
 strategist 上报策略后：
 1. risk 快速审核（合规即放行）
-2. engineer 启动 Rust 引擎：`make hft`（或 nohup 后台运行）
-3. 引擎自动接收行情、计算信号、下单
+2. team-lead 启动 Rust 引擎（nohup 后台运行）
+3. 引擎自动交易
 
-### Step 3: 启动心跳循环
+```bash
+# 启动引擎示例
+source .env && nohup engine/target/release/hft-engine \
+  --symbol PIPPINUSDT --strategy scalping --leverage 5 \
+  > /tmp/rust-pippin.log 2>&1 &
+```
+
+### Step 3: 启动风控守护
+
+```bash
+make guard   # 后台运行，每 30 秒自动风控检查 + 止损 + 记录权益曲线
+```
+
+风控守护进程（risk_guard.py）：
+- 每 30 秒运行风控检查
+- 触发止损 → 自动平仓 + 邮件通知
+- 记录权益曲线到 `reports/equity.csv`
+
+### Step 4: 启动心跳循环
 
 ```
 /loop 1m 心跳循环
@@ -91,17 +121,18 @@ make account && make pnl && make check
 ### 2. 驱动团队
 
 - 无策略 → strategist 扫描 + 回测
-- 有策略无引擎 → engineer 启动 Rust 引擎
-- 引擎运行中 → risk 监控风控，strategist 寻找更优策略
-- engineer 保障系统稳定
+- 有策略未实现 → engineer 在 Rust 实现
+- 有策略无引擎 → team-lead 启动引擎
+- 引擎运行中 → risk 监控，strategist 继续优化
+- 新策略发现 → engineer 实现 → 重新编译 → team-lead 重启引擎
 
 ### 3. 事件处理
 
 | 事件 | 处理 |
 |------|------|
-| 新策略产出 | strategist → `strategies/approved/` → engineer 启动引擎 |
-| 止损触发 | risk 通知 engineer 停引擎 + 通知 CEO |
-| 系统故障 | engineer 重启引擎 + 通知全团队 |
+| 新策略产出 | strategist → engineer Rust 实现 → team-lead 启动引擎 |
+| 止损触发 | 风控守护自动平仓 + 邮件通知 |
+| 系统故障 | engineer 排查 + 重启 |
 
 ### 4. 报告
 
