@@ -20,7 +20,7 @@ import argparse
 import math
 import sys
 from datetime import datetime
-from exchange import get_exchange
+from futures_exchange import get_futures_exchange
 
 
 # ─── 费用常量 ───
@@ -192,14 +192,14 @@ class BreakoutStrategy(Strategy):
     原理：
     - 价格突破 N 周期高点 → 做多
     - 价格跌破 N 周期低点 → 做空
-    - 用 ATR 过滤假突破（突破幅度需 > 0.5x ATR）
-    - ATR 移动止损
+    - 用 ATR 过滤假突破（突破幅度需 > 0.3x ATR）
+    - ATR 移动止损（宽松：3x ATR，给趋势空间）
 
     设计目标：抓大波段，错过开头没关系，抓住中间
     """
 
-    def __init__(self, lookback=48, atr_period=14, atr_filter=0.5,
-                 trail_atr=2.0):
+    def __init__(self, lookback=48, atr_period=14, atr_filter=0.3,
+                 trail_atr=3.0):
         self.lookback = lookback
         self.atr_period = atr_period
         self.atr_filter = atr_filter
@@ -609,10 +609,28 @@ class GridStrategy(Strategy):
         return None
 
 
+class TrendFastStrategy(TrendFollowStrategy):
+    """趋势跟踪-快速版（适合 7 天 1h 回测，EMA 更短）"""
+
+    def __init__(self):
+        super().__init__(fast_ema=10, slow_ema=30, rsi_period=10,
+                         atr_period=10, atr_sl=1.5, atr_tp=3.5)
+
+
+class MACDFastStrategy(MACDTrendStrategy):
+    """MACD 趋势-快速版（EMA 100 替代 200，适合短回测窗口）"""
+
+    def __init__(self):
+        super().__init__(fast=12, slow=26, signal=9, trend_ema=100,
+                         atr_period=14, atr_sl=2.5)
+
+
 STRATEGIES = {
     'trend': TrendFollowStrategy,
+    'trend_fast': TrendFastStrategy,
     'breakout': BreakoutStrategy,
     'macd': MACDTrendStrategy,
+    'macd_fast': MACDFastStrategy,
     'scalping': ScalpingStrategy,
     'rsi': RSIStrategy,
     'bollinger': BollingerStrategy,
@@ -624,7 +642,7 @@ STRATEGIES = {
 
 def fetch_candles(symbol, timeframe, days):
     """从币安拉历史 K 线数据"""
-    exchange = get_exchange()
+    exchange = get_futures_exchange()
     candles_per_day = {
         '1m': 1440, '5m': 288, '15m': 96,
         '1h': 24, '4h': 6, '1d': 1,
