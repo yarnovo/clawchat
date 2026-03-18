@@ -55,36 +55,64 @@ fn default_order_qty(symbol: &str) -> f64 {
     }
 }
 
-/// 根据 config.strategy 创建策略实例
+/// 根据 config 创建策略实例（优先使用 config file 中的参数）
 fn create_strategy(config: &Config) -> Box<dyn Strategy> {
-    let qty = default_order_qty(&config.symbol);
-    tracing::info!(symbol = %config.symbol, order_qty = qty, "order qty for symbol");
+    // order_qty: config file > symbol default
+    let qty = config.order_qty.unwrap_or_else(|| default_order_qty(&config.symbol));
+    let has_params = !config.params.is_empty();
+    tracing::info!(symbol = %config.symbol, order_qty = qty, has_params, "creating strategy");
+
+    let sym = &config.symbol;
+    let p = &config.params;
 
     match config.strategy.as_str() {
         "market_maker" | "mm" => {
             tracing::info!("using MarketMaker strategy");
-            Box::new(MarketMaker::new(&config.symbol, 0.0004, qty))
+            if has_params {
+                Box::new(MarketMaker::from_params(sym, qty, p))
+            } else {
+                Box::new(MarketMaker::new(sym, 0.0004, qty))
+            }
         }
         "scalping" => {
             tracing::info!("using Scalping strategy");
-            Box::new(ScalpingStrategy::new(&config.symbol, qty))
+            if has_params {
+                Box::new(ScalpingStrategy::from_params(sym, qty, p))
+            } else {
+                Box::new(ScalpingStrategy::new(sym, qty))
+            }
         }
         "breakout" => {
             tracing::info!("using Breakout strategy");
-            Box::new(BreakoutStrategy::new(&config.symbol, qty))
+            if has_params {
+                Box::new(BreakoutStrategy::from_params(sym, qty, p))
+            } else {
+                Box::new(BreakoutStrategy::new(sym, qty))
+            }
         }
         "rsi" => {
             tracing::info!("using RSI strategy");
-            Box::new(RSIStrategy::new(&config.symbol, qty))
+            if has_params {
+                Box::new(RSIStrategy::from_params(sym, qty, p))
+            } else {
+                Box::new(RSIStrategy::new(sym, qty))
+            }
         }
         "bollinger" => {
             tracing::info!("using Bollinger strategy");
-            Box::new(BollingerStrategy::new(&config.symbol, qty))
+            if has_params {
+                Box::new(BollingerStrategy::from_params(sym, qty, p))
+            } else {
+                Box::new(BollingerStrategy::new(sym, qty))
+            }
         }
         _ => {
-            // 默认使用 TrendFollower
             tracing::info!("using TrendFollower strategy");
-            Box::new(TrendFollower::new(&config.symbol, qty))
+            if has_params {
+                Box::new(TrendFollower::from_params(sym, qty, p))
+            } else {
+                Box::new(TrendFollower::new(sym, qty))
+            }
         }
     }
 }
@@ -129,7 +157,9 @@ async fn main() {
         .init();
 
     let config = Config::load();
-    tracing::info!("symbol={} leverage={} strategy={} dry_run={}", config.symbol, config.leverage, config.strategy, config.dry_run);
+    let display_name = config.strategy_name.as_deref().unwrap_or(&config.strategy);
+    tracing::info!("symbol={} leverage={} strategy={} name={} dry_run={}",
+        config.symbol, config.leverage, config.strategy, display_name, config.dry_run);
 
     let mut exchange = Exchange::new(&config);
 
@@ -146,9 +176,10 @@ async fn main() {
     // 注册引擎到 /tmp/hft-engines.json（供 risk_guard 读取策略映射）
     register_engine(&config.symbol, &strategy_name);
 
-    let mut aggregator = CandleAggregator::new(300_000); // 5 分钟 K 线
+    let candle_ms = config.timeframe_ms.unwrap_or(300_000); // default 5m
+    let mut aggregator = CandleAggregator::new(candle_ms);
 
-    tracing::info!("strategy={} candle_interval=5m", strategy.name());
+    tracing::info!("strategy={} candle_interval={}ms", strategy.name(), candle_ms);
 
     // 启动行情 WebSocket 流
     let feed_config = FeedConfig {

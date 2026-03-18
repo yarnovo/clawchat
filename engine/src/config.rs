@@ -1,17 +1,24 @@
 use clap::Parser;
+use serde::Deserialize;
+use std::collections::HashMap;
+use std::path::PathBuf;
 
 #[derive(Parser, Debug, Clone)]
 #[command(name = "hft-engine", about = "High-frequency trading engine for Binance futures")]
 pub struct Config {
-    /// Trading symbol (e.g. BTCUSDT)
+    /// Path to strategy.json config file
+    #[arg(long)]
+    pub config: Option<PathBuf>,
+
+    /// Trading symbol (e.g. BTCUSDT) — overridden by config file
     #[arg(long, env = "SYMBOL", default_value = "BTCUSDT")]
     pub symbol: String,
 
-    /// Leverage multiplier
+    /// Leverage multiplier — overridden by config file
     #[arg(long, env = "LEVERAGE", default_value_t = 10)]
     pub leverage: u32,
 
-    /// Strategy name
+    /// Strategy name — overridden by config file
     #[arg(long, env = "STRATEGY", default_value = "default")]
     pub strategy: String,
 
@@ -30,12 +37,112 @@ pub struct Config {
     /// Binance futures API base URL
     #[arg(long, env = "BINANCE_BASE_URL", default_value = "https://fapi.binance.com")]
     pub base_url: String,
+
+    // ── Fields populated from strategy.json ──
+    /// Strategy display name (from config file)
+    #[arg(skip)]
+    pub strategy_name: Option<String>,
+
+    /// Order quantity (from config file)
+    #[arg(skip)]
+    pub order_qty: Option<f64>,
+
+    /// Candle timeframe in ms (from config file)
+    #[arg(skip)]
+    pub timeframe_ms: Option<u64>,
+
+    /// Strategy-specific parameters (from config file)
+    #[arg(skip)]
+    pub params: HashMap<String, f64>,
+}
+
+/// Deserialized strategy.json
+#[derive(Debug, Deserialize)]
+pub struct StrategyFile {
+    pub name: Option<String>,
+    /// Maps to Config.strategy: "scalping", "breakout", "rsi", etc.
+    #[serde(alias = "engine_strategy", alias = "strategy")]
+    pub engine_strategy: Option<String>,
+    pub symbol: Option<String>,
+    pub leverage: Option<u32>,
+    pub order_qty: Option<f64>,
+    pub timeframe_ms: Option<u64>,
+    /// Timeframe string like "5m", "1h" — converted to ms
+    pub timeframe: Option<String>,
+    #[serde(default)]
+    pub params: HashMap<String, serde_json::Value>,
+}
+
+fn timeframe_to_ms(tf: &str) -> Option<u64> {
+    let (num_str, unit) = tf.split_at(tf.len().saturating_sub(1));
+    let num: u64 = num_str.parse().ok()?;
+    match unit {
+        "m" => Some(num * 60_000),
+        "h" => Some(num * 3_600_000),
+        "d" => Some(num * 86_400_000),
+        "s" => Some(num * 1_000),
+        _ => None,
+    }
+}
+
+/// Normalize symbol: "PIPPIN/USDT" → "PIPPINUSDT", "BTC/USDT" → "BTCUSDT"
+fn normalize_symbol(s: &str) -> String {
+    s.replace("/", "").replace(":USDT", "")
 }
 
 impl Config {
-    /// Load config from .env file (if present), then parse CLI args + env vars.
+    /// Load config from .env file (if present), then parse CLI args + env vars,
+    /// then overlay strategy.json if --config is provided.
     pub fn load() -> Self {
-        let _ = dotenvy::dotenv(); // silently ignore if .env doesn't exist
-        Self::parse()
+        let _ = dotenvy::dotenv();
+        let mut config = Self::parse();
+
+        if let Some(ref path) = config.config {
+            match std::fs::read_to_string(path) {
+                Ok(contents) => match serde_json::from_str::<StrategyFile>(&contents) {
+                    Ok(sf) => config.apply_strategy_file(sf),
+                    Err(e) => {
+                        eprintln!("Failed to parse {}: {e}", path.display());
+                        std::process::exit(1);
+                    }
+                },
+                Err(e) => {
+                    eprintln!("Failed to read {}: {e}", path.display());
+                    std::process::exit(1);
+                }
+            }
+        }
+
+        config
+    }
+
+    fn apply_strategy_file(&mut self, sf: StrategyFile) {
+        if let Some(name) = sf.name {
+            self.strategy_name = Some(name);
+        }
+        if let Some(engine_strategy) = sf.engine_strategy {
+            self.strategy = engine_strategy;
+        }
+        if let Some(symbol) = sf.symbol {
+            self.symbol = normalize_symbol(&symbol);
+        }
+        if let Some(leverage) = sf.leverage {
+            self.leverage = leverage;
+        }
+        if let Some(order_qty) = sf.order_qty {
+            self.order_qty = Some(order_qty);
+        }
+        // timeframe: prefer timeframe_ms, fallback to timeframe string
+        if let Some(ms) = sf.timeframe_ms {
+            self.timeframe_ms = Some(ms);
+        } else if let Some(ref tf) = sf.timeframe {
+            self.timeframe_ms = timeframe_to_ms(tf);
+        }
+        // Extract numeric params
+        for (k, v) in sf.params {
+            if let Some(n) = v.as_f64() {
+                self.params.insert(k, n);
+            }
+        }
     }
 }

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::types::{DepthData, MarketEvent, OrderRequest, OrderType, Side, TickData};
 
 // ── 信号 ──────────────────────────────────────────────────────
@@ -132,6 +134,16 @@ impl MarketMaker {
             pending_ask: None,
         }
     }
+
+    pub fn from_params(symbol: &str, order_qty: f64, params: &HashMap<String, f64>) -> Self {
+        Self {
+            symbol: symbol.to_string(),
+            fee_rate: params.get("fee_rate").copied().unwrap_or(0.0004),
+            order_qty,
+            pending_bid: None,
+            pending_ask: None,
+        }
+    }
 }
 
 impl Strategy for MarketMaker {
@@ -233,6 +245,24 @@ impl TrendFollower {
             atr_period: 14,
             atr_sl_mult: 1.5,
             atr_tp_mult: 2.5,
+            order_qty,
+            ema_fast: None,
+            ema_slow: None,
+            prev_fast_above: None,
+            atr: None,
+            prev_close: None,
+            candle_count: 0,
+        }
+    }
+
+    pub fn from_params(symbol: &str, order_qty: f64, params: &HashMap<String, f64>) -> Self {
+        Self {
+            symbol: symbol.to_string(),
+            ema_fast_period: params.get("ema_fast").copied().unwrap_or(21.0) as usize,
+            ema_slow_period: params.get("ema_slow").copied().unwrap_or(55.0) as usize,
+            atr_period: params.get("atr_period").copied().unwrap_or(14.0) as usize,
+            atr_sl_mult: params.get("atr_sl_mult").copied().unwrap_or(1.5),
+            atr_tp_mult: params.get("atr_tp_mult").copied().unwrap_or(2.5),
             order_qty,
             ema_fast: None,
             ema_slow: None,
@@ -424,6 +454,21 @@ impl ScalpingStrategy {
             pos: None,
         }
     }
+
+    pub fn from_params(symbol: &str, order_qty: f64, params: &HashMap<String, f64>) -> Self {
+        Self {
+            symbol: symbol.to_string(),
+            order_qty,
+            fast_period: params.get("ema_fast").copied().unwrap_or(12.0) as usize,
+            slow_period: params.get("ema_slow").copied().unwrap_or(50.0) as usize,
+            vol_mult: params.get("volume_multiplier").copied().unwrap_or(1.2),
+            closes: Vec::new(),
+            highs: Vec::new(),
+            lows: Vec::new(),
+            volumes: Vec::new(),
+            pos: None,
+        }
+    }
 }
 
 impl Strategy for ScalpingStrategy {
@@ -543,6 +588,21 @@ impl BreakoutStrategy {
             atr_period: 14,
             atr_filter: 0.3,
             trail_atr: 3.0,
+            closes: Vec::new(),
+            highs: Vec::new(),
+            lows: Vec::new(),
+            pos: None,
+        }
+    }
+
+    pub fn from_params(symbol: &str, order_qty: f64, params: &HashMap<String, f64>) -> Self {
+        Self {
+            symbol: symbol.to_string(),
+            order_qty,
+            lookback: params.get("lookback").copied().unwrap_or(48.0) as usize,
+            atr_period: params.get("atr_period").copied().unwrap_or(14.0) as usize,
+            atr_filter: params.get("atr_filter").copied().unwrap_or(0.3),
+            trail_atr: params.get("trail_atr").copied().unwrap_or(3.0),
             closes: Vec::new(),
             highs: Vec::new(),
             lows: Vec::new(),
@@ -694,6 +754,21 @@ impl RSIStrategy {
             pos: None,
         }
     }
+
+    pub fn from_params(symbol: &str, order_qty: f64, params: &HashMap<String, f64>) -> Self {
+        Self {
+            symbol: symbol.to_string(),
+            order_qty,
+            rsi_period: params.get("rsi_period").copied().unwrap_or(14.0) as usize,
+            oversold: params.get("rsi_oversold").copied().unwrap_or(25.0),
+            overbought: params.get("rsi_overbought").copied().unwrap_or(75.0),
+            trend_ema: params.get("trend_ema").copied().unwrap_or(50.0) as usize,
+            closes: Vec::new(),
+            highs: Vec::new(),
+            lows: Vec::new(),
+            pos: None,
+        }
+    }
 }
 
 impl Strategy for RSIStrategy {
@@ -804,6 +879,20 @@ impl BollingerStrategy {
             bb_period: 20,
             num_std: 2.5,
             trend_ema: 50,
+            closes: Vec::new(),
+            highs: Vec::new(),
+            lows: Vec::new(),
+            pos: None,
+        }
+    }
+
+    pub fn from_params(symbol: &str, order_qty: f64, params: &HashMap<String, f64>) -> Self {
+        Self {
+            symbol: symbol.to_string(),
+            order_qty,
+            bb_period: params.get("bb_period").copied().unwrap_or(20.0) as usize,
+            num_std: params.get("num_std").copied().unwrap_or(2.5),
+            trend_ema: params.get("trend_ema").copied().unwrap_or(50.0) as usize,
             closes: Vec::new(),
             highs: Vec::new(),
             lows: Vec::new(),

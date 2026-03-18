@@ -1,11 +1,10 @@
 {
-  "name": "pippin-breakout-5m",
+  "name": "pippin-ema2050-5m",
   "symbol": "PIPPIN/USDT",
-  "strategy": "breakout",
+  "strategy": "ema2050",
   "timeframe": "5m",
   "market": "binance_futures",
   "leverage": 2,
-  "order_qty": 100,
   "position_size": 0.5,
   "capital": 200,
   "fees": {
@@ -13,12 +12,6 @@
     "maker": 0.0002
   },
   "slippage": 0.0005,
-  "params": {
-    "lookback": 48,
-    "atr_period": 14,
-    "atr_filter": 0.3,
-    "trail_atr": 3.0
-  },
   "status": "approved",
   "approved_date": "2026-03-18"
 }
