@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""风控守护进程 — 每 30 秒检查持仓，触发止损自动平仓 + 通知 + 记录权益曲线"""
+"""风控守护进程 — 每 30 秒检查持仓，触发止损自动平仓 + 通知 + 记录权益曲线
+支持按策略独立风控：读取 strategies/*/risk.json + strategy.json"""
 
 import csv
 import json
@@ -9,12 +10,13 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from check import check_positions
+from check import check_positions, DEFAULT_RISK
 from futures_exchange import get_futures_exchange, get_positions, close_all
 
 INTERVAL = 30  # 秒
 EQUITY_CSV = Path(__file__).parent.parent / "reports" / "equity.csv"
 ENGINE_REGISTRY = Path("/tmp/hft-engines.json")
+STRATEGIES_DIR = Path(__file__).parent.parent / "strategies"
 
 running = True
 
@@ -37,6 +39,41 @@ def append_equity(timestamp, equity, unrealized_pnl, num_positions, detail):
                          json.dumps(detail, ensure_ascii=False)])
 
 
+def load_risk_configs():
+    """扫描 strategies/*/，用 strategy.json 的 symbol 做键，risk.json 做值。
+    返回 {normalized_symbol: risk_config}，如 {'PIPPINUSDT': {...}}。
+    """
+    risk_by_symbol = {}
+    for strategy_dir in sorted(STRATEGIES_DIR.iterdir()):
+        if not strategy_dir.is_dir():
+            continue
+        strategy_file = strategy_dir / "strategy.json"
+        risk_file = strategy_dir / "risk.json"
+        if not strategy_file.exists():
+            continue
+
+        try:
+            strategy_cfg = json.loads(strategy_file.read_text())
+            symbol = strategy_cfg.get("symbol", "")
+            # 归一化: "PIPPIN/USDT" → "PIPPINUSDT", "PIPPINUSDT" → "PIPPINUSDT"
+            norm_symbol = symbol.replace("/", "").replace(":USDT", "")
+            if not norm_symbol:
+                continue
+
+            if risk_file.exists():
+                risk_cfg = json.loads(risk_file.read_text())
+            else:
+                risk_cfg = dict(DEFAULT_RISK)
+
+            # 保留策略名用于日志标注
+            risk_cfg['name'] = strategy_cfg.get('name', strategy_dir.name)
+            risk_by_symbol[norm_symbol] = risk_cfg
+        except Exception as e:
+            print(f"  加载风控配置失败 {strategy_dir.name}: {e}")
+
+    return risk_by_symbol
+
+
 def notify_stop_loss(alerts, exchange):
     """触发止损时发邮件通知"""
     try:
@@ -54,7 +91,13 @@ def notify_stop_loss(alerts, exchange):
 def run_check(exchange):
     """执行一轮风控检查"""
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    result = check_positions(exchange)
+
+    # 加载每个策略的独立风控配置
+    risk_by_symbol = load_risk_configs()
+    if risk_by_symbol:
+        print(f"  [{now}] 加载 {len(risk_by_symbol)} 个策略风控配置: {list(risk_by_symbol.keys())}")
+
+    result = check_positions(exchange, risk_by_symbol=risk_by_symbol)
 
     equity = result.get("equity", 0)
     unrealized = result.get("unrealized_pnl", 0)
