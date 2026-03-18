@@ -29,6 +29,11 @@
 - [ ] risk.json: max_correlation_exposure（相关策略合并敞口）
 - [ ] risk.json: max_unrealized_loss（未实现亏损上限）
 
+### 业务扩展（quant 建议）
+- [ ] P0: 闲置资金活期理财（Earn API，$113 闲钱）
+- [ ] P0: Funding Rate 策略（结算前反向开仓收费率）
+- [ ] P1: 期现套利（需接入现货 API）
+
 ### 生命周期
 - [ ] Phase 3: `clawchat rebalance` 资金三池分配
 
