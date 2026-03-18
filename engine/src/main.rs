@@ -8,8 +8,8 @@ pub mod ws_feed;
 use config::Config;
 use exchange::Exchange;
 use strategy::{
-    BollingerStrategy, BreakoutStrategy, CandleAggregator, MarketMaker, RSIStrategy,
-    ScalpingStrategy, Signal, Strategy, TrendFollower,
+    BollingerStrategy, BreakoutStrategy, CandleAggregator, MACDStrategy, MarketMaker,
+    RSIStrategy, ScalpingStrategy, Signal, Strategy, TrendFollower,
 };
 use types::{MarketEvent, OrderType as StratOrderType, Side as StratSide};
 
@@ -104,6 +104,14 @@ fn create_strategy(config: &Config) -> Box<dyn Strategy> {
                 Box::new(BollingerStrategy::from_params(sym, qty, p))
             } else {
                 Box::new(BollingerStrategy::new(sym, qty))
+            }
+        }
+        "macd" => {
+            tracing::info!("using MACD strategy");
+            if has_params {
+                Box::new(MACDStrategy::from_params(sym, qty, p))
+            } else {
+                Box::new(MACDStrategy::new(sym, qty))
             }
         }
         _ => {

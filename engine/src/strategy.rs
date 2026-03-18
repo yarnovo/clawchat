@@ -986,6 +986,224 @@ impl Strategy for BollingerStrategy {
     }
 }
 
+// ══════════════════════════════════════════════════════════════
+// MACD 策略 — MACD(12,26,9) 金叉死叉 + EMA 趋势过滤 + ATR 移动止损
+// ══════════════════════════════════════════════════════════════
+
+struct MACDPosition {
+    side: Side,
+    sl: f64,
+}
+
+pub struct MACDStrategy {
+    pub symbol: String,
+    pub order_qty: f64,
+    fast_period: usize,
+    slow_period: usize,
+    signal_period: usize,
+    trend_ema: usize,
+    atr_period: usize,
+    atr_sl: f64,
+    closes: Vec<f64>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
+    prev_histogram: Option<f64>,
+    pos: Option<MACDPosition>,
+}
+
+impl MACDStrategy {
+    pub fn new(symbol: &str, order_qty: f64) -> Self {
+        Self {
+            symbol: symbol.to_string(),
+            order_qty,
+            fast_period: 12,
+            slow_period: 26,
+            signal_period: 9,
+            trend_ema: 200,
+            atr_period: 14,
+            atr_sl: 2.0,
+            closes: Vec::new(),
+            highs: Vec::new(),
+            lows: Vec::new(),
+            prev_histogram: None,
+            pos: None,
+        }
+    }
+
+    pub fn from_params(symbol: &str, order_qty: f64, params: &HashMap<String, f64>) -> Self {
+        Self {
+            symbol: symbol.to_string(),
+            order_qty,
+            fast_period: params.get("fast_period").copied().unwrap_or(12.0) as usize,
+            slow_period: params.get("slow_period").copied().unwrap_or(26.0) as usize,
+            signal_period: params.get("signal_period").copied().unwrap_or(9.0) as usize,
+            trend_ema: params.get("trend_ema").copied().unwrap_or(200.0) as usize,
+            atr_period: params.get("atr_period").copied().unwrap_or(14.0) as usize,
+            atr_sl: params.get("atr_sl").copied().unwrap_or(2.0),
+            closes: Vec::new(),
+            highs: Vec::new(),
+            lows: Vec::new(),
+            prev_histogram: None,
+            pos: None,
+        }
+    }
+
+    /// 计算 MACD: 返回 (macd_line, signal_line, histogram)
+    fn compute_macd(&self) -> (Option<f64>, Option<f64>, Option<f64>) {
+        let n = self.closes.len();
+        if n < self.slow_period {
+            return (None, None, None);
+        }
+
+        // 计算完整的 MACD 序列以得到 signal line
+        let fast_k = 2.0 / (self.fast_period as f64 + 1.0);
+        let slow_k = 2.0 / (self.slow_period as f64 + 1.0);
+
+        // 初始化 slow EMA（用前 slow_period 根的 SMA）
+        let mut slow_ema: f64 = self.closes[..self.slow_period].iter().sum::<f64>()
+            / self.slow_period as f64;
+
+        // 初始化 fast EMA: SMA over fast_period, then walk to slow_period
+        let mut fast_ema: f64 = self.closes[..self.fast_period].iter().sum::<f64>()
+            / self.fast_period as f64;
+        for i in self.fast_period..self.slow_period {
+            fast_ema = self.closes[i] * fast_k + fast_ema * (1.0 - fast_k);
+        }
+
+        // 收集 MACD 序列（从 slow_period 开始）
+        let mut macd_series = Vec::with_capacity(n - self.slow_period + 1);
+        macd_series.push(fast_ema - slow_ema);
+
+        for i in self.slow_period..n {
+            fast_ema = self.closes[i] * fast_k + fast_ema * (1.0 - fast_k);
+            slow_ema = self.closes[i] * slow_k + slow_ema * (1.0 - slow_k);
+            macd_series.push(fast_ema - slow_ema);
+        }
+
+        let macd_line = *macd_series.last().unwrap();
+
+        if macd_series.len() < self.signal_period {
+            return (Some(macd_line), None, None);
+        }
+
+        // Signal line = EMA of MACD series
+        let sig_k = 2.0 / (self.signal_period as f64 + 1.0);
+        let mut signal: f64 = macd_series[..self.signal_period].iter().sum::<f64>()
+            / self.signal_period as f64;
+        for &m in &macd_series[self.signal_period..] {
+            signal = m * sig_k + signal * (1.0 - sig_k);
+        }
+
+        let histogram = macd_line - signal;
+        (Some(macd_line), Some(signal), Some(histogram))
+    }
+}
+
+impl Strategy for MACDStrategy {
+    fn on_candle(&mut self, candle: &Candle) -> Option<Signal> {
+        self.closes.push(candle.close);
+        self.highs.push(candle.high);
+        self.lows.push(candle.low);
+
+        let n = self.closes.len();
+        // 需要 trend_ema + 1 根和足够的 MACD 数据
+        let warmup = self.trend_ema.max(self.slow_period + self.signal_period) + 1;
+        if n < warmup {
+            // 仍然更新 prev_histogram 以便预热后第一根能判断方向
+            let (_, _, hist) = self.compute_macd();
+            self.prev_histogram = hist;
+            return Some(Signal::None);
+        }
+
+        let trend = ema_from_slice(&self.closes, self.trend_ema)?;
+        let atr = atr_from_slices(&self.highs, &self.lows, &self.closes, self.atr_period)?;
+        let (_, _, hist_opt) = self.compute_macd();
+        let hist = hist_opt?;
+
+        let prev_hist = self.prev_histogram;
+        self.prev_histogram = Some(hist);
+
+        let prev_hist = prev_hist?;
+
+        // 持仓中：ATR 移动止损 + MACD 反转出场
+        if let Some(ref mut pos) = self.pos {
+            match pos.side {
+                Side::Buy => {
+                    // 移动止损：只上移不下移
+                    let new_stop = candle.close - atr * self.atr_sl;
+                    if new_stop > pos.sl {
+                        pos.sl = new_stop;
+                    }
+                    // 止损触发 或 MACD 柱转负
+                    if candle.close <= pos.sl || (hist < 0.0 && prev_hist >= 0.0) {
+                        self.pos = None;
+                        return Some(Signal::Order(OrderRequest {
+                            symbol: self.symbol.clone(),
+                            side: Side::Sell,
+                            order_type: OrderType::Market,
+                            qty: self.order_qty,
+                            price: None,
+                        }));
+                    }
+                }
+                Side::Sell => {
+                    let new_stop = candle.close + atr * self.atr_sl;
+                    if new_stop < pos.sl {
+                        pos.sl = new_stop;
+                    }
+                    if candle.close >= pos.sl || (hist > 0.0 && prev_hist <= 0.0) {
+                        self.pos = None;
+                        return Some(Signal::Order(OrderRequest {
+                            symbol: self.symbol.clone(),
+                            side: Side::Buy,
+                            order_type: OrderType::Market,
+                            qty: self.order_qty,
+                            price: None,
+                        }));
+                    }
+                }
+            }
+            return Some(Signal::None);
+        }
+
+        // 做多：MACD 柱由负转正 + 价格在趋势线上方
+        if prev_hist <= 0.0 && hist > 0.0 && candle.close > trend {
+            self.pos = Some(MACDPosition {
+                side: Side::Buy,
+                sl: candle.close - atr * self.atr_sl,
+            });
+            return Some(Signal::Order(OrderRequest {
+                symbol: self.symbol.clone(),
+                side: Side::Buy,
+                order_type: OrderType::Market,
+                qty: self.order_qty,
+                price: None,
+            }));
+        }
+
+        // 做空：MACD 柱由正转负 + 价格在趋势线下方
+        if prev_hist >= 0.0 && hist < 0.0 && candle.close < trend {
+            self.pos = Some(MACDPosition {
+                side: Side::Sell,
+                sl: candle.close + atr * self.atr_sl,
+            });
+            return Some(Signal::Order(OrderRequest {
+                symbol: self.symbol.clone(),
+                side: Side::Sell,
+                order_type: OrderType::Market,
+                qty: self.order_qty,
+                price: None,
+            }));
+        }
+
+        Some(Signal::None)
+    }
+
+    fn name(&self) -> &str {
+        "MACD"
+    }
+}
+
 /// 计算止损/止盈价格
 pub fn calc_sl_tp(entry: f64, atr: f64, is_long: bool, sl_mult: f64, tp_mult: f64) -> (f64, f64) {
     if is_long {
