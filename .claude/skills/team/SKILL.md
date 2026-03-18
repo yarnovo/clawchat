@@ -65,6 +65,7 @@ strategist risk bull bear engineer
 | **engineer** | Rust 交易/风控引擎代码 + Python 守护代码 | 引擎/守护进程 |
 
 | **trader** | 交易员：通过 trade.json 控制引擎（加仓/减仓/暂停/平仓） | 引擎文件监听执行 |
+| **quant** | 量化交易专家：策略设计/风控模型/市场分析（只建议不实现） | team-lead + strategist 参考 |
 | **architect** | 系统架构师：技术方案设计、架构评审（只设计不实现） | team-lead 讨论后派 engineer 实现 |
 | **qa** | 质量保障：代码审查、跑测试、功能验证、回归检查 | team-lead review 前先过 qa |
 
