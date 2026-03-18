@@ -6,6 +6,7 @@ use hft_engine::strategy::{
     MarketMaker, MeanReversionStrategy, RSIStrategy, ScalpingStrategy, Signal, Strategy,
     TrendFollower,
 };
+use hft_engine::trade::{decision_gate_allows_signal, TradeAction, TradeOverride};
 use hft_engine::types::{MarketEvent, OrderType as StratOrderType, Side as StratSide};
 use hft_engine::ws_feed::{start_feed, FeedConfig};
 
@@ -299,6 +300,13 @@ fn state_json_path(config: &Config) -> Option<PathBuf> {
     Some(dir.join("state.json"))
 }
 
+/// 确定 trade.json 路径：strategies/{name}/trade.json
+fn trade_json_path(config: &Config) -> Option<PathBuf> {
+    let config_path = config.config.as_ref()?;
+    let dir = config_path.parent()?;
+    Some(dir.join("trade.json"))
+}
+
 /// 保存引擎状态
 fn save_state(
     path: &std::path::Path,
@@ -351,6 +359,40 @@ fn start_strategy_watcher(config_path: PathBuf, tx: tokio_mpsc::Sender<()>) {
     });
 }
 
+/// 监听 trade.json 文件变化，发送通知到 channel
+fn start_trade_watcher(trade_path: PathBuf, tx: tokio_mpsc::Sender<()>) {
+    std::thread::spawn(move || {
+        let watched_path = trade_path.clone();
+        let tx_clone = tx.clone();
+        let mut watcher = notify::recommended_watcher(
+            move |res: Result<notify::Event, notify::Error>| {
+                let Ok(event) = res else { return };
+                match event.kind {
+                    EventKind::Modify(_) | EventKind::Create(_) => {}
+                    _ => return,
+                }
+                let dominated = event.paths.iter().any(|p| p == &watched_path);
+                if !dominated {
+                    return;
+                }
+                tracing::info!("trade.json changed, reloading override");
+                let _ = tx_clone.blocking_send(());
+            },
+        )
+        .expect("failed to create trade file watcher");
+
+        let watch_dir = trade_path.parent().unwrap_or(&trade_path);
+        watcher
+            .watch(watch_dir, RecursiveMode::NonRecursive)
+            .expect("failed to watch trade directory");
+
+        tracing::info!("trade file watcher started: {:?}", trade_path);
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(3600));
+        }
+    });
+}
+
 /// 从 strategy.json 重新加载参数，创建新策略实例并恢复旧状态
 fn reload_strategy(config: &mut Config, strategy: &mut Box<dyn Strategy>) {
     let Some(ref path) = config.config else { return };
@@ -387,6 +429,188 @@ fn reload_strategy(config: &mut Config, strategy: &mut Box<dyn Strategy>) {
         "strategy hot-reloaded with new params"
     );
     *strategy = new_strategy;
+}
+
+/// 尝试执行信号，先经过 DecisionGate 过滤
+async fn try_execute_signal(
+    signal: &Signal,
+    trade_override: &TradeOverride,
+    exchange: &Exchange,
+    strategy_name: &str,
+    sizing_mode: SizingMode,
+    position_size: Option<f64>,
+    leverage: u32,
+    current_price: f64,
+) {
+    if *signal == Signal::None {
+        return;
+    }
+    // DecisionGate: trade override 过滤
+    if !decision_gate_allows_signal(trade_override) {
+        tracing::debug!(
+            action = ?trade_override.action,
+            "signal blocked by trade override"
+        );
+        return;
+    }
+    tracing::info!(?signal, "signal passed decision gate");
+    execute_signal(
+        signal, exchange, strategy_name,
+        sizing_mode, position_size, leverage, current_price,
+    ).await;
+}
+
+/// 执行一次性 trade override 指令（close_all/close_long/close_short/stop/reduce/add）
+async fn execute_trade_override(
+    trade_override: &mut TradeOverride,
+    trade_path: &std::path::Path,
+    exchange: &Exchange,
+    strategy_name: &str,
+) {
+    if !trade_override.needs_execution() {
+        return;
+    }
+
+    tracing::warn!(
+        action = ?trade_override.action,
+        note = %trade_override.note,
+        "executing trade override"
+    );
+
+    match trade_override.action {
+        TradeAction::CloseAll | TradeAction::Stop => {
+            match exchange.get_positions().await {
+                Ok(positions) => {
+                    for pos in &positions {
+                        let sym = pos.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
+                        if sym != exchange.symbol {
+                            continue;
+                        }
+                        let amt: f64 = pos.get("positionAmt")
+                            .and_then(|v| v.as_str())
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(0.0);
+                        if amt.abs() < f64::EPSILON {
+                            continue;
+                        }
+                        match exchange.close_position(sym, amt).await {
+                            Ok(_) => tracing::info!("[{strategy_name}] closed {sym} amt={amt}"),
+                            Err(e) => tracing::error!("[{strategy_name}] close {sym} failed: {e}"),
+                        }
+                    }
+                }
+                Err(e) => tracing::error!("failed to get positions for close_all: {e}"),
+            }
+        }
+        TradeAction::CloseLong => {
+            match exchange.get_positions().await {
+                Ok(positions) => {
+                    for pos in &positions {
+                        let sym = pos.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
+                        if sym != exchange.symbol {
+                            continue;
+                        }
+                        let amt: f64 = pos.get("positionAmt")
+                            .and_then(|v| v.as_str())
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(0.0);
+                        if amt > f64::EPSILON {
+                            match exchange.close_position(sym, amt).await {
+                                Ok(_) => tracing::info!("[{strategy_name}] closed long {sym} amt={amt}"),
+                                Err(e) => tracing::error!("[{strategy_name}] close long {sym} failed: {e}"),
+                            }
+                        }
+                    }
+                }
+                Err(e) => tracing::error!("failed to get positions for close_long: {e}"),
+            }
+        }
+        TradeAction::CloseShort => {
+            match exchange.get_positions().await {
+                Ok(positions) => {
+                    for pos in &positions {
+                        let sym = pos.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
+                        if sym != exchange.symbol {
+                            continue;
+                        }
+                        let amt: f64 = pos.get("positionAmt")
+                            .and_then(|v| v.as_str())
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(0.0);
+                        if amt < -f64::EPSILON {
+                            match exchange.close_position(sym, amt).await {
+                                Ok(_) => tracing::info!("[{strategy_name}] closed short {sym} amt={amt}"),
+                                Err(e) => tracing::error!("[{strategy_name}] close short {sym} failed: {e}"),
+                            }
+                        }
+                    }
+                }
+                Err(e) => tracing::error!("failed to get positions for close_short: {e}"),
+            }
+        }
+        TradeAction::Reduce => {
+            let ratio = trade_override.params.ratio.unwrap_or(0.5);
+            match exchange.get_positions().await {
+                Ok(positions) => {
+                    for pos in &positions {
+                        let sym = pos.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
+                        if sym != exchange.symbol {
+                            continue;
+                        }
+                        let amt: f64 = pos.get("positionAmt")
+                            .and_then(|v| v.as_str())
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(0.0);
+                        if amt.abs() < f64::EPSILON {
+                            continue;
+                        }
+                        let reduce_amt = amt * ratio;
+                        match exchange.close_position(sym, reduce_amt).await {
+                            Ok(_) => tracing::info!("[{strategy_name}] reduced {sym} by {ratio:.0}%: {reduce_amt}"),
+                            Err(e) => tracing::error!("[{strategy_name}] reduce {sym} failed: {e}"),
+                        }
+                    }
+                }
+                Err(e) => tracing::error!("failed to get positions for reduce: {e}"),
+            }
+        }
+        TradeAction::Add => {
+            let ratio = trade_override.params.ratio.unwrap_or(0.5);
+            match exchange.get_positions().await {
+                Ok(positions) => {
+                    for pos in &positions {
+                        let sym = pos.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
+                        if sym != exchange.symbol {
+                            continue;
+                        }
+                        let amt: f64 = pos.get("positionAmt")
+                            .and_then(|v| v.as_str())
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(0.0);
+                        if amt.abs() < f64::EPSILON {
+                            continue;
+                        }
+                        let add_amt = (amt * ratio).abs();
+                        let (side, pos_side) = if amt > 0.0 {
+                            (exchange::Side::Buy, exchange::PositionSide::Long)
+                        } else {
+                            (exchange::Side::Sell, exchange::PositionSide::Short)
+                        };
+                        match exchange.market_order(side, pos_side, add_amt).await {
+                            Ok(_) => tracing::info!("[{strategy_name}] added {sym} by {ratio:.0}%: {add_amt}"),
+                            Err(e) => tracing::error!("[{strategy_name}] add {sym} failed: {e}"),
+                        }
+                    }
+                }
+                Err(e) => tracing::error!("failed to get positions for add: {e}"),
+            }
+        }
+        _ => {} // Hold/Pause/Resume are not oneshot
+    }
+
+    // 标记已执行
+    trade_override.mark_executed(trade_path);
+    tracing::info!(action = ?trade_override.action, "trade override executed and marked");
 }
 
 #[tokio::main]
@@ -427,6 +651,16 @@ async fn main() {
     // state.json 路径
     let state_path = state_json_path(&config);
 
+    // trade.json 路径 + 初始加载
+    let trade_path = trade_json_path(&config);
+    let mut trade_override = trade_path
+        .as_ref()
+        .map(|p| TradeOverride::load(p))
+        .unwrap_or_default();
+    if trade_override.action != TradeAction::Hold {
+        tracing::info!(action = ?trade_override.action, "loaded trade override");
+    }
+
     // 恢复状态（如果存在）
     let mut trade_stats = TradeStats::default();
     if let Some(ref sp) = state_path {
@@ -464,8 +698,21 @@ async fn main() {
         start_strategy_watcher(path.clone(), config_tx);
     }
 
+    // 启动 trade.json 文件监听
+    let (trade_tx, mut trade_rx) = tokio_mpsc::channel::<()>(16);
+    if let Some(ref path) = trade_path {
+        start_trade_watcher(path.clone(), trade_tx);
+    }
+
     // 最新市价（从 tick 更新，用于百分比下单量计算）
     let mut last_price: f64 = 0.0;
+
+    // 启动时执行待处理的一次性指令
+    if let Some(ref tp) = trade_path {
+        execute_trade_override(
+            &mut trade_override, tp, &exchange, &strategy_name,
+        ).await;
+    }
 
     // 策略驱动的事件循环
     loop {
@@ -483,13 +730,12 @@ async fn main() {
                                 "candle closed"
                             );
                             if let Some(signal) = strategy.on_candle(&candle) {
-                                if signal != Signal::None {
-                                    tracing::info!(?signal, "candle signal");
-                                    execute_signal(
-                                        &signal, &exchange, &strategy_name,
-                                        config.sizing_mode, config.position_size, config.leverage, last_price,
-                                    ).await;
-                                    // 成交后保存状态
+                                try_execute_signal(
+                                    &signal, &trade_override, &exchange, &strategy_name,
+                                    config.sizing_mode, config.position_size, config.leverage, last_price,
+                                ).await;
+                                // 成交后保存状态
+                                if signal != Signal::None && decision_gate_allows_signal(&trade_override) {
                                     if let Some(ref sp) = state_path {
                                         save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
                                     }
@@ -503,13 +749,11 @@ async fn main() {
 
                         // 也把 tick 直接给策略（高频策略用）
                         if let Some(signal) = strategy.on_tick(tick) {
-                            if signal != Signal::None {
-                                tracing::info!(?signal, "tick signal");
-                                execute_signal(
-                                    &signal, &exchange, &strategy_name,
-                                    config.sizing_mode, config.position_size, config.leverage, last_price,
-                                ).await;
-                                // 成交后保存状态
+                            try_execute_signal(
+                                &signal, &trade_override, &exchange, &strategy_name,
+                                config.sizing_mode, config.position_size, config.leverage, last_price,
+                            ).await;
+                            if signal != Signal::None && decision_gate_allows_signal(&trade_override) {
                                 if let Some(ref sp) = state_path {
                                     save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
                                 }
@@ -518,13 +762,11 @@ async fn main() {
                     }
                     MarketEvent::Depth(depth) => {
                         if let Some(signal) = strategy.on_depth(depth) {
-                            if signal != Signal::None {
-                                tracing::info!(?signal, "depth signal");
-                                execute_signal(
-                                    &signal, &exchange, &strategy_name,
-                                    config.sizing_mode, config.position_size, config.leverage, last_price,
-                                ).await;
-                                // 成交后保存状态
+                            try_execute_signal(
+                                &signal, &trade_override, &exchange, &strategy_name,
+                                config.sizing_mode, config.position_size, config.leverage, last_price,
+                            ).await;
+                            if signal != Signal::None && decision_gate_allows_signal(&trade_override) {
                                 if let Some(ref sp) = state_path {
                                     save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
                                 }
@@ -539,6 +781,23 @@ async fn main() {
             Some(()) = config_rx.recv() => {
                 // strategy.json 文件变化 → 热更新策略参数
                 reload_strategy(&mut config, &mut strategy);
+            }
+            Some(()) = trade_rx.recv() => {
+                // trade.json 文件变化 → 重新加载 trade override
+                if let Some(ref tp) = trade_path {
+                    let new_override = TradeOverride::load(tp);
+                    tracing::info!(
+                        action = ?new_override.action,
+                        note = %new_override.note,
+                        executed_at = ?new_override.executed_at,
+                        "trade.json reloaded"
+                    );
+                    trade_override = new_override;
+                    // 立即执行一次性指令
+                    execute_trade_override(
+                        &mut trade_override, tp, &exchange, &strategy_name,
+                    ).await;
+                }
             }
         }
     }

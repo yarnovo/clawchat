@@ -1,20 +1,20 @@
 {
-  "last_updated": "2026-03-18T14:01:07Z",
+  "last_updated": "2026-03-18T14:44:58Z",
   "indicators": {
-    "atr": 0.004742000000000003,
-    "candle_count": 2,
-    "ema_fast": 0.07397909090909091,
-    "ema_slow": 0.07397964285714285,
-    "prev_close": 0.07397,
+    "atr": 0.005744501925925928,
+    "candle_count": 5,
+    "ema_fast": 0.07185797213305102,
+    "ema_slow": 0.0731306641926541,
+    "prev_close": 0.05937,
     "prev_fast_above": false
   },
   "candle_aggregator": {
-    "open": 0.07571,
-    "high": 0.07571,
-    "low": 0.07571,
-    "close": 0.07571,
-    "volume": 1427.0,
-    "window_start": 1773842400000
+    "open": 0.05935,
+    "high": 0.05935,
+    "low": 0.05935,
+    "close": 0.05935,
+    "volume": 4242.0,
+    "window_start": 1773845100000
   },
   "trade_stats": {
     "total": 0,

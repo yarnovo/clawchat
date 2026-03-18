@@ -294,6 +294,106 @@ impl EngineRiskGuard {
     }
 }
 
+// ── RiskGate: 纯函数风控检查 ─────────────────────────────────
+// 从 risk_engine.rs 提取的核心检查逻辑，不涉及 IO，可在 hft-engine 内使用
+
+/// RiskGate 检查结果
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RiskVerdict {
+    /// 允许信号通过
+    Pass,
+    /// 拦截信号，附带原因
+    Block(String),
+    /// 需要平仓，附带原因
+    ClosePosition(String),
+}
+
+/// 纯函数：检查单笔止损
+pub fn check_stop_loss(pnl: f64, capital: f64, max_loss_per_trade: f64) -> RiskVerdict {
+    if capital > 0.0 && pnl < 0.0 {
+        let loss_ratio = -pnl / capital;
+        if loss_ratio >= max_loss_per_trade {
+            return RiskVerdict::ClosePosition(format!(
+                "stop_loss: {:.2}% >= {:.2}%",
+                loss_ratio * 100.0,
+                max_loss_per_trade * 100.0
+            ));
+        }
+    }
+    RiskVerdict::Pass
+}
+
+/// 纯函数：检查单笔止盈
+pub fn check_take_profit(pnl: f64, capital: f64, max_profit_per_trade: f64) -> RiskVerdict {
+    if capital > 0.0 && pnl > 0.0 {
+        let profit_ratio = pnl / capital;
+        if profit_ratio >= max_profit_per_trade {
+            return RiskVerdict::ClosePosition(format!(
+                "take_profit: {:.2}% >= {:.2}%",
+                profit_ratio * 100.0,
+                max_profit_per_trade * 100.0
+            ));
+        }
+    }
+    RiskVerdict::Pass
+}
+
+/// 纯函数：检查高水位利润保护
+pub fn check_hwm_protection(pnl: f64, hwm: f64, max_drawdown_stop: f64) -> RiskVerdict {
+    if pnl > 0.0 && hwm > 0.0 {
+        let protection_line = hwm * (1.0 - max_drawdown_stop);
+        if pnl <= protection_line {
+            return RiskVerdict::ClosePosition(format!(
+                "profit_protection: hwm={hwm:.4} pnl={pnl:.4} line={protection_line:.4}"
+            ));
+        }
+    }
+    RiskVerdict::Pass
+}
+
+/// 纯函数：检查仓位占比
+pub fn check_position_ratio(
+    notional: f64,
+    total_balance: f64,
+    max_position_ratio: f64,
+) -> RiskVerdict {
+    if total_balance > 0.0 && notional > 0.0 {
+        let ratio = notional / total_balance;
+        if ratio > max_position_ratio {
+            return RiskVerdict::Block(format!(
+                "position_ratio: {:.2}% > {:.2}%",
+                ratio * 100.0,
+                max_position_ratio * 100.0
+            ));
+        }
+    }
+    RiskVerdict::Pass
+}
+
+/// 综合风控门：依次检查止损/止盈/高水位/仓位占比
+/// 返回第一个非 Pass 的结果，全部通过返回 Pass
+pub fn risk_gate(
+    pnl: f64,
+    capital: f64,
+    hwm: f64,
+    notional: f64,
+    total_balance: f64,
+    config: &RiskConfig,
+) -> RiskVerdict {
+    let checks = [
+        check_stop_loss(pnl, capital, config.max_loss_per_trade),
+        check_take_profit(pnl, capital, config.max_profit_per_trade),
+        check_hwm_protection(pnl, hwm, config.max_drawdown_stop),
+        check_position_ratio(notional, total_balance, config.max_position_ratio),
+    ];
+    for v in checks {
+        if v != RiskVerdict::Pass {
+            return v;
+        }
+    }
+    RiskVerdict::Pass
+}
+
 // ── 原有基础风控管理器（保留兼容）─────────────────────────────
 
 /// 风控管理器 — 仓位限制、亏损限制、爆仓价计算、连续亏损熔断
@@ -604,124 +704,149 @@ mod tests {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // 风控规则测试（止损/止盈/高水位保护）
+    // RiskGate 纯函数风控测试
     // ══════════════════════════════════════════════════════════════
 
-    /// Simulate risk check logic (same as risk_engine.rs)
-    struct RiskCheckResult {
-        should_close: bool,
-        reason: &'static str,
-    }
-
-    fn check_risk_rules(
-        pnl: f64,
-        capital: f64,
-        risk: &RiskConfig,
-        hwm: f64,
-        _balance: f64,
-        _notional: f64,
-    ) -> RiskCheckResult {
-        // Stop loss
-        if capital > 0.0 && pnl < 0.0 {
-            let loss_ratio = -pnl / capital;
-            if loss_ratio >= risk.max_loss_per_trade {
-                return RiskCheckResult {
-                    should_close: true,
-                    reason: "stop_loss",
-                };
-            }
-        }
-        // Take profit
-        if capital > 0.0 && pnl > 0.0 {
-            let profit_ratio = pnl / capital;
-            if profit_ratio >= risk.max_profit_per_trade {
-                return RiskCheckResult {
-                    should_close: true,
-                    reason: "take_profit",
-                };
-            }
-        }
-        // High water mark profit protection
-        if pnl > 0.0 && hwm > 0.0 {
-            let protection_line = hwm * (1.0 - risk.max_drawdown_stop);
-            if pnl <= protection_line {
-                return RiskCheckResult {
-                    should_close: true,
-                    reason: "profit_protection",
-                };
-            }
-        }
-        RiskCheckResult {
-            should_close: false,
-            reason: "ok",
-        }
+    #[test]
+    fn risk_gate_stop_loss_triggers() {
+        let v = check_stop_loss(-10.0, 200.0, 0.05);
+        assert!(matches!(v, RiskVerdict::ClosePosition(_)));
     }
 
     #[test]
+    fn risk_gate_stop_loss_below_threshold() {
+        let v = check_stop_loss(-9.9, 200.0, 0.05);
+        assert_eq!(v, RiskVerdict::Pass);
+    }
+
+    #[test]
+    fn risk_gate_take_profit_triggers() {
+        let v = check_take_profit(20.0, 200.0, 0.10);
+        assert!(matches!(v, RiskVerdict::ClosePosition(_)));
+    }
+
+    #[test]
+    fn risk_gate_take_profit_below_threshold() {
+        let v = check_take_profit(19.9, 200.0, 0.10);
+        assert_eq!(v, RiskVerdict::Pass);
+    }
+
+    #[test]
+    fn risk_gate_hwm_triggers() {
+        // hwm = $20, max_drawdown_stop = 0.30 → protection_line = $14
+        // pnl = $14 → should trigger
+        let v = check_hwm_protection(14.0, 20.0, 0.30);
+        assert!(matches!(v, RiskVerdict::ClosePosition(_)));
+    }
+
+    #[test]
+    fn risk_gate_hwm_does_not_trigger() {
+        // pnl = $15 → above protection line
+        let v = check_hwm_protection(15.0, 20.0, 0.30);
+        assert_eq!(v, RiskVerdict::Pass);
+    }
+
+    #[test]
+    fn risk_gate_hwm_exact_boundary() {
+        // pnl = $14.01 → just above, should NOT trigger
+        let v = check_hwm_protection(14.01, 20.0, 0.30);
+        assert_eq!(v, RiskVerdict::Pass);
+    }
+
+    #[test]
+    fn risk_gate_hwm_deep_drawdown() {
+        let v = check_hwm_protection(5.0, 20.0, 0.30);
+        assert!(matches!(v, RiskVerdict::ClosePosition(_)));
+    }
+
+    #[test]
+    fn risk_gate_position_ratio_triggers() {
+        // notional=400, balance=1000, limit=0.30 → ratio=40% > 30%
+        let v = check_position_ratio(400.0, 1000.0, 0.30);
+        assert!(matches!(v, RiskVerdict::Block(_)));
+    }
+
+    #[test]
+    fn risk_gate_position_ratio_within_limit() {
+        // notional=200, balance=1000, limit=0.30 → ratio=20% < 30%
+        let v = check_position_ratio(200.0, 1000.0, 0.30);
+        assert_eq!(v, RiskVerdict::Pass);
+    }
+
+    #[test]
+    fn risk_gate_combined_first_fail_wins() {
+        let config = RiskConfig::default();
+        // pnl = -10, capital = 200 → loss 5% = stop_loss triggers first
+        let v = risk_gate(-10.0, 200.0, 0.0, 0.0, 200.0, &config);
+        assert!(matches!(v, RiskVerdict::ClosePosition(_)));
+    }
+
+    #[test]
+    fn risk_gate_combined_all_pass() {
+        let config = RiskConfig::default();
+        // small positive pnl, no hwm, small notional
+        let v = risk_gate(1.0, 200.0, 0.0, 50.0, 200.0, &config);
+        assert_eq!(v, RiskVerdict::Pass);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // Legacy risk rule tests (via risk_gate)
+    // ══════════════════════════════════════════════════════════════
+
+    #[test]
     fn risk_stop_loss_triggers() {
-        let risk = RiskConfig::default(); // max_loss_per_trade = 0.05
-        let result = check_risk_rules(-10.0, 200.0, &risk, 0.0, 200.0, 0.0);
-        assert!(result.should_close);
-        assert_eq!(result.reason, "stop_loss");
+        let risk = RiskConfig::default();
+        let result = risk_gate(-10.0, 200.0, 0.0, 0.0, 200.0, &risk);
+        assert!(matches!(result, RiskVerdict::ClosePosition(_)));
     }
 
     #[test]
     fn risk_stop_loss_below_threshold() {
         let risk = RiskConfig::default();
-        let result = check_risk_rules(-9.9, 200.0, &risk, 0.0, 200.0, 0.0);
-        assert!(!result.should_close);
+        let result = risk_gate(-9.9, 200.0, 0.0, 0.0, 200.0, &risk);
+        assert_eq!(result, RiskVerdict::Pass);
     }
 
     #[test]
     fn risk_take_profit_triggers() {
-        let risk = RiskConfig::default(); // max_profit_per_trade = 0.10
-        let result = check_risk_rules(20.0, 200.0, &risk, 0.0, 200.0, 0.0);
-        assert!(result.should_close);
-        assert_eq!(result.reason, "take_profit");
+        let risk = RiskConfig::default();
+        let result = risk_gate(20.0, 200.0, 0.0, 0.0, 200.0, &risk);
+        assert!(matches!(result, RiskVerdict::ClosePosition(_)));
     }
 
     #[test]
     fn risk_take_profit_below_threshold() {
         let risk = RiskConfig::default();
-        let result = check_risk_rules(19.9, 200.0, &risk, 0.0, 200.0, 0.0);
-        assert!(!result.should_close);
+        let result = risk_gate(19.9, 200.0, 0.0, 0.0, 200.0, &risk);
+        assert_eq!(result, RiskVerdict::Pass);
     }
 
     #[test]
     fn risk_hwm_protection_triggers() {
-        let risk = RiskConfig::default(); // max_drawdown_stop = 0.30
-        // hwm = $20, protection_line = $20 * 0.70 = $14
-        // pnl = $14 → should trigger (pnl <= protection_line)
-        let result = check_risk_rules(14.0, 200.0, &risk, 20.0, 200.0, 0.0);
-        assert!(result.should_close);
-        assert_eq!(result.reason, "profit_protection");
+        let risk = RiskConfig::default();
+        let result = risk_gate(14.0, 200.0, 20.0, 0.0, 200.0, &risk);
+        assert!(matches!(result, RiskVerdict::ClosePosition(_)));
     }
 
     #[test]
     fn risk_hwm_protection_does_not_trigger() {
         let risk = RiskConfig::default();
-        // hwm = $20, protection_line = $14
-        // pnl = $15 → should NOT trigger
-        let result = check_risk_rules(15.0, 200.0, &risk, 20.0, 200.0, 0.0);
-        assert!(!result.should_close);
+        let result = risk_gate(15.0, 200.0, 20.0, 0.0, 200.0, &risk);
+        assert_eq!(result, RiskVerdict::Pass);
     }
 
     #[test]
     fn risk_hwm_protection_exact_boundary() {
         let risk = RiskConfig::default();
-        // hwm = $20, protection_line = $14
-        // pnl = $14.01 → should NOT trigger (just above)
-        let result = check_risk_rules(14.01, 200.0, &risk, 20.0, 200.0, 0.0);
-        assert!(!result.should_close);
+        let result = risk_gate(14.01, 200.0, 20.0, 0.0, 200.0, &risk);
+        assert_eq!(result, RiskVerdict::Pass);
     }
 
     #[test]
     fn risk_hwm_protection_deep_drawdown() {
         let risk = RiskConfig::default();
-        // hwm = $20, pnl = $5 → deep drawdown, should trigger
-        let result = check_risk_rules(5.0, 200.0, &risk, 20.0, 200.0, 0.0);
-        assert!(result.should_close);
-        assert_eq!(result.reason, "profit_protection");
+        let result = risk_gate(5.0, 200.0, 20.0, 0.0, 200.0, &risk);
+        assert!(matches!(result, RiskVerdict::ClosePosition(_)));
     }
 
     // ══════════════════════════════════════════════════════════════

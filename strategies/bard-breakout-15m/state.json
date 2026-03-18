@@ -1,12 +1,18 @@
 {
   "last_updated": "2026-03-18T14:44:58Z",
   "indicators": {
-    "atr": 0.0642553639506173,
-    "candle_count": 5,
-    "ema_fast": 0.7116488422921932,
-    "ema_slow": 0.7146166045723136,
-    "prev_close": 0.6877,
-    "prev_fast_above": false
+    "closes": [
+      0.7072,
+      0.6877
+    ],
+    "highs": [
+      0.74,
+      0.7284
+    ],
+    "lows": [
+      0.6945,
+      0.685
+    ]
   },
   "candle_aggregator": {
     "open": 0.6878,
