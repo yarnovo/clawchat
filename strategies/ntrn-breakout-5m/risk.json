@@ -1,0 +1,7 @@
+{
+  "name": "ntrn-breakout-5m",
+  "max_loss_per_trade": 0.05,
+  "max_daily_loss": 0.15,
+  "max_drawdown_warning": 0.10,
+  "max_drawdown_stop": 0.20
+}

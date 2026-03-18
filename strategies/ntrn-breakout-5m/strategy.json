@@ -1,0 +1,27 @@
+{
+  "name": "ntrn-breakout-5m",
+  "engine_strategy": "breakout",
+  "symbol": "NTRNUSDT",
+  "timeframe_ms": 300000,
+  "leverage": 3,
+  "order_qty": 100,
+  "position_size": 0.5,
+  "capital": 200,
+  "params": {
+    "lookback": 48,
+    "atr_period": 14,
+    "atr_filter": 0.3,
+    "trail_atr": 3.0
+  },
+  "backtest": {
+    "days": 14,
+    "return_pct": 42.36,
+    "sharpe": 17.81,
+    "max_drawdown_pct": 4.98,
+    "trades": 9,
+    "win_rate": 0.556,
+    "profit_factor": 8.80
+  },
+  "status": "approved",
+  "approved_date": "2026-03-18"
+}
