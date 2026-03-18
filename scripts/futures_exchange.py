@@ -206,6 +206,22 @@ def place_take_profit(exchange, symbol, side, amount, stop_price, close_position
     return order
 
 
+# ── 划转 ───────────────────────────────────────────────────
+
+def transfer_to_futures(exchange, amount, currency='USDT'):
+    """从现货账户划转到合约账户。"""
+    resp = exchange.transfer(currency, amount, 'spot', 'future')
+    print(f"  划转成功: {amount} {currency} 现货 → 合约")
+    return resp
+
+
+def transfer_to_spot(exchange, amount, currency='USDT'):
+    """从合约账户划转到现货账户。"""
+    resp = exchange.transfer(currency, amount, 'future', 'spot')
+    print(f"  划转成功: {amount} {currency} 合约 → 现货")
+    return resp
+
+
 # ── 查询 ───────────────────────────────────────────────────
 
 def get_positions(exchange, symbols=None):
@@ -269,6 +285,8 @@ def main():
         print("  close-long SYMBOL AMOUNT [PRICE] 平多")
         print("  close-short SYMBOL AMOUNT [PRICE]平空")
         print("  close-all SYMBOL                 全部平仓")
+        print("  transfer AMOUNT                  现货→合约划转")
+        print("  transfer AMOUNT to-spot          合约→现货划转")
         print("  stop-loss SYMBOL SIDE AMOUNT PRICE  止损单")
         print("  take-profit SYMBOL SIDE AMOUNT PRICE 止盈单")
         return
@@ -309,6 +327,14 @@ def main():
 
     elif cmd == 'close-all':
         close_all(ex, sym())
+
+    elif cmd == 'transfer':
+        # transfer AMOUNT [to-spot]
+        amount = float(sys.argv[2])
+        if len(sys.argv) > 3 and sys.argv[3] == 'to-spot':
+            transfer_to_spot(ex, amount)
+        else:
+            transfer_to_futures(ex, amount)
 
     elif cmd == 'stop-loss':
         # stop-loss SYMBOL SIDE AMOUNT PRICE

@@ -4,7 +4,7 @@ export BASH_ENV := .env
 ROOT := $(shell pwd)
 PY := cd $(ROOT)/scripts && uv run python
 
-.PHONY: install clean watch account scan backtest pnl check build hft notify report-dev help
+.PHONY: install clean watch account scan backtest pnl check build hft transfer notify report-dev help
 
 # === Setup ===
 
@@ -32,6 +32,9 @@ backtest: ## Backtest (SYMBOL= STRATEGY=scalping DAYS=7 LEVERAGE=5 TIMEFRAME=5m 
 	@$(PY) backtest.py --symbol $(or $(SYMBOL),BTC/USDT) --strategy $(or $(STRATEGY),scalping) --days $(or $(DAYS),7) --leverage $(or $(LEVERAGE),5) --capital $(or $(CAPITAL),200) --timeframe $(or $(TIMEFRAME),5m)
 
 # === Trading ===
+
+transfer: ## Transfer USDT spot→futures (AMOUNT=197)
+	@$(PY) futures_exchange.py transfer $(or $(AMOUNT),197)
 
 pnl: ## Real P&L from exchange trades
 	@$(PY) pnl.py $(SYMBOL) $(HOURS)
