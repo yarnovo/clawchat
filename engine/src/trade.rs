@@ -1,3 +1,4 @@
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -60,6 +61,12 @@ pub struct TradeOverride {
     /// 引擎执行一次性指令后写入时间戳，表示已执行
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub executed_at: Option<String>,
+    /// 过期时间（ISO 8601），过期后指令自动失效回 hold
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<String>,
+    /// 条件触发：价格达到条件时才激活
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub condition: Option<TradeCondition>,
 }
 
 /// trade override 的附加参数
@@ -73,6 +80,16 @@ pub struct TradeParams {
     pub direction: Option<String>,
 }
 
+/// 条件触发：价格到达指定水平时才激活指令
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum TradeCondition {
+    /// 当前价 >= price 时触发
+    PriceAbove { price: f64 },
+    /// 当前价 <= price 时触发
+    PriceBelow { price: f64 },
+}
+
 impl Default for TradeOverride {
     fn default() -> Self {
         Self {
@@ -81,6 +98,8 @@ impl Default for TradeOverride {
             note: String::new(),
             updated_at: String::new(),
             executed_at: None,
+            expires_at: None,
+            condition: None,
         }
     }
 }
@@ -130,6 +149,39 @@ impl TradeOverride {
     /// 是否处于暂停状态（pause 或 stop 后）
     pub fn is_paused(&self) -> bool {
         matches!(self.action, TradeAction::Pause | TradeAction::Stop)
+    }
+
+    /// 指令是否有效：检查过期时间和条件触发
+    ///
+    /// 返回 false 时，调用方应将此指令视为 hold（失效）
+    pub fn is_active(&self, current_price: f64) -> bool {
+        // 1. 过期检查
+        if let Some(ref exp) = self.expires_at {
+            if let Ok(expires) = chrono::DateTime::parse_from_rfc3339(exp) {
+                if Utc::now() >= expires {
+                    return false;
+                }
+            }
+            // 解析失败视为不过期（宽容处理）
+        }
+
+        // 2. 条件检查
+        if let Some(ref cond) = self.condition {
+            match cond {
+                TradeCondition::PriceAbove { price } => {
+                    if current_price < *price {
+                        return false;
+                    }
+                }
+                TradeCondition::PriceBelow { price } => {
+                    if current_price > *price {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        true
     }
 }
 
@@ -240,10 +292,9 @@ mod tests {
 
         let t = TradeOverride {
             action: TradeAction::Stop,
-            params: TradeParams::default(),
             note: "stop all".to_string(),
             updated_at: "2026-03-18T12:00:00Z".to_string(),
-            executed_at: None,
+            ..Default::default()
         };
         t.save(&path);
 
@@ -259,10 +310,9 @@ mod tests {
 
         let mut t = TradeOverride {
             action: TradeAction::CloseAll,
-            params: TradeParams::default(),
             note: "emergency close".to_string(),
             updated_at: "2026-03-18T12:00:00Z".to_string(),
-            executed_at: None,
+            ..Default::default()
         };
         assert!(t.needs_execution());
 
@@ -396,5 +446,145 @@ mod tests {
         ).unwrap();
         assert_eq!(t.params.percent, Some(0.5));
         assert!(t.params.direction.is_none());
+    }
+
+    // ── expires_at tests ──
+
+    #[test]
+    fn is_active_no_expiry_no_condition() {
+        let t = TradeOverride {
+            action: TradeAction::Pause,
+            ..Default::default()
+        };
+        assert!(t.is_active(100.0));
+    }
+
+    #[test]
+    fn is_active_future_expiry() {
+        let t = TradeOverride {
+            action: TradeAction::Pause,
+            expires_at: Some("2099-12-31T23:59:59Z".to_string()),
+            ..Default::default()
+        };
+        assert!(t.is_active(100.0));
+    }
+
+    #[test]
+    fn is_active_past_expiry() {
+        let t = TradeOverride {
+            action: TradeAction::Pause,
+            expires_at: Some("2020-01-01T00:00:00Z".to_string()),
+            ..Default::default()
+        };
+        assert!(!t.is_active(100.0));
+    }
+
+    #[test]
+    fn is_active_invalid_expiry_treated_as_no_expiry() {
+        let t = TradeOverride {
+            action: TradeAction::Pause,
+            expires_at: Some("not-a-date".to_string()),
+            ..Default::default()
+        };
+        assert!(t.is_active(100.0)); // 宽容处理
+    }
+
+    // ── condition tests ──
+
+    #[test]
+    fn is_active_price_above_met() {
+        let t = TradeOverride {
+            action: TradeAction::CloseAll,
+            condition: Some(TradeCondition::PriceAbove { price: 50.0 }),
+            ..Default::default()
+        };
+        assert!(t.is_active(60.0));  // 60 >= 50
+        assert!(t.is_active(50.0));  // 50 >= 50 (boundary)
+    }
+
+    #[test]
+    fn is_active_price_above_not_met() {
+        let t = TradeOverride {
+            action: TradeAction::CloseAll,
+            condition: Some(TradeCondition::PriceAbove { price: 50.0 }),
+            ..Default::default()
+        };
+        assert!(!t.is_active(49.0)); // 49 < 50
+    }
+
+    #[test]
+    fn is_active_price_below_met() {
+        let t = TradeOverride {
+            action: TradeAction::CloseAll,
+            condition: Some(TradeCondition::PriceBelow { price: 50.0 }),
+            ..Default::default()
+        };
+        assert!(t.is_active(40.0));  // 40 <= 50
+        assert!(t.is_active(50.0));  // 50 <= 50 (boundary)
+    }
+
+    #[test]
+    fn is_active_price_below_not_met() {
+        let t = TradeOverride {
+            action: TradeAction::CloseAll,
+            condition: Some(TradeCondition::PriceBelow { price: 50.0 }),
+            ..Default::default()
+        };
+        assert!(!t.is_active(51.0)); // 51 > 50
+    }
+
+    #[test]
+    fn is_active_expired_overrides_condition() {
+        // 即使条件满足，过期了也失效
+        let t = TradeOverride {
+            action: TradeAction::CloseAll,
+            expires_at: Some("2020-01-01T00:00:00Z".to_string()),
+            condition: Some(TradeCondition::PriceAbove { price: 50.0 }),
+            ..Default::default()
+        };
+        assert!(!t.is_active(60.0));
+    }
+
+    // ── condition serde tests ──
+
+    #[test]
+    fn trade_condition_serde_price_above() {
+        let json = r#"{"type":"price_above","price":100.5}"#;
+        let cond: TradeCondition = serde_json::from_str(json).unwrap();
+        assert_eq!(cond, TradeCondition::PriceAbove { price: 100.5 });
+        let serialized = serde_json::to_string(&cond).unwrap();
+        assert!(serialized.contains("price_above"));
+        assert!(serialized.contains("100.5"));
+    }
+
+    #[test]
+    fn trade_condition_serde_price_below() {
+        let json = r#"{"type":"price_below","price":0.35}"#;
+        let cond: TradeCondition = serde_json::from_str(json).unwrap();
+        assert_eq!(cond, TradeCondition::PriceBelow { price: 0.35 });
+    }
+
+    #[test]
+    fn trade_override_with_condition_load() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("trade.json");
+        let mut f = std::fs::File::create(&path).unwrap();
+        write!(
+            f,
+            r#"{{"action":"close_all","condition":{{"type":"price_below","price":0.30}},"expires_at":"2099-12-31T23:59:59Z"}}"#
+        ).unwrap();
+
+        let t = TradeOverride::load(&path);
+        assert_eq!(t.action, TradeAction::CloseAll);
+        assert!(t.condition.is_some());
+        assert_eq!(t.condition.unwrap(), TradeCondition::PriceBelow { price: 0.30 });
+        assert!(t.expires_at.is_some());
+    }
+
+    #[test]
+    fn trade_override_defaults_have_no_expiry_no_condition() {
+        let t = TradeOverride::default();
+        assert!(t.expires_at.is_none());
+        assert!(t.condition.is_none());
     }
 }

@@ -39,6 +39,9 @@ def main():
     # 报告
     sub.add_parser("report", help="报告生成（daily/weekly）")
 
+    # 风控
+    sub.add_parser("risk-log", help="风控事件查询")
+
     # 紧急操作
     sub.add_parser("emergency-close", help="紧急全平（所有或指定策略）")
 
@@ -106,6 +109,9 @@ def main():
         cmd()
     elif args.command == "report":
         from clawchat.cmd_report import main as cmd
+        cmd()
+    elif args.command == "risk-log":
+        from clawchat.cmd_risklog import main as cmd
         cmd()
     elif args.command == "emergency-close":
         from clawchat.cmd_emergency import main as cmd

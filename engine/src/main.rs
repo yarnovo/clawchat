@@ -966,13 +966,16 @@ async fn try_execute_signal(
     if *signal == Signal::None {
         return;
     }
-    // DecisionGate: trade override 过滤
-    if !decision_gate_allows_signal(trade_override) {
-        tracing::debug!(
-            action = ?trade_override.action,
-            "signal blocked by trade override"
-        );
-        return;
+    // 过期/条件失效的 trade override 视为 hold，不拦截
+    if trade_override.is_active(current_price) {
+        // DecisionGate: trade override 过滤
+        if !decision_gate_allows_signal(trade_override) {
+            tracing::debug!(
+                action = ?trade_override.action,
+                "signal blocked by trade override"
+            );
+            return;
+        }
     }
 
     // Funding rate 过滤：做多时 funding > limit 拒绝，做空时 funding < -limit 拒绝
@@ -1012,8 +1015,18 @@ async fn execute_trade_override(
     trade_path: &std::path::Path,
     exchange: &Exchange,
     strategy_name: &str,
+    current_price: f64,
 ) {
     if !trade_override.needs_execution() {
+        return;
+    }
+
+    // 检查过期和条件
+    if !trade_override.is_active(current_price) {
+        tracing::debug!(
+            action = ?trade_override.action,
+            "trade override inactive (expired or condition not met)"
+        );
         return;
     }
 
@@ -1317,7 +1330,7 @@ async fn main() {
     // 启动时执行待处理的一次性指令
     if let Some(ref tp) = trade_path {
         execute_trade_override(
-            &mut trade_override, tp, &exchange, &strategy_name,
+            &mut trade_override, tp, &exchange, &strategy_name, last_price,
         ).await;
     }
 
@@ -1516,7 +1529,7 @@ async fn main() {
                     trade_override = new_override;
                     // 立即执行一次性指令
                     execute_trade_override(
-                        &mut trade_override, tp, &exchange, &strategy_name,
+                        &mut trade_override, tp, &exchange, &strategy_name, last_price,
                     ).await;
                 }
             }
