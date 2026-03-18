@@ -6,7 +6,6 @@
 - [ ] quant: 每日 9:00 跑 `clawchat review` 评估策略健康
 - [ ] quant: 每周一 9:00 生成周报（`clawchat report weekly`）
 - [ ] trader: 持续监控持仓，判断加仓/减仓/锁利
-- [ ] team-lead: 心跳策略管理 + 读 TODO 派活
 - [ ] team-lead: 定期检查提示词/文档是否过时，同步到最新架构
 
 ## 进行中
