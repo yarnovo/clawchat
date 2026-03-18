@@ -12,17 +12,34 @@ use types::{MarketEvent, OrderType as StratOrderType, Side as StratSide};
 
 use crate::ws_feed::{start_feed, FeedConfig};
 
+/// 根据 symbol 返回合适的下单数量（满足交易所精度要求）
+fn default_order_qty(symbol: &str) -> f64 {
+    match symbol {
+        s if s.starts_with("PIPPIN") => 100.0,
+        s if s.starts_with("ETH") => 0.01,
+        s if s.starts_with("BTC") => 0.001,
+        s if s.starts_with("BNB") => 0.01,
+        s if s.starts_with("SOL") => 0.1,
+        s if s.starts_with("XRP") => 10.0,
+        s if s.starts_with("DOGE") => 100.0,
+        _ => 1.0,
+    }
+}
+
 /// 根据 config.strategy 创建策略实例
 fn create_strategy(config: &Config) -> Box<dyn Strategy> {
+    let qty = default_order_qty(&config.symbol);
+    tracing::info!(symbol = %config.symbol, order_qty = qty, "order qty for symbol");
+
     match config.strategy.as_str() {
         "market_maker" | "mm" => {
             tracing::info!("using MarketMaker strategy");
-            Box::new(MarketMaker::new(&config.symbol, 0.0004, 0.001))
+            Box::new(MarketMaker::new(&config.symbol, 0.0004, qty))
         }
         _ => {
             // 默认使用 TrendFollower
             tracing::info!("using TrendFollower strategy");
-            Box::new(TrendFollower::new(&config.symbol, 0.001))
+            Box::new(TrendFollower::new(&config.symbol, qty))
         }
     }
 }
