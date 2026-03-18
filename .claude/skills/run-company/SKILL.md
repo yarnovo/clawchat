@@ -26,20 +26,23 @@ TeamCreate(team_name="clawchat-fund")
 make start
 ```
 
-### 2. 分配任务
+### 2. 分配任务与报告责任
 
-- **analyst**: make scan 选币 → 推荐给 trader
-- **trader**: make status 检查 → 评估调整 → 通知 risk
-- **risk**: make account + make check → make report-brief 发报告
+| 成员 | 职责 | 负责的报告 |
+|------|------|-----------|
+| **CEO（main）** | 维护 skills/scripts、KPI 推进 | KPI 推进报告（心跳输出） |
+| **analyst** | make scan 选币 → 推荐 trader | 市场分析报告（按需） |
+| **trader** | make status 检查 → 评估调整 | 策略运行报告（按需） |
+| **risk** | make account + make check 风控 | 运营快报邮件（每 10 分钟） |
 
 ### 3. 设置定时任务
 
-```
-/loop 1m make check（KPI 心跳 + 自动 promote + 止损检查）
-/loop 30m make report-brief（运营快报，含 KPI 进度）
-/loop 1h commit + make report-dev（迭代报告）
-/loop 1h make scan（定时选币）
-每日 20:00 make report-daily（运营日报）
+调用以下技能启动定时任务：
+
+1. `/heartbeat` — 每 1 分钟 KPI 心跳（promote + 止损 + 选币 + 驱动团队 + 推进报告）
+2. `/ops-brief` — 每 10 分钟运营快报邮件（由 risk 发送）
+3. `/dev-report` — 每 30 分钟自动 commit + 迭代报告邮件
+4. `/ops-daily` — 每日 20:00 运营日报邮件
 ```
 
 ### 4. 报告体系
