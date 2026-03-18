@@ -64,13 +64,12 @@ strategist risk bull bear engineer
 | **risk** | 审核 risk.json、监控风控状态 | risk-engine 实时执行 |
 | **engineer** | Rust 交易/风控引擎代码 + Python 守护代码 | 引擎/守护进程 |
 
-| **bull** | 积极派分析师：找机会，论证该行动的理由 | team-lead 决策参考 |
-| **bear** | 谨慎派分析师：找风险，论证要谨慎的理由 | team-lead 决策参考 |
 | **architect** | 系统架构师：技术方案设计、架构评审（只设计不实现） | team-lead 讨论后派 engineer 实现 |
 | **tester** | 测试工程师：engineer 提交后验证代码、跑测试、查 bug | team-lead review 前先过 tester |
 
 > **技术支持**：strategist 和 risk 如需新脚本/工具/数据支持，告诉 team-lead，team-lead 派 engineer 实现。
-> **决策讨论**：team-lead 重要决策前同时问 bull 和 bear，听两边分析后决策。
+> **架构讨论**：技术方案先找 architect 讨论设计，确认后派 engineer 实现。
+> **同类角色默认多个**：strategist、engineer、architect 等角色按需创建多个并行工作（如 strategist + strategist2），name 用纯字母数字。
 
 ## 策略配置
 
@@ -161,11 +160,7 @@ TeamCreate(team_name="clawchat")
 - **risk.json 由你决定**：止盈止损阈值根据策略特性设不同值（scalping 紧、趋势宽）
 - 需要技术支持告诉 team-lead，engineer 会实现
 
-**可创建多个 strategist 并行找策略**（如 strategist + strategist2），分工不同方向：
-- strategist：新币种开拓 + 投资组合分散
-- strategist2：调参优化 + 均值回归
-- 更多：按需创建（name 用纯字母数字，不能有连字符）
-- **spawn prompt 不要重复写准入标准，指向"准入标准见本 SKILL.md"即可**，避免标准更新后新旧不一致
+- **spawn prompt 不要重复写准入标准**，指向 criteria.py 和 SCHEMA.md
 
 **risk spawn prompt 要点：**
 - `make check` 风控检查 + 确认 risk.json 就位
@@ -178,10 +173,7 @@ TeamCreate(team_name="clawchat")
 - **不要修改 TODO.md**，完成任务向 team-lead 汇报，由 team-lead review 后更新
 - 代码改动必须同步更新 engine/SCHEMA.md 文档
 
-**可创建多个 engineer 并行做任务**（如 engineer + engineer2），team-lead 协调分工：
-- engineer：风控引擎 + 核心功能
-- engineer2：工具脚本 + 辅助功能
-- 更多：按需创建（name 用纯字母数字）
+- 代码改动必须同步更新 engine/SCHEMA.md 文档
 
 **所有成员 spawn prompt 通用规则：**
 - 不要修改 TODO.md（只有 team-lead 维护）
