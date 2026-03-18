@@ -246,6 +246,11 @@ engineer 提交代码后，team-lead 必须 review：
 - `cargo test --lib && cargo test --bin risk-engine` 验证测试
 - 不能只听汇报，要看代码
 
+strategist 提交策略后，team-lead 必须验证：
+- `make backtest` 亲自跑一遍确认回测数据真实
+- 对比 strategy.json 的 backtest 字段和实际输出是否一致
+- **不能信 backtest 字段的数据，必须自己验证**
+
 ## 心跳 — 交易总监的策略管理循环
 
 心跳是 team-lead 的核心工作，每 1 分钟一轮。本质是**读数据、判断、做决策**。
