@@ -16,9 +16,9 @@ make hft     # 运行
 ## 配置
 
 三个 JSON 配置控制引擎行为，格式规范用技能查看：
-- `strategy.json` — 策略参数（strategist 写）→ `/strategy-config`
+- `strategy.json` — 策略参数（quant 写）→ `/strategy-config`
 - `trade.json` — 交易指令（trader 写）→ `/trade-config`
-- `risk.json` — 风控规则（strategist 写，risk 审核）→ `/risk-config`
+- `risk.json` — 风控规则（quant 写，risk 审核）→ `/risk-config`
 
 ## records/
 

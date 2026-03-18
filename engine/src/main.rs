@@ -21,6 +21,8 @@ use tokio::sync::mpsc as tokio_mpsc;
 use tokio_tungstenite::connect_async;
 
 const TRADES_LOG: &str = "records/trades.jsonl";
+const RISK_EVENTS_LOG: &str = "records/risk_events.jsonl";
+const SIGNALS_LOG: &str = "records/signals.jsonl";
 const HIGH_WATER_FILE: &str = "records/high_water.json";
 const BINANCE_FSTREAM_WS: &str = "wss://fstream.binance.com";
 /// listenKey keepalive 间隔（分钟）
@@ -438,6 +440,81 @@ fn log_trade(
             }
         }
         Err(e) => tracing::warn!("failed to open trades.jsonl: {e}"),
+    }
+}
+
+/// Append a risk event to records/risk_events.jsonl
+fn log_risk_event(
+    strategy: &str,
+    symbol: &str,
+    verdict: &RiskVerdict,
+    pnl: f64,
+) {
+    let (rule, detail) = match verdict {
+        RiskVerdict::ClosePosition(reason) => ("close_position", reason.as_str()),
+        RiskVerdict::Block(reason) => ("block", reason.as_str()),
+        RiskVerdict::Pass => return, // don't log Pass
+    };
+
+    let ts = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let record = serde_json::json!({
+        "ts": ts,
+        "strategy": strategy,
+        "symbol": symbol,
+        "rule": rule,
+        "pnl": pnl,
+        "verdict": format!("{:?}", verdict),
+        "detail": detail,
+    });
+
+    let log_path = std::path::Path::new(RISK_EVENTS_LOG);
+    if let Some(parent) = log_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    match OpenOptions::new().create(true).append(true).open(log_path) {
+        Ok(mut file) => {
+            if let Err(e) = writeln!(file, "{}", record) {
+                tracing::warn!("failed to write risk event log: {e}");
+            }
+        }
+        Err(e) => tracing::warn!("failed to open risk_events.jsonl: {e}"),
+    }
+}
+
+/// Append a signal record to records/signals.jsonl
+fn log_signal(
+    strategy_name: &str,
+    signal: &Signal,
+    price: f64,
+    indicators: &serde_json::Value,
+    executed: bool,
+) {
+    let signal_str = match signal {
+        Signal::Order(req) => format!("{:?}", req.side).to_lowercase(),
+        Signal::None => return, // don't log None
+    };
+
+    let ts = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let record = serde_json::json!({
+        "ts": ts,
+        "strategy": strategy_name,
+        "signal": signal_str,
+        "price": price,
+        "indicators": indicators,
+        "executed": executed,
+    });
+
+    let log_path = std::path::Path::new(SIGNALS_LOG);
+    if let Some(parent) = log_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    match OpenOptions::new().create(true).append(true).open(log_path) {
+        Ok(mut file) => {
+            if let Err(e) = writeln!(file, "{}", record) {
+                tracing::warn!("failed to write signal log: {e}");
+            }
+        }
+        Err(e) => tracing::warn!("failed to open signals.jsonl: {e}"),
     }
 }
 
@@ -1195,13 +1272,15 @@ async fn main() {
                                 "candle closed"
                             );
                             if let Some(signal) = strategy.on_candle(&candle) {
+                                let executed = signal != Signal::None && decision_gate_allows_signal(&trade_override);
+                                log_signal(&strategy_name, &signal, last_price, &strategy.export_state(), executed);
                                 try_execute_signal(
                                     &signal, &trade_override, &exchange, &strategy_name,
                                     config.sizing_mode, config.position_size, config.leverage, last_price,
                                     risk_config.max_loss_per_trade,
                                 ).await;
                                 // 成交后保存状态
-                                if signal != Signal::None && decision_gate_allows_signal(&trade_override) {
+                                if executed {
                                     if let Some(ref sp) = state_path {
                                         save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
                                     }
@@ -1215,12 +1294,14 @@ async fn main() {
 
                         // 也把 tick 直接给策略（高频策略用）
                         if let Some(signal) = strategy.on_tick(tick) {
+                            let executed = signal != Signal::None && decision_gate_allows_signal(&trade_override);
+                            log_signal(&strategy_name, &signal, last_price, &strategy.export_state(), executed);
                             try_execute_signal(
                                 &signal, &trade_override, &exchange, &strategy_name,
                                 config.sizing_mode, config.position_size, config.leverage, last_price,
                                 risk_config.max_loss_per_trade,
                             ).await;
-                            if signal != Signal::None && decision_gate_allows_signal(&trade_override) {
+                            if executed {
                                 if let Some(ref sp) = state_path {
                                     save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
                                 }
@@ -1229,12 +1310,14 @@ async fn main() {
                     }
                     MarketEvent::Depth(depth) => {
                         if let Some(signal) = strategy.on_depth(depth) {
+                            let executed = signal != Signal::None && decision_gate_allows_signal(&trade_override);
+                            log_signal(&strategy_name, &signal, last_price, &strategy.export_state(), executed);
                             try_execute_signal(
                                 &signal, &trade_override, &exchange, &strategy_name,
                                 config.sizing_mode, config.position_size, config.leverage, last_price,
                                 risk_config.max_loss_per_trade,
                             ).await;
-                            if signal != Signal::None && decision_gate_allows_signal(&trade_override) {
+                            if executed {
                                 if let Some(ref sp) = state_path {
                                     save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
                                 }
@@ -1276,6 +1359,7 @@ async fn main() {
                                         "[RISK GATE] {symbol} {} pnl={pnl:.4} → {reason}",
                                         pos.position_side
                                     );
+                                    log_risk_event(&strategy_name, symbol, &verdict, pnl);
                                     match exchange.close_position(symbol, pos.position_amt).await {
                                         Ok(_) => {
                                             tracing::info!("  {symbol} closed by risk gate");
@@ -1291,6 +1375,7 @@ async fn main() {
                                         "[RISK GATE] {symbol} {} → block: {reason}",
                                         pos.position_side
                                     );
+                                    log_risk_event(&strategy_name, symbol, &verdict, pnl);
                                 }
                                 RiskVerdict::Pass => {
                                     // 更新高水位

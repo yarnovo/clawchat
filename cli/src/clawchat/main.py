@@ -33,6 +33,9 @@ def main():
     # 评估
     sub.add_parser("review", help="策略实盘评估（对比回测）")
 
+    # 报告
+    sub.add_parser("report", help="报告生成（daily/weekly）")
+
     # 交易所直接操作
     sub.add_parser("exchange", help="交易所操作（开仓/平仓/止损等）")
 
@@ -91,6 +94,9 @@ def main():
         cmd()
     elif args.command == "review":
         from clawchat.cmd_review import main as cmd
+        cmd()
+    elif args.command == "report":
+        from clawchat.cmd_report import main as cmd
         cmd()
     elif args.command == "exchange":
         from clawchat.exchange import main as cmd

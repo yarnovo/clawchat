@@ -6,7 +6,7 @@ user-invocable: true
 
 # 策略配置编写规范
 
-strategist 产出策略时需要写 2 个配置文件。
+quant 产出策略时需要写 2 个配置文件。
 
 ## strategy.json
 
@@ -93,7 +93,7 @@ pending → approved → active → degraded → suspended
 
 ## risk.json
 
-风控引擎读取，控制止损止盈阈值。由 strategist 根据策略特性定义。
+风控引擎读取，控制止损止盈阈值。由 quant 根据策略特性定义。
 
 ```json
 {
