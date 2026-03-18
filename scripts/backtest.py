@@ -1250,12 +1250,21 @@ def main():
     parser.add_argument('--capital', type=float, default=200, help='初始资金 USDT')
     parser.add_argument('--position', type=float, default=0.5,
                         help='每笔仓位占可用资金比例 (0-1)')
+    parser.add_argument('--params', type=str, default=None,
+                        help='策略自定义参数 JSON (如 \'{"atr_sl_mult":2.0}\')')
 
     args = parser.parse_args()
 
     symbol = args.symbol.upper().replace('-', '/')
     strategy_name = args.strategy
-    strategy = STRATEGIES[strategy_name]()
+
+    # 支持自定义参数覆盖策略默认值
+    if args.params:
+        import json
+        custom_params = json.loads(args.params)
+        strategy = STRATEGIES[strategy_name](**custom_params)
+    else:
+        strategy = STRATEGIES[strategy_name]()
 
     print(f"\n  正在拉取 {symbol} {args.timeframe} K线数据 ({args.days}天)...")
     candles = fetch_candles(symbol, args.timeframe, args.days)
