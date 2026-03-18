@@ -3,6 +3,29 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+/// 下单量模式
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SizingMode {
+    /// 固定下单量（order_qty 原值）
+    #[default]
+    Fixed,
+    /// 百分比下单：order_qty = (equity × position_size × leverage) / price
+    Percent,
+}
+
+impl SizingMode {
+    pub fn from_str_lossy(s: &str) -> Self {
+        match s {
+            "percent" => Self::Percent,
+            "fixed" => Self::Fixed,
+            other => {
+                eprintln!("WARN: unknown sizing_mode '{other}', defaulting to fixed");
+                Self::Fixed
+            }
+        }
+    }
+}
+
 #[derive(Parser, Debug, Clone)]
 #[command(name = "hft-engine", about = "High-frequency trading engine for Binance futures")]
 pub struct Config {
@@ -58,6 +81,14 @@ pub struct Config {
     /// Capital amount (from config file)
     #[arg(skip)]
     pub capital: Option<f64>,
+
+    /// Position size as fraction of equity (e.g. 0.3 = 30%)
+    #[arg(skip)]
+    pub position_size: Option<f64>,
+
+    /// Sizing mode: Fixed (use order_qty) or Percent (compute from equity)
+    #[arg(skip)]
+    pub sizing_mode: SizingMode,
 }
 
 /// Deserialized strategy.json
@@ -71,6 +102,8 @@ pub struct StrategyFile {
     pub leverage: Option<u32>,
     pub order_qty: Option<f64>,
     pub capital: Option<f64>,
+    pub position_size: Option<f64>,
+    pub sizing_mode: Option<String>,
     pub timeframe_ms: Option<u64>,
     /// Timeframe string like "5m", "1h" — converted to ms
     pub timeframe: Option<String>,
@@ -97,6 +130,7 @@ pub fn normalize_symbol(s: &str) -> String {
 
 const VALID_STRATEGIES: &[&str] = &[
     "mm", "market_maker", "default", "scalping", "breakout", "rsi", "bollinger", "macd",
+    "mean_reversion",
 ];
 
 /// Known params per strategy (for validation warnings)
@@ -109,6 +143,7 @@ fn known_params(strategy: &str) -> &'static [&'static str] {
         "rsi" => &["rsi_period", "rsi_oversold", "rsi_overbought", "trend_ema"],
         "bollinger" => &["bb_period", "num_std", "trend_ema"],
         "macd" => &["fast_period", "slow_period", "signal_period", "trend_ema", "atr_period", "atr_sl"],
+        "mean_reversion" => &["ema_period", "std_period", "entry_std", "atr_period", "atr_sl"],
         _ => &[],
     }
 }
@@ -218,6 +253,12 @@ impl Config {
         if let Some(capital) = sf.capital {
             self.capital = Some(capital);
         }
+        if let Some(position_size) = sf.position_size {
+            self.position_size = Some(position_size);
+        }
+        if let Some(ref mode) = sf.sizing_mode {
+            self.sizing_mode = SizingMode::from_str_lossy(mode);
+        }
         // timeframe: prefer timeframe_ms, fallback to timeframe string
         if let Some(ms) = sf.timeframe_ms {
             self.timeframe_ms = Some(ms);
@@ -253,6 +294,8 @@ mod tests {
             timeframe_ms: None,
             params: HashMap::new(),
             capital: None,
+            position_size: None,
+            sizing_mode: SizingMode::Fixed,
         }
     }
 
@@ -430,5 +473,83 @@ mod tests {
 
         // timeframe_ms should take priority over timeframe string
         assert_eq!(cfg.timeframe_ms, Some(60_000));
+    }
+
+    // ── SizingMode ──
+
+    #[test]
+    fn sizing_mode_from_str_percent() {
+        assert_eq!(SizingMode::from_str_lossy("percent"), SizingMode::Percent);
+    }
+
+    #[test]
+    fn sizing_mode_from_str_fixed() {
+        assert_eq!(SizingMode::from_str_lossy("fixed"), SizingMode::Fixed);
+    }
+
+    #[test]
+    fn sizing_mode_from_str_unknown_defaults_fixed() {
+        assert_eq!(SizingMode::from_str_lossy("banana"), SizingMode::Fixed);
+        assert_eq!(SizingMode::from_str_lossy(""), SizingMode::Fixed);
+    }
+
+    #[test]
+    fn sizing_mode_default_is_fixed() {
+        let cfg = test_config("macd", "BTCUSDT", 5);
+        assert_eq!(cfg.sizing_mode, SizingMode::Fixed);
+    }
+
+    #[test]
+    fn apply_strategy_file_sizing_mode_percent() {
+        let mut cfg = test_config("default", "BTCUSDT", 10);
+        let sf: StrategyFile = serde_json::from_str(r#"{
+            "sizing_mode": "percent",
+            "position_size": 0.3
+        }"#).unwrap();
+
+        cfg.apply_strategy_file(sf);
+
+        assert_eq!(cfg.sizing_mode, SizingMode::Percent);
+        assert_eq!(cfg.position_size, Some(0.3));
+    }
+
+    #[test]
+    fn apply_strategy_file_sizing_mode_fixed() {
+        let mut cfg = test_config("default", "BTCUSDT", 10);
+        let sf: StrategyFile = serde_json::from_str(r#"{
+            "sizing_mode": "fixed",
+            "order_qty": 50
+        }"#).unwrap();
+
+        cfg.apply_strategy_file(sf);
+
+        assert_eq!(cfg.sizing_mode, SizingMode::Fixed);
+        assert_eq!(cfg.order_qty, Some(50.0));
+    }
+
+    #[test]
+    fn apply_strategy_file_sizing_mode_missing_stays_fixed() {
+        let mut cfg = test_config("default", "BTCUSDT", 10);
+        let sf: StrategyFile = serde_json::from_str(r#"{
+            "symbol": "ETHUSDT"
+        }"#).unwrap();
+
+        cfg.apply_strategy_file(sf);
+
+        // sizing_mode not in JSON → stays at default Fixed
+        assert_eq!(cfg.sizing_mode, SizingMode::Fixed);
+    }
+
+    #[test]
+    fn apply_strategy_file_sizing_mode_invalid_defaults_fixed() {
+        let mut cfg = test_config("default", "BTCUSDT", 10);
+        let sf: StrategyFile = serde_json::from_str(r#"{
+            "sizing_mode": "auto_magic"
+        }"#).unwrap();
+
+        cfg.apply_strategy_file(sf);
+
+        // invalid value → from_str_lossy warns + returns Fixed
+        assert_eq!(cfg.sizing_mode, SizingMode::Fixed);
     }
 }

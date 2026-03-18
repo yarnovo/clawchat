@@ -1,4 +1,4 @@
-use hft_engine::config::Config;
+use hft_engine::config::{Config, SizingMode, StrategyFile};
 use hft_engine::exchange::{self, Exchange};
 use hft_engine::state::{EngineState, TradeStats};
 use hft_engine::strategy::{
@@ -8,23 +8,14 @@ use hft_engine::strategy::{
 use hft_engine::types::{MarketEvent, OrderType as StratOrderType, Side as StratSide};
 use hft_engine::ws_feed::{start_feed, FeedConfig};
 
+use notify::{EventKind, RecursiveMode, Watcher};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::PathBuf;
+use tokio::sync::mpsc as tokio_mpsc;
 
 const ENGINE_REGISTRY: &str = "/tmp/hft-engines.json";
 const TRADES_LOG: &str = "reports/trades.jsonl";
-const DYNAMIC_QTY_FILE: &str = "/tmp/dynamic_qty.json";
-
-/// 从 /tmp/dynamic_qty.json 读取动态 order_qty（复利）
-/// 如果文件不存在或解析失败，返回 None
-fn read_dynamic_qty(symbol: &str) -> Option<f64> {
-    let contents = std::fs::read_to_string(DYNAMIC_QTY_FILE).ok()?;
-    let map: serde_json::Value = serde_json::from_str(&contents).ok()?;
-    map.get(symbol)?
-        .get("dynamic_qty")?
-        .as_f64()
-}
 
 /// Append a trade record to reports/trades.jsonl
 fn log_trade(
@@ -199,21 +190,66 @@ fn create_strategy(config: &Config) -> Box<dyn Strategy> {
     }
 }
 
+/// 根据 sizing_mode 计算下单量
+/// - Percent: order_qty = (equity × position_size × leverage) / price
+/// - Fixed: 直接用 order_qty
+async fn compute_order_qty(
+    exchange: &Exchange,
+    sizing_mode: SizingMode,
+    position_size: Option<f64>,
+    leverage: u32,
+    current_price: f64,
+    fallback_qty: f64,
+) -> f64 {
+    if sizing_mode == SizingMode::Fixed {
+        return fallback_qty;
+    }
+    // Percent mode
+    let ps = position_size.unwrap_or(0.3);
+    if current_price <= 0.0 {
+        tracing::warn!("current_price <= 0, using fallback qty");
+        return fallback_qty;
+    }
+    match exchange.get_balance().await {
+        Ok(equity) => {
+            let qty = (equity * ps * leverage as f64) / current_price;
+            tracing::info!(
+                equity = format!("{equity:.2}"),
+                position_size = ps,
+                leverage,
+                price = format!("{current_price:.6}"),
+                qty = format!("{qty:.4}"),
+                "percent-based order qty"
+            );
+            qty
+        }
+        Err(e) => {
+            tracing::warn!("failed to get equity: {e}, using fallback qty");
+            fallback_qty
+        }
+    }
+}
+
 /// 将策略信号转为交易所下单，成功后写交易日志
-async fn execute_signal(signal: &Signal, exchange: &Exchange, strategy_name: &str) {
+async fn execute_signal(
+    signal: &Signal,
+    exchange: &Exchange,
+    strategy_name: &str,
+    sizing_mode: SizingMode,
+    position_size: Option<f64>,
+    leverage: u32,
+    current_price: f64,
+) {
     let Signal::Order(req) = signal else { return };
 
-    // 复利：优先使用 risk-engine 计算的动态 order_qty
-    let qty = read_dynamic_qty(&exchange.symbol).unwrap_or(req.qty);
-    if (qty - req.qty).abs() > f64::EPSILON {
-        tracing::info!(base_qty = req.qty, dynamic_qty = qty, "using compound qty");
-    }
+    let qty = compute_order_qty(
+        exchange, sizing_mode, position_size, leverage, current_price, req.qty,
+    ).await;
 
     let side = match req.side {
         StratSide::Buy => exchange::Side::Buy,
         StratSide::Sell => exchange::Side::Sell,
     };
-    // 简化：Buy → Long, Sell → Short
     let pos_side = match req.side {
         StratSide::Buy => exchange::PositionSide::Long,
         StratSide::Sell => exchange::PositionSide::Short,
@@ -270,6 +306,80 @@ fn save_state(
     state.save(path);
 }
 
+/// 监听 strategy.json 文件变化，发送通知到 channel
+fn start_strategy_watcher(config_path: PathBuf, tx: tokio_mpsc::Sender<()>) {
+    std::thread::spawn(move || {
+        let watched_path = config_path.clone();
+        let tx_clone = tx.clone();
+        let mut watcher = notify::recommended_watcher(
+            move |res: Result<notify::Event, notify::Error>| {
+                let Ok(event) = res else { return };
+                match event.kind {
+                    EventKind::Modify(_) | EventKind::Create(_) => {}
+                    _ => return,
+                }
+                // 只响应被监听的文件
+                let dominated = event.paths.iter().any(|p| p == &watched_path);
+                if !dominated {
+                    return;
+                }
+                tracing::info!("strategy.json changed, reloading params");
+                let _ = tx_clone.blocking_send(());
+            },
+        )
+        .expect("failed to create strategy file watcher");
+
+        // 监听 strategy.json 所在目录（notify 需要目录级监听）
+        let watch_dir = config_path.parent().unwrap_or(&config_path);
+        watcher
+            .watch(watch_dir, RecursiveMode::NonRecursive)
+            .expect("failed to watch strategy directory");
+
+        tracing::info!("strategy file watcher started: {:?}", config_path);
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(3600));
+        }
+    });
+}
+
+/// 从 strategy.json 重新加载参数，创建新策略实例并恢复旧状态
+fn reload_strategy(config: &mut Config, strategy: &mut Box<dyn Strategy>) {
+    let Some(ref path) = config.config else { return };
+    let contents = match std::fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!("failed to read strategy.json for reload: {e}");
+            return;
+        }
+    };
+    let sf: StrategyFile = match serde_json::from_str(&contents) {
+        Ok(sf) => sf,
+        Err(e) => {
+            tracing::warn!("failed to parse strategy.json for reload: {e}");
+            return;
+        }
+    };
+
+    // 保存旧策略的指标状态
+    let saved_state = strategy.export_state();
+
+    // 应用新参数到 config
+    config.apply_strategy_file(sf);
+
+    // 创建新策略实例（使用新参数）
+    let mut new_strategy = create_strategy(config);
+
+    // 恢复旧指标状态（价格历史等），新参数（周期/阈值）生效
+    new_strategy.restore_state(&saved_state);
+
+    tracing::info!(
+        strategy = new_strategy.name(),
+        params = ?config.params,
+        "strategy hot-reloaded with new params"
+    );
+    *strategy = new_strategy;
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
@@ -279,7 +389,7 @@ async fn main() {
         )
         .init();
 
-    let config = Config::load();
+    let mut config = Config::load();
     let display_name = config.strategy_name.as_deref().unwrap_or(&config.strategy);
     tracing::info!("symbol={} leverage={} strategy={} name={} dry_run={}",
         config.symbol, config.leverage, config.strategy, display_name, config.dry_run);
@@ -339,59 +449,87 @@ async fn main() {
     };
     let mut rx = start_feed(feed_config, 4096).await;
 
+    // 启动 strategy.json 文件监听（热更新参数）
+    let (config_tx, mut config_rx) = tokio_mpsc::channel::<()>(16);
+    if let Some(ref path) = config.config {
+        start_strategy_watcher(path.clone(), config_tx);
+    }
+
+    // 最新市价（从 tick 更新，用于百分比下单量计算）
+    let mut last_price: f64 = 0.0;
+
     // 策略驱动的事件循环
-    while let Some(event) = rx.recv().await {
-        match &event {
-            MarketEvent::Tick(tick) => {
-                // Tick → CandleAggregator，产出 K 线时调策略
-                if let Some(candle) = aggregator.update(tick) {
-                    tracing::info!(
-                        o = candle.open, h = candle.high, l = candle.low,
-                        c = candle.close, v = candle.volume,
-                        "candle closed"
-                    );
-                    if let Some(signal) = strategy.on_candle(&candle) {
-                        if signal != Signal::None {
-                            tracing::info!(?signal, "candle signal");
-                            execute_signal(&signal, &exchange, &strategy_name).await;
-                            // 成交后保存状态
+    loop {
+        tokio::select! {
+            Some(event) = rx.recv() => {
+                match &event {
+                    MarketEvent::Tick(tick) => {
+                        last_price = tick.price;
+
+                        // Tick → CandleAggregator，产出 K 线时调策略
+                        if let Some(candle) = aggregator.update(tick) {
+                            tracing::info!(
+                                o = candle.open, h = candle.high, l = candle.low,
+                                c = candle.close, v = candle.volume,
+                                "candle closed"
+                            );
+                            if let Some(signal) = strategy.on_candle(&candle) {
+                                if signal != Signal::None {
+                                    tracing::info!(?signal, "candle signal");
+                                    execute_signal(
+                                        &signal, &exchange, &strategy_name,
+                                        config.sizing_mode, config.position_size, config.leverage, last_price,
+                                    ).await;
+                                    // 成交后保存状态
+                                    if let Some(ref sp) = state_path {
+                                        save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
+                                    }
+                                }
+                            }
+                            // K 线收盘后保存状态（指标更新了）
                             if let Some(ref sp) = state_path {
                                 save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
                             }
                         }
-                    }
-                    // K 线收盘后保存状态（指标更新了）
-                    if let Some(ref sp) = state_path {
-                        save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
-                    }
-                }
 
-                // 也把 tick 直接给策略（高频策略用）
-                if let Some(signal) = strategy.on_tick(tick) {
-                    if signal != Signal::None {
-                        tracing::info!(?signal, "tick signal");
-                        execute_signal(&signal, &exchange, &strategy_name).await;
-                        // 成交后保存状态
-                        if let Some(ref sp) = state_path {
-                            save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
+                        // 也把 tick 直接给策略（高频策略用）
+                        if let Some(signal) = strategy.on_tick(tick) {
+                            if signal != Signal::None {
+                                tracing::info!(?signal, "tick signal");
+                                execute_signal(
+                                    &signal, &exchange, &strategy_name,
+                                    config.sizing_mode, config.position_size, config.leverage, last_price,
+                                ).await;
+                                // 成交后保存状态
+                                if let Some(ref sp) = state_path {
+                                    save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
+                                }
+                            }
                         }
+                    }
+                    MarketEvent::Depth(depth) => {
+                        if let Some(signal) = strategy.on_depth(depth) {
+                            if signal != Signal::None {
+                                tracing::info!(?signal, "depth signal");
+                                execute_signal(
+                                    &signal, &exchange, &strategy_name,
+                                    config.sizing_mode, config.position_size, config.leverage, last_price,
+                                ).await;
+                                // 成交后保存状态
+                                if let Some(ref sp) = state_path {
+                                    save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
+                                }
+                            }
+                        }
+                    }
+                    _ => {
+                        tracing::debug!(?event, "unhandled event");
                     }
                 }
             }
-            MarketEvent::Depth(depth) => {
-                if let Some(signal) = strategy.on_depth(depth) {
-                    if signal != Signal::None {
-                        tracing::info!(?signal, "depth signal");
-                        execute_signal(&signal, &exchange, &strategy_name).await;
-                        // 成交后保存状态
-                        if let Some(ref sp) = state_path {
-                            save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
-                        }
-                    }
-                }
-            }
-            _ => {
-                tracing::debug!(?event, "unhandled event");
+            Some(()) = config_rx.recv() => {
+                // strategy.json 文件变化 → 热更新策略参数
+                reload_strategy(&mut config, &mut strategy);
             }
         }
     }
