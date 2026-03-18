@@ -54,6 +54,14 @@ pub struct Config {
     /// Strategy-specific parameters (from config file)
     #[arg(skip)]
     pub params: HashMap<String, f64>,
+
+    /// Capital amount (from config file, for risk calculations)
+    #[arg(skip)]
+    pub capital: Option<f64>,
+
+    /// Path to risk.json (derived from strategy.json directory)
+    #[arg(skip)]
+    pub risk_json_path: Option<PathBuf>,
 }
 
 /// Deserialized strategy.json
@@ -66,6 +74,7 @@ pub struct StrategyFile {
     pub symbol: Option<String>,
     pub leverage: Option<u32>,
     pub order_qty: Option<f64>,
+    pub capital: Option<f64>,
     pub timeframe_ms: Option<u64>,
     /// Timeframe string like "5m", "1h" — converted to ms
     pub timeframe: Option<String>,
@@ -115,8 +124,8 @@ impl Config {
         let _ = dotenvy::dotenv();
         let mut config = Self::parse();
 
-        if let Some(ref path) = config.config {
-            match std::fs::read_to_string(path) {
+        if let Some(path) = config.config.clone() {
+            match std::fs::read_to_string(&path) {
                 Ok(contents) => match serde_json::from_str::<StrategyFile>(&contents) {
                     Ok(sf) => config.apply_strategy_file(sf),
                     Err(e) => {
@@ -128,6 +137,11 @@ impl Config {
                     eprintln!("Failed to read {}: {e}", path.display());
                     std::process::exit(1);
                 }
+            }
+            // Derive risk.json path from strategy.json's parent directory
+            if let Some(parent) = path.parent() {
+                let risk_path = parent.join("risk.json");
+                config.risk_json_path = Some(risk_path);
             }
         }
 
@@ -202,6 +216,9 @@ impl Config {
         }
         if let Some(order_qty) = sf.order_qty {
             self.order_qty = Some(order_qty);
+        }
+        if let Some(capital) = sf.capital {
+            self.capital = Some(capital);
         }
         // timeframe: prefer timeframe_ms, fallback to timeframe string
         if let Some(ms) = sf.timeframe_ms {
