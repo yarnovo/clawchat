@@ -12,11 +12,17 @@
 - [ ] 生命周期状态：discovery → backtest → approved → live → degraded → suspended → archived
 - [ ] 策略归档：suspended 超期 → 移入 strategies/archived/
 
-## 待做（交易员）
+## 待做（交易员 — architect 评审通过）
 
-- [ ] risk.json 新增 override 字段（action: hold/close_all/pause/resume/stop/reduce + params）
-- [ ] risk-engine 读取 override 执行人工干预指令
+- [ ] risk.json 新增 override 字段：
+  - action: hold/close_all/close_long/close_short/pause/resume/stop/reduce/add
+  - add params: { percent, direction(long/short) }
+  - reduce params: { percent }
+- [ ] risk-engine 读取 override 执行（加仓前 7 项检查：余额/仓位/敞口/持仓数/杠杆/日亏/连亏）
+- [ ] Exchange 扩展 open_position 接口（risk-engine 执行 add 需要）
 - [ ] 优先级：override > risk rules > strategy signals
+- [ ] add 执行后自动进 hold 状态（防止 hft-engine 发矛盾信号）
+- [ ] SCHEMA.md 更新 override 字段说明
 
 ## 待做（技术）
 
