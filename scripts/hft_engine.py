@@ -15,6 +15,9 @@
   python hft_engine.py --symbol ETH/USDT --strategy ema2050 --leverage 3
 """
 
+from dotenv import load_dotenv
+load_dotenv()
+
 import argparse
 import json
 import logging
