@@ -122,6 +122,8 @@ pub struct Exchange {
     base_url: String,
     pub symbol: String,
     pub dry_run: bool,
+    /// Prefix for clientOrderId, e.g. "scalping-BTCUSDT"
+    pub order_id_prefix: String,
 }
 
 impl Exchange {
@@ -133,6 +135,17 @@ impl Exchange {
             base_url: config.base_url.clone(),
             symbol: config.symbol.clone(),
             dry_run: config.dry_run,
+            order_id_prefix: String::new(),
+        }
+    }
+
+    /// Generate a clientOrderId with strategy prefix: "{strategy}-{symbol}-{short_uuid}"
+    fn gen_client_order_id(&self) -> String {
+        let ts = Self::timestamp_ms();
+        if self.order_id_prefix.is_empty() {
+            format!("hft-{ts}")
+        } else {
+            format!("{}-{ts}", self.order_id_prefix)
         }
     }
 
@@ -220,17 +233,19 @@ impl Exchange {
         position_side: PositionSide,
         quantity: f64,
     ) -> Result<serde_json::Value, ExchangeError> {
+        let cid = self.gen_client_order_id();
         let params = [
             ("symbol", self.symbol.clone()),
             ("side", side.to_string()),
             ("type", OrderType::Market.to_string()),
             ("positionSide", position_side.to_string()),
             ("quantity", format!("{quantity}")),
+            ("newClientOrderId", cid.clone()),
         ];
 
         if self.dry_run {
             tracing::info!(
-                "[DRY RUN] market_order side={side} pos={position_side} qty={quantity} fee_rate={TAKER_FEE}"
+                "[DRY RUN] market_order side={side} pos={position_side} qty={quantity} cid={cid} fee_rate={TAKER_FEE}"
             );
             return Ok(serde_json::json!({
                 "dryRun": true,
@@ -238,6 +253,7 @@ impl Exchange {
                 "positionSide": position_side.to_string(),
                 "quantity": quantity,
                 "feeRate": TAKER_FEE,
+                "clientOrderId": cid,
             }));
         }
 
@@ -252,6 +268,7 @@ impl Exchange {
         quantity: f64,
         price: f64,
     ) -> Result<serde_json::Value, ExchangeError> {
+        let cid = self.gen_client_order_id();
         let params = [
             ("symbol", self.symbol.clone()),
             ("side", side.to_string()),
@@ -260,11 +277,12 @@ impl Exchange {
             ("quantity", format!("{quantity}")),
             ("price", format!("{price}")),
             ("timeInForce", "GTC".to_string()),
+            ("newClientOrderId", cid.clone()),
         ];
 
         if self.dry_run {
             tracing::info!(
-                "[DRY RUN] limit_order side={side} pos={position_side} qty={quantity} price={price} fee_rate={MAKER_FEE}"
+                "[DRY RUN] limit_order side={side} pos={position_side} qty={quantity} price={price} cid={cid} fee_rate={MAKER_FEE}"
             );
             return Ok(serde_json::json!({
                 "dryRun": true,
@@ -273,6 +291,7 @@ impl Exchange {
                 "quantity": quantity,
                 "price": price,
                 "feeRate": MAKER_FEE,
+                "clientOrderId": cid,
             }));
         }
 

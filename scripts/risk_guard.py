@@ -14,6 +14,7 @@ from futures_exchange import get_futures_exchange, get_positions, close_all
 
 INTERVAL = 30  # 秒
 EQUITY_CSV = Path(__file__).parent.parent / "reports" / "equity.csv"
+ENGINE_REGISTRY = Path("/tmp/hft-engines.json")
 
 running = True
 
@@ -59,14 +60,27 @@ def run_check(exchange):
     unrealized = result.get("unrealized_pnl", 0)
     num_pos = result.get("positions", 0)
 
-    # 获取每个持仓的独立盈亏
+    # 读取引擎注册表: symbol → strategy
+    strategy_map = {}
+    try:
+        if ENGINE_REGISTRY.exists():
+            strategy_map = json.loads(ENGINE_REGISTRY.read_text())
+    except Exception:
+        pass
+
+    # 获取每个持仓的独立盈亏（按策略标注）
     positions = get_positions(exchange)
     detail = []
     for p in positions:
+        sym = p.get("symbol", "")
+        # ccxt symbol 格式如 "PIPPIN/USDT:USDT"，registry 用 "PIPPINUSDT"
+        raw_sym = sym.replace("/", "").replace(":USDT", "")
+        strategy = strategy_map.get(raw_sym, "unknown")
         detail.append({
-            "symbol": p.get("symbol", ""),
+            "symbol": sym,
             "side": p.get("side", ""),
             "pnl": round(float(p.get("unrealizedPnl", 0) or 0), 4),
+            "strategy": strategy,
         })
 
     # 记录权益曲线（含持仓明细）
