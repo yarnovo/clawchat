@@ -1,5 +1,6 @@
 pub mod config;
 pub mod exchange;
+pub mod filter;
 pub mod risk;
 pub mod state;
 pub mod strategy;

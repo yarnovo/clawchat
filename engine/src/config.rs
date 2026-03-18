@@ -3,6 +3,8 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
+use crate::filter::TradeDirection;
+
 /// 下单量模式
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SizingMode {
@@ -89,6 +91,26 @@ pub struct Config {
     /// Sizing mode: Fixed (use order_qty) or Percent (compute from equity)
     #[arg(skip)]
     pub sizing_mode: SizingMode,
+
+    /// Trade direction filter: Both / LongOnly / ShortOnly
+    #[arg(skip)]
+    pub trade_direction: TradeDirection,
+
+    /// Signal cooldown in bars (0 = disabled)
+    #[arg(skip)]
+    pub cooldown_bars: u32,
+
+    /// Minimum candle volume to allow signal (0 = disabled)
+    #[arg(skip)]
+    pub min_volume: f64,
+
+    /// Maximum spread in basis points (0 = disabled)
+    #[arg(skip)]
+    pub min_spread_bps: f64,
+
+    /// Minimum order book depth in USD (0 = disabled)
+    #[arg(skip)]
+    pub min_depth_usd: f64,
 }
 
 /// Deserialized strategy.json
@@ -109,6 +131,11 @@ pub struct StrategyFile {
     pub timeframe: Option<String>,
     #[serde(default)]
     pub params: HashMap<String, serde_json::Value>,
+    pub trade_direction: Option<String>,
+    pub cooldown_bars: Option<u32>,
+    pub min_volume: Option<f64>,
+    pub min_spread_bps: Option<f64>,
+    pub min_depth_usd: Option<f64>,
 }
 
 pub fn timeframe_to_ms(tf: &str) -> Option<u64> {
@@ -272,6 +299,22 @@ impl Config {
                 self.params.insert(k, n);
             }
         }
+        // Filter fields
+        if let Some(ref dir) = sf.trade_direction {
+            self.trade_direction = TradeDirection::from_str_lossy(dir);
+        }
+        if let Some(cd) = sf.cooldown_bars {
+            self.cooldown_bars = cd;
+        }
+        if let Some(vol) = sf.min_volume {
+            self.min_volume = vol;
+        }
+        if let Some(spread) = sf.min_spread_bps {
+            self.min_spread_bps = spread;
+        }
+        if let Some(depth) = sf.min_depth_usd {
+            self.min_depth_usd = depth;
+        }
     }
 }
 
@@ -297,6 +340,11 @@ mod tests {
             capital: None,
             position_size: None,
             sizing_mode: SizingMode::Fixed,
+            trade_direction: TradeDirection::Both,
+            cooldown_bars: 0,
+            min_volume: 0.0,
+            min_spread_bps: 0.0,
+            min_depth_usd: 0.0,
         }
     }
 

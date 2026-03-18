@@ -45,6 +45,10 @@ pub struct RiskConfig {
     /// 所有策略总仓位不超过权益的百分比，默认 0.80 = 80%
     #[serde(default = "default_max_portfolio_exposure")]
     pub max_portfolio_exposure: f64,
+    /// 资金费率上限（绝对值），如 0.001 = 0.1%。超限时拒绝开仓。
+    /// None = 不检查
+    #[serde(default)]
+    pub funding_rate_limit: Option<f64>,
 }
 
 fn default_max_loss_per_trade() -> f64 { 0.05 }
@@ -76,6 +80,7 @@ impl Default for RiskConfig {
             max_hold_time_hours: 24.0,
             trailing_stop: 0.02,
             max_portfolio_exposure: 0.80,
+            funding_rate_limit: None,
         }
     }
 }
@@ -182,7 +187,16 @@ impl EngineRiskGuard {
     }
 
     /// 下单前检查：返回 Ok(()) 允许下单，Err(reason) 拒绝
-    pub fn pre_trade_check(&mut self, qty: f64, leverage: u32) -> Result<(), String> {
+    ///
+    /// - `is_long`: true = 做多（buy），false = 做空（sell）
+    /// - `current_funding_rate`: 当前资金费率（从 MarkPrice 事件获取）
+    pub fn pre_trade_check(
+        &mut self,
+        qty: f64,
+        leverage: u32,
+        is_long: bool,
+        current_funding_rate: f64,
+    ) -> Result<(), String> {
         self.maybe_reset_day();
 
         // 1. 是否已停止
@@ -226,6 +240,20 @@ impl EngineRiskGuard {
         // 5. 下单量 > 0
         if qty <= 0.0 {
             return Err("order qty must be > 0".to_string());
+        }
+
+        // 6. 资金费率检查：做多时 funding > limit 拒绝，做空时 funding < -limit 拒绝
+        if let Some(limit) = self.config.funding_rate_limit {
+            if is_long && current_funding_rate > limit {
+                return Err(format!(
+                    "funding rate {current_funding_rate:.6} > limit {limit:.6}, long blocked"
+                ));
+            }
+            if !is_long && current_funding_rate < -limit {
+                return Err(format!(
+                    "funding rate {current_funding_rate:.6} < -{limit:.6}, short blocked"
+                ));
+            }
         }
 
         Ok(())
@@ -533,6 +561,7 @@ mod tests {
         assert!((cfg.max_hold_time_hours - 24.0).abs() < f64::EPSILON);
         assert!((cfg.trailing_stop - 0.02).abs() < f64::EPSILON);
         assert!((cfg.max_portfolio_exposure - 0.80).abs() < f64::EPSILON);
+        assert!(cfg.funding_rate_limit.is_none());
     }
 
     #[test]
@@ -553,7 +582,8 @@ mod tests {
             "max_concurrent_positions": 5,
             "max_hold_time_hours": 48,
             "trailing_stop": 0.03,
-            "max_portfolio_exposure": 0.60
+            "max_portfolio_exposure": 0.60,
+            "funding_rate_limit": 0.001
         }}"#).unwrap();
 
         let cfg = RiskConfig::load(&path);
@@ -568,6 +598,7 @@ mod tests {
         assert!((cfg.max_hold_time_hours - 48.0).abs() < f64::EPSILON);
         assert!((cfg.trailing_stop - 0.03).abs() < f64::EPSILON);
         assert!((cfg.max_portfolio_exposure - 0.60).abs() < f64::EPSILON);
+        assert!((cfg.funding_rate_limit.unwrap() - 0.001).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -609,20 +640,20 @@ mod tests {
     #[test]
     fn pre_trade_check_normal_pass() {
         let mut guard = guard_with_defaults(200.0);
-        assert!(guard.pre_trade_check(100.0, 5).is_ok());
+        assert!(guard.pre_trade_check(100.0, 5, true, 0.0).is_ok());
     }
 
     #[test]
     fn pre_trade_check_zero_qty_rejected() {
         let mut guard = guard_with_defaults(200.0);
-        let err = guard.pre_trade_check(0.0, 5).unwrap_err();
+        let err = guard.pre_trade_check(0.0, 5, true, 0.0).unwrap_err();
         assert!(err.contains("qty must be > 0"));
     }
 
     #[test]
     fn pre_trade_check_leverage_exceeded() {
         let mut guard = guard_with_defaults(200.0);
-        let err = guard.pre_trade_check(100.0, 25).unwrap_err();
+        let err = guard.pre_trade_check(100.0, 25, true, 0.0).unwrap_err();
         assert!(err.contains("leverage 25 exceeds max 20"));
     }
 
@@ -631,8 +662,8 @@ mod tests {
         let mut cfg = RiskConfig::default();
         cfg.max_leverage = 5;
         let mut guard = EngineRiskGuard::new(cfg, 200.0);
-        assert!(guard.pre_trade_check(100.0, 5).is_ok());
-        let err = guard.pre_trade_check(100.0, 6).unwrap_err();
+        assert!(guard.pre_trade_check(100.0, 5, true, 0.0).is_ok());
+        let err = guard.pre_trade_check(100.0, 6, true, 0.0).unwrap_err();
         assert!(err.contains("leverage 6 exceeds max 5"));
     }
 
@@ -641,7 +672,7 @@ mod tests {
         let mut guard = guard_with_defaults(200.0);
         // max_daily_loss default = 0.15 = $30 on $200 capital
         guard.record_trade(-30.0); // exactly at limit
-        let err = guard.pre_trade_check(100.0, 5).unwrap_err();
+        let err = guard.pre_trade_check(100.0, 5, true, 0.0).unwrap_err();
         assert!(err.contains("daily loss"));
     }
 
@@ -649,7 +680,7 @@ mod tests {
     fn pre_trade_check_daily_loss_under_limit() {
         let mut guard = guard_with_defaults(200.0);
         guard.record_trade(-29.0); // just under 15%
-        assert!(guard.pre_trade_check(100.0, 5).is_ok());
+        assert!(guard.pre_trade_check(100.0, 5, true, 0.0).is_ok());
     }
 
     #[test]
@@ -658,7 +689,7 @@ mod tests {
         for _ in 0..5 {
             guard.record_trade(-1.0);
         }
-        let err = guard.pre_trade_check(100.0, 5).unwrap_err();
+        let err = guard.pre_trade_check(100.0, 5, true, 0.0).unwrap_err();
         assert!(err.contains("consecutive losses"));
     }
 
@@ -671,7 +702,7 @@ mod tests {
         guard.record_trade(-1.0);
         guard.record_trade(10.0); // win resets counter
         guard.record_trade(-1.0);
-        assert!(guard.pre_trade_check(100.0, 5).is_ok());
+        assert!(guard.pre_trade_check(100.0, 5, true, 0.0).is_ok());
     }
 
     #[test]
@@ -679,7 +710,7 @@ mod tests {
         let mut guard = guard_with_defaults(200.0);
         guard.record_trade(-31.0); // triggers daily stop
         assert!(guard.is_stopped());
-        let err = guard.pre_trade_check(100.0, 5).unwrap_err();
+        let err = guard.pre_trade_check(100.0, 5, true, 0.0).unwrap_err();
         assert!(err.contains("trading stopped"));
     }
 
@@ -690,7 +721,7 @@ mod tests {
         assert!(guard.is_stopped());
         guard.reset();
         assert!(!guard.is_stopped());
-        assert!(guard.pre_trade_check(100.0, 5).is_ok());
+        assert!(guard.pre_trade_check(100.0, 5, true, 0.0).is_ok());
     }
 
     #[test]
@@ -701,6 +732,72 @@ mod tests {
         guard.record_trade(5.0);
         assert!((guard.daily_pnl() - 12.0).abs() < f64::EPSILON);
         assert_eq!(guard.daily_trades(), 3);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // funding_rate_limit 测试
+    // ══════════════════════════════════════════════════════════════
+
+    fn guard_with_funding_limit(limit: f64) -> EngineRiskGuard {
+        let mut cfg = RiskConfig::default();
+        cfg.funding_rate_limit = Some(limit);
+        EngineRiskGuard::new(cfg, 1000.0)
+    }
+
+    #[test]
+    fn funding_rate_long_blocked_when_high() {
+        let mut guard = guard_with_funding_limit(0.001);
+        let err = guard.pre_trade_check(100.0, 5, true, 0.002).unwrap_err();
+        assert!(err.contains("funding rate"));
+        assert!(err.contains("long blocked"));
+    }
+
+    #[test]
+    fn funding_rate_long_allowed_when_low() {
+        let mut guard = guard_with_funding_limit(0.001);
+        assert!(guard.pre_trade_check(100.0, 5, true, 0.0005).is_ok());
+    }
+
+    #[test]
+    fn funding_rate_long_allowed_when_negative() {
+        let mut guard = guard_with_funding_limit(0.001);
+        assert!(guard.pre_trade_check(100.0, 5, true, -0.002).is_ok());
+    }
+
+    #[test]
+    fn funding_rate_short_blocked_when_very_negative() {
+        let mut guard = guard_with_funding_limit(0.001);
+        let err = guard.pre_trade_check(100.0, 5, false, -0.002).unwrap_err();
+        assert!(err.contains("funding rate"));
+        assert!(err.contains("short blocked"));
+    }
+
+    #[test]
+    fn funding_rate_short_allowed_when_positive() {
+        let mut guard = guard_with_funding_limit(0.001);
+        assert!(guard.pre_trade_check(100.0, 5, false, 0.002).is_ok());
+    }
+
+    #[test]
+    fn funding_rate_short_allowed_when_within_limit() {
+        let mut guard = guard_with_funding_limit(0.001);
+        assert!(guard.pre_trade_check(100.0, 5, false, -0.0005).is_ok());
+    }
+
+    #[test]
+    fn funding_rate_no_limit_always_passes() {
+        let mut guard = guard_with_defaults(1000.0);
+        // No funding_rate_limit set (None), should pass even with extreme rates
+        assert!(guard.pre_trade_check(100.0, 5, true, 0.05).is_ok());
+        assert!(guard.pre_trade_check(100.0, 5, false, -0.05).is_ok());
+    }
+
+    #[test]
+    fn funding_rate_exact_boundary_allowed() {
+        let mut guard = guard_with_funding_limit(0.001);
+        // Exactly at the limit should pass (> not >=)
+        assert!(guard.pre_trade_check(100.0, 5, true, 0.001).is_ok());
+        assert!(guard.pre_trade_check(100.0, 5, false, -0.001).is_ok());
     }
 
     // ══════════════════════════════════════════════════════════════

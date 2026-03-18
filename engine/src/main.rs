@@ -1,5 +1,6 @@
 use hft_engine::config::{Config, SizingMode, StrategyFile};
 use hft_engine::exchange::{self, Exchange};
+use hft_engine::filter::{FilterResult, SignalFilter};
 use hft_engine::risk::{risk_gate, RiskConfig, RiskVerdict};
 use hft_engine::state::{EngineState, TradeStats};
 use hft_engine::strategy::{
@@ -32,8 +33,8 @@ const KEEPALIVE_MINUTES: u64 = 20;
 
 #[derive(Debug)]
 enum UserEvent {
-    /// 标记价格更新
-    MarkPrice { symbol: String, mark_price: f64 },
+    /// 标记价格更新（含资金费率）
+    MarkPrice { symbol: String, mark_price: f64, funding_rate: f64 },
     /// 持仓更新（ACCOUNT_UPDATE）
     PositionUpdate {
         symbol: String,
@@ -165,6 +166,7 @@ async fn start_mark_price_feed(symbol: String, tx: tokio_mpsc::Sender<UserEvent>
 
     let mut retry_delay = std::time::Duration::from_secs(1);
     let max_delay = std::time::Duration::from_secs(30);
+    let read_timeout = std::time::Duration::from_secs(30);
 
     loop {
         tracing::info!(url = %url, "connecting to markPrice ws");
@@ -176,27 +178,37 @@ async fn start_mark_price_feed(symbol: String, tx: tokio_mpsc::Sender<UserEvent>
 
                 let (mut write, mut read) = ws.split();
 
-                while let Some(msg) = read.next().await {
-                    match msg {
-                        Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
-                            if let Some(event) = parse_mark_price_msg(&text) {
-                                let _ = tx.try_send(event);
+                loop {
+                    match tokio::time::timeout(read_timeout, read.next()).await {
+                        Ok(Some(msg)) => match msg {
+                            Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
+                                if let Some(event) = parse_mark_price_msg(&text) {
+                                    let _ = tx.try_send(event);
+                                }
                             }
-                        }
-                        Ok(tokio_tungstenite::tungstenite::Message::Ping(data)) => {
-                            let _ = write
-                                .send(tokio_tungstenite::tungstenite::Message::Pong(data))
-                                .await;
-                        }
-                        Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => {
-                            tracing::warn!("markPrice ws closed");
+                            Ok(tokio_tungstenite::tungstenite::Message::Ping(data)) => {
+                                let _ = write
+                                    .send(tokio_tungstenite::tungstenite::Message::Pong(data))
+                                    .await;
+                            }
+                            Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => {
+                                tracing::warn!("markPrice ws closed");
+                                break;
+                            }
+                            Err(e) => {
+                                tracing::error!("markPrice ws error: {e}");
+                                break;
+                            }
+                            _ => {}
+                        },
+                        Ok(None) => {
+                            tracing::warn!("markPrice ws stream ended");
                             break;
                         }
-                        Err(e) => {
-                            tracing::error!("markPrice ws error: {e}");
+                        Err(_) => {
+                            tracing::warn!("markPrice ws read timeout, reconnecting");
                             break;
                         }
-                        _ => {}
                     }
                 }
             }
@@ -220,7 +232,13 @@ fn parse_mark_price_msg(raw: &str) -> Option<UserEvent> {
     let data = v.get("data")?;
     let symbol = data.get("s")?.as_str()?.to_string();
     let mark_price: f64 = data.get("p")?.as_str()?.parse().ok()?;
-    Some(UserEvent::MarkPrice { symbol, mark_price })
+    // "r" = funding rate，可能缺失（非结算周期）
+    let funding_rate: f64 = data
+        .get("r")
+        .and_then(|v| v.as_str())
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0.0);
+    Some(UserEvent::MarkPrice { symbol, mark_price, funding_rate })
 }
 
 // ── User Data Stream WebSocket ───────────────────────────────
@@ -919,7 +937,7 @@ fn reload_strategy(config: &mut Config, strategy: &mut Box<dyn Strategy>) {
     *strategy = new_strategy;
 }
 
-/// 尝试执行信号，先经过 DecisionGate 过滤
+/// 尝试执行信号，先经过 DecisionGate + funding rate 过滤
 async fn try_execute_signal(
     signal: &Signal,
     trade_override: &TradeOverride,
@@ -930,6 +948,8 @@ async fn try_execute_signal(
     leverage: u32,
     current_price: f64,
     max_loss_per_trade: f64,
+    current_funding_rate: f64,
+    funding_rate_limit: Option<f64>,
 ) {
     if *signal == Signal::None {
         return;
@@ -942,6 +962,30 @@ async fn try_execute_signal(
         );
         return;
     }
+
+    // Funding rate 过滤：做多时 funding > limit 拒绝，做空时 funding < -limit 拒绝
+    if let Some(limit) = funding_rate_limit {
+        if let Signal::Order(req) = signal {
+            let is_long = matches!(req.side, StratSide::Buy);
+            if is_long && current_funding_rate > limit {
+                tracing::warn!(
+                    funding_rate = current_funding_rate,
+                    limit,
+                    "long signal blocked: funding rate too high"
+                );
+                return;
+            }
+            if !is_long && current_funding_rate < -limit {
+                tracing::warn!(
+                    funding_rate = current_funding_rate,
+                    limit,
+                    "short signal blocked: funding rate too negative"
+                );
+                return;
+            }
+        }
+    }
+
     tracing::info!(?signal, "signal passed decision gate");
     execute_signal(
         signal, exchange, strategy_name,
@@ -1246,8 +1290,17 @@ async fn main() {
         start_user_data_feed(uds_api_key, uds_api_secret, uds_base_url, uds_dry_run, uds_tx).await;
     });
 
+    // 信号过滤器
+    let mut signal_filter = SignalFilter::from_config(&config);
+
+    // 缓存最新盘口（供 liquidity_guard 使用）
+    let mut latest_depth: Option<hft_engine::types::DepthData> = None;
+
     // 最新市价（从 tick 更新，用于百分比下单量计算）
     let mut last_price: f64 = 0.0;
+
+    // 缓存最新资金费率（从 MarkPrice 事件更新）
+    let mut last_funding_rate: f64 = 0.0;
 
     // 启动时执行待处理的一次性指令
     if let Some(ref tp) = trade_path {
@@ -1271,15 +1324,19 @@ async fn main() {
                                 c = candle.close, v = candle.volume,
                                 "candle closed"
                             );
+                            signal_filter.on_bar();
                             if let Some(signal) = strategy.on_candle(&candle) {
-                                let executed = signal != Signal::None && decision_gate_allows_signal(&trade_override);
+                                let filter_ok = signal_filter.allows(&signal, Some(&candle), latest_depth.as_ref()) == FilterResult::Pass;
+                                let executed = filter_ok && signal != Signal::None && decision_gate_allows_signal(&trade_override);
                                 log_signal(&strategy_name, &signal, last_price, &strategy.export_state(), executed);
-                                try_execute_signal(
-                                    &signal, &trade_override, &exchange, &strategy_name,
-                                    config.sizing_mode, config.position_size, config.leverage, last_price,
-                                    risk_config.max_loss_per_trade,
-                                ).await;
-                                // 成交后保存状态
+                                if filter_ok {
+                                    try_execute_signal(
+                                        &signal, &trade_override, &exchange, &strategy_name,
+                                        config.sizing_mode, config.position_size, config.leverage, last_price,
+                                        risk_config.max_loss_per_trade,
+                                        last_funding_rate, risk_config.funding_rate_limit,
+                                    ).await;
+                                }
                                 if executed {
                                     if let Some(ref sp) = state_path {
                                         save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
@@ -1294,13 +1351,17 @@ async fn main() {
 
                         // 也把 tick 直接给策略（高频策略用）
                         if let Some(signal) = strategy.on_tick(tick) {
-                            let executed = signal != Signal::None && decision_gate_allows_signal(&trade_override);
+                            let filter_ok = signal_filter.allows(&signal, None, latest_depth.as_ref()) == FilterResult::Pass;
+                            let executed = filter_ok && signal != Signal::None && decision_gate_allows_signal(&trade_override);
                             log_signal(&strategy_name, &signal, last_price, &strategy.export_state(), executed);
-                            try_execute_signal(
-                                &signal, &trade_override, &exchange, &strategy_name,
-                                config.sizing_mode, config.position_size, config.leverage, last_price,
-                                risk_config.max_loss_per_trade,
-                            ).await;
+                            if filter_ok {
+                                try_execute_signal(
+                                    &signal, &trade_override, &exchange, &strategy_name,
+                                    config.sizing_mode, config.position_size, config.leverage, last_price,
+                                    risk_config.max_loss_per_trade,
+                                    last_funding_rate, risk_config.funding_rate_limit,
+                                ).await;
+                            }
                             if executed {
                                 if let Some(ref sp) = state_path {
                                     save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
@@ -1309,14 +1370,19 @@ async fn main() {
                         }
                     }
                     MarketEvent::Depth(depth) => {
+                        latest_depth = Some(depth.clone());
                         if let Some(signal) = strategy.on_depth(depth) {
-                            let executed = signal != Signal::None && decision_gate_allows_signal(&trade_override);
+                            let filter_ok = signal_filter.allows(&signal, None, latest_depth.as_ref()) == FilterResult::Pass;
+                            let executed = filter_ok && signal != Signal::None && decision_gate_allows_signal(&trade_override);
                             log_signal(&strategy_name, &signal, last_price, &strategy.export_state(), executed);
-                            try_execute_signal(
-                                &signal, &trade_override, &exchange, &strategy_name,
-                                config.sizing_mode, config.position_size, config.leverage, last_price,
-                                risk_config.max_loss_per_trade,
-                            ).await;
+                            if filter_ok {
+                                try_execute_signal(
+                                    &signal, &trade_override, &exchange, &strategy_name,
+                                    config.sizing_mode, config.position_size, config.leverage, last_price,
+                                    risk_config.max_loss_per_trade,
+                                    last_funding_rate, risk_config.funding_rate_limit,
+                                ).await;
+                            }
                             if executed {
                                 if let Some(ref sp) = state_path {
                                     save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
@@ -1331,7 +1397,9 @@ async fn main() {
             }
             Some(user_event) = user_rx.recv() => {
                 match user_event {
-                    UserEvent::MarkPrice { ref symbol, mark_price } => {
+                    UserEvent::MarkPrice { ref symbol, mark_price, funding_rate } => {
+                        // 缓存最新资金费率
+                        last_funding_rate = funding_rate;
                         // 更新持仓跟踪器的标记价格
                         pos_tracker.update_mark_price(symbol, mark_price);
 
@@ -1419,8 +1487,9 @@ async fn main() {
                 }
             }
             Some(()) = config_rx.recv() => {
-                // strategy.json 文件变化 → 热更新策略参数
+                // strategy.json 文件变化 → 热更新策略参数 + 重建信号过滤器
                 reload_strategy(&mut config, &mut strategy);
+                signal_filter = SignalFilter::from_config(&config);
             }
             Some(()) = trade_rx.recv() => {
                 // trade.json 文件变化 → 重新加载 trade override
@@ -1469,9 +1538,24 @@ mod tests {
         let raw = r#"{"stream":"ntrnusdt@markPrice@1s","data":{"e":"markPriceUpdate","s":"NTRNUSDT","p":"0.35120000"}}"#;
         let event = parse_mark_price_msg(raw).unwrap();
         match event {
-            UserEvent::MarkPrice { symbol, mark_price } => {
+            UserEvent::MarkPrice { symbol, mark_price, funding_rate } => {
                 assert_eq!(symbol, "NTRNUSDT");
                 assert!((mark_price - 0.3512).abs() < 1e-8);
+                assert!((funding_rate - 0.0).abs() < 1e-10); // "r" 缺失时默认 0
+            }
+            _ => panic!("expected MarkPrice event"),
+        }
+    }
+
+    #[test]
+    fn parse_mark_price_with_funding_rate() {
+        let raw = r#"{"stream":"ntrnusdt@markPrice@1s","data":{"e":"markPriceUpdate","s":"NTRNUSDT","p":"0.35120000","r":"0.00015000"}}"#;
+        let event = parse_mark_price_msg(raw).unwrap();
+        match event {
+            UserEvent::MarkPrice { symbol, mark_price, funding_rate } => {
+                assert_eq!(symbol, "NTRNUSDT");
+                assert!((mark_price - 0.3512).abs() < 1e-8);
+                assert!((funding_rate - 0.00015).abs() < 1e-10);
             }
             _ => panic!("expected MarkPrice event"),
         }

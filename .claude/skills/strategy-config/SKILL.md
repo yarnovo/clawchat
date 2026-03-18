@@ -52,6 +52,11 @@ quant 产出策略时需要写 2 个配置文件。
 | leverage | 是 | 杠杆 1-20 |
 | position_size | 是 | 仓位占权益百分比（0.3 = 30%） |
 | sizing_mode | 否 | percent（百分比）或 fixed（固定量），默认 fixed |
+| trade_direction | 否 | long_only / short_only / both，默认 both |
+| cooldown_bars | 否 | 信号冷却期（K 线根数），默认 0（不冷却） |
+| min_volume | 否 | K 线最低成交量门槛，默认 0（不过滤） |
+| min_spread_bps | 否 | 盘口最大价差（基点），默认 0（不过滤） |
+| min_depth_usd | 否 | 盘口最小深度（USD），默认 0（不过滤） |
 | params | 是 | 策略参数，不同策略不同，见 SCHEMA.md |
 | backtest | 是 | 回测指标，必须真实可复现 |
 | lifecycle | 否 | 生命周期时间戳（见下表），引擎忽略此字段 |
