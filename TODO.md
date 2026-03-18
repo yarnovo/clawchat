@@ -16,13 +16,22 @@
 - [x] risk.json 热更新 start_risk_watcher（QA1 验证通过）
 - [ ] suspended 策略的 trade.json 怎么执行？（没引擎监听）
 
-## 待做（策略生命周期）
+## 待做（策略生命周期 — architect+strategist+trader 讨论通过）
 
-- [ ] 实盘表现差时 team-lead 决策 suspend
-- [ ] 实盘评估机制：自动对比实盘表现 vs 回测表现
-- [ ] 自动淘汰规则：实盘连续 3 天低于回测 30% → suspend
-- [ ] 生命周期状态：discovery → backtest → approved → live → degraded → suspended → archived
-- [ ] 策略归档：suspended 超期 → 移入 strategies/archived/
+### Phase 1：基础（先做）
+- [ ] strategy.json 加 lifecycle 字段（created/approved/probation_end/last_review）
+- [ ] `clawchat review` 命令：生成 performance.json（实盘指标 + vs 回测偏离度）
+- [ ] 状态扩展：candidate → approved → probation → active → degraded → suspended
+
+### Phase 2：自动检测
+- [ ] degradation 自动检测（滚动 7 天窗口：收益<-5% / 胜率<回测60% / 连亏>=5）
+- [ ] probation → active 自动升级（7 天实盘达标）
+- [ ] degraded → suspended 自动降级（7 天未恢复）
+
+### Phase 3：资金分配
+- [ ] `clawchat rebalance` 命令：三池模型（储备30%/运营50%/研发20%）
+- [ ] 运营池按 sharpe 加权分配
+- [ ] probation 策略用研发池资金（position_size 减半）
 
 ## 待做（技术）
 
