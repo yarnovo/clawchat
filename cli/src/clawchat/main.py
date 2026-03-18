@@ -33,8 +33,14 @@ def main():
     # 评估
     sub.add_parser("review", help="策略实盘评估（对比回测）")
 
+    # 分析
+    sub.add_parser("correlation", help="策略相关性分析")
+
     # 报告
     sub.add_parser("report", help="报告生成（daily/weekly）")
+
+    # 紧急操作
+    sub.add_parser("emergency-close", help="紧急全平（所有或指定策略）")
 
     # 交易所直接操作
     sub.add_parser("exchange", help="交易所操作（开仓/平仓/止损等）")
@@ -95,8 +101,14 @@ def main():
     elif args.command == "review":
         from clawchat.cmd_review import main as cmd
         cmd()
+    elif args.command == "correlation":
+        from clawchat.cmd_correlation import main as cmd
+        cmd()
     elif args.command == "report":
         from clawchat.cmd_report import main as cmd
+        cmd()
+    elif args.command == "emergency-close":
+        from clawchat.cmd_emergency import main as cmd
         cmd()
     elif args.command == "exchange":
         from clawchat.exchange import main as cmd
