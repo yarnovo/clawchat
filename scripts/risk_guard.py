@@ -39,37 +39,83 @@ def append_equity(timestamp, equity, unrealized_pnl, num_positions, detail):
                          json.dumps(detail, ensure_ascii=False)])
 
 
-def load_risk_configs():
-    """扫描 strategies/*/，用 strategy.json 的 symbol 做键，risk.json 做值。
-    返回 {normalized_symbol: risk_config}，如 {'PIPPINUSDT': {...}}。
-    """
-    risk_by_symbol = {}
+def _build_strategy_index():
+    """扫描 strategies/*/strategy.json，建立 {name: dir_path} 和 {norm_symbol: dir_path} 索引。"""
+    by_name = {}
+    by_symbol = {}
     for strategy_dir in sorted(STRATEGIES_DIR.iterdir()):
         if not strategy_dir.is_dir():
             continue
         strategy_file = strategy_dir / "strategy.json"
-        risk_file = strategy_dir / "risk.json"
         if not strategy_file.exists():
             continue
-
         try:
-            strategy_cfg = json.loads(strategy_file.read_text())
-            symbol = strategy_cfg.get("symbol", "")
-            # 归一化: "PIPPIN/USDT" → "PIPPINUSDT", "PIPPINUSDT" → "PIPPINUSDT"
-            norm_symbol = symbol.replace("/", "").replace(":USDT", "")
-            if not norm_symbol:
-                continue
+            cfg = json.loads(strategy_file.read_text())
+            name = cfg.get("name", strategy_dir.name)
+            symbol = cfg.get("symbol", "")
+            norm = symbol.replace("/", "").replace(":USDT", "")
+            by_name[name] = strategy_dir
+            if norm:
+                by_symbol[norm] = strategy_dir
+        except Exception:
+            pass
+    return by_name, by_symbol
 
-            if risk_file.exists():
-                risk_cfg = json.loads(risk_file.read_text())
-            else:
-                risk_cfg = dict(DEFAULT_RISK)
 
-            # 保留策略名用于日志标注
-            risk_cfg['name'] = strategy_cfg.get('name', strategy_dir.name)
-            risk_by_symbol[norm_symbol] = risk_cfg
-        except Exception as e:
-            print(f"  加载风控配置失败 {strategy_dir.name}: {e}")
+def _load_risk_from_dir(strategy_dir, strategy_name):
+    """从策略目录加载 risk.json，缺失则返回全局默认值。"""
+    risk_file = strategy_dir / "risk.json"
+    if risk_file.exists():
+        try:
+            risk_cfg = json.loads(risk_file.read_text())
+        except Exception:
+            risk_cfg = dict(DEFAULT_RISK)
+    else:
+        risk_cfg = dict(DEFAULT_RISK)
+    risk_cfg['name'] = strategy_name
+    return risk_cfg
+
+
+def load_risk_configs():
+    """加载每个持仓对应的策略风控配置。
+    返回 {normalized_symbol: risk_config}，如 {'PIPPINUSDT': {...}}。
+
+    匹配路径（优先 engine registry）：
+    1. /tmp/hft-engines.json: {symbol: strategy_name} → strategies/{name}/risk.json
+    2. 补充：遍历 strategies/*/strategy.json 按 symbol 字段匹配
+    """
+    by_name, by_symbol = _build_strategy_index()
+    risk_by_symbol = {}
+
+    # 路径 1：通过 engine registry (symbol→strategy name→risk.json)
+    engine_map = {}
+    try:
+        if ENGINE_REGISTRY.exists():
+            engine_map = json.loads(ENGINE_REGISTRY.read_text())
+    except Exception:
+        pass
+
+    for norm_symbol, strategy_name in engine_map.items():
+        if norm_symbol in risk_by_symbol:
+            continue
+        # strategy_name 可能是策略类型如 "scalping"，也可能是完整名如 "pippin-scalping-5m"
+        # 先按完整名匹配
+        strategy_dir = by_name.get(strategy_name)
+        if strategy_dir:
+            risk_by_symbol[norm_symbol] = _load_risk_from_dir(strategy_dir, strategy_name)
+            continue
+        # 再按 symbol 匹配
+        strategy_dir = by_symbol.get(norm_symbol)
+        if strategy_dir:
+            dir_name = strategy_dir.name
+            risk_by_symbol[norm_symbol] = _load_risk_from_dir(strategy_dir, dir_name)
+
+    # 路径 2：补充——遍历 strategies/ 中未被 registry 覆盖的
+    for norm_symbol, strategy_dir in by_symbol.items():
+        if norm_symbol in risk_by_symbol:
+            continue
+        dir_name = strategy_dir.name
+        risk_by_symbol[norm_symbol] = _load_risk_from_dir(strategy_dir, dir_name)
 
     return risk_by_symbol
 
