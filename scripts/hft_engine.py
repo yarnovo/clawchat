@@ -26,7 +26,7 @@ from pathlib import Path
 
 from backtest import (
     TrendFollowStrategy, RSIStrategy, EMA2050TrendStrategy,
-    BreakoutStrategy, VWAPRevertStrategy, _atr,
+    BreakoutStrategy, VWAPRevertStrategy, ScalpingStrategy, _atr,
 )
 from futures_exchange import (
     get_futures_exchange, set_leverage, set_margin_mode,
@@ -51,6 +51,7 @@ STRATEGIES = {
     'ema2050': EMA2050TrendStrategy,
     'breakout': BreakoutStrategy,
     'vwap': VWAPRevertStrategy,
+    'scalping': ScalpingStrategy,
 }
 
 
