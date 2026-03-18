@@ -3,7 +3,7 @@
 
 import sys
 from datetime import datetime
-from .exchange import get_exchange
+from exchange import get_exchange
 
 WATCHLIST = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT']
 

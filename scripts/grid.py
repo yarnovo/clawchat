@@ -5,11 +5,15 @@ import json
 import time
 from datetime import datetime
 from pathlib import Path
-from .exchange import get_exchange
+from exchange import get_exchange
 
-DATA_DIR = Path(__file__).parents[4] / "data"
+DATA_DIR = Path(__file__).parent.parent / "data"
 DATA_DIR.mkdir(exist_ok=True)
-STATE_FILE = DATA_DIR / "grid_state.json"
+
+
+def state_file(symbol):
+    safe = symbol.replace('/', '-').lower()
+    return DATA_DIR / f"grid_{safe}.json"
 
 
 def calc_grid_lines(lower, upper, grids):
@@ -17,14 +21,16 @@ def calc_grid_lines(lower, upper, grids):
     return [lower + i * step for i in range(grids + 1)]
 
 
-def load_state():
-    if STATE_FILE.exists():
-        return json.loads(STATE_FILE.read_text())
+def load_state(symbol='BTC/USDT'):
+    f = state_file(symbol)
+    if f.exists():
+        return json.loads(f.read_text())
     return None
 
 
 def save_state(state):
-    STATE_FILE.write_text(json.dumps(state, indent=2, default=str))
+    f = state_file(state['symbol'])
+    f.write_text(json.dumps(state, indent=2, default=str))
 
 
 def init_state(symbol, lower, upper, grids, amount):
@@ -132,21 +138,32 @@ def backtest(symbol, lower, upper, grids, amount, days):
     print()
 
 
-def show_status():
-    state = load_state()
-    if not state:
+def show_status(symbol=None):
+    if symbol:
+        symbols = [symbol]
+    else:
+        symbols = [f.stem.replace('grid_', '').replace('-', '/').upper()
+                   for f in DATA_DIR.glob("grid_*.json")]
+    if not symbols:
         print("  没有运行中的网格策略")
         return
-    print(f"\n  {state['symbol']}  ${state['lower']:,.0f}-${state['upper']:,.0f}  "
-          f"x{state['grids']}  ${state['amount_per_grid']}/格")
-    print(f"  价格: ${state['last_price']:,.2f}  交易: {len(state['trades'])}笔  "
-          f"利润: ${state['total_profit']:,.2f}  {'运行中' if state['active'] else '已停止'}")
+    for sym in symbols:
+        state = load_state(sym)
+        if not state:
+            continue
+        def fmt(v):
+            return f"${v:,.2f}" if v >= 1 else f"${v:.4f}"
+        lp = fmt(state['last_price']) if state['last_price'] else '?'
+        print(f"\n  {state['symbol']}  {fmt(state['lower'])}-{fmt(state['upper'])}  "
+              f"x{state['grids']}  ${state['amount_per_grid']}/格")
+        print(f"  价格: {lp}  交易: {len(state['trades'])}笔  "
+              f"利润: ${state['total_profit']:,.2f}  {'运行中' if state['active'] else '已停止'}")
     print()
 
 
 def run_loop(symbol, lower, upper, grids, amount, interval=60, dry_run=False):
     exchange = get_exchange()
-    state = load_state()
+    state = load_state(symbol)
     if not state or state['symbol'] != symbol:
         state = init_state(symbol, lower, upper, grids, amount)
         save_state(state)
@@ -190,7 +207,8 @@ def main():
     p.add_argument('--amount', type=float, default=50)
     p.add_argument('--days', type=int, default=30)
 
-    sub.add_parser('status')
+    p = sub.add_parser('status')
+    p.add_argument('--symbol', default=None)
     args = parser.parse_args()
 
     if args.cmd == 'run':
@@ -199,7 +217,7 @@ def main():
     elif args.cmd == 'backtest':
         backtest(args.symbol, args.lower, args.upper, args.grids, args.amount, args.days)
     elif args.cmd == 'status':
-        show_status()
+        show_status(args.symbol)
     else:
         parser.print_help()
 

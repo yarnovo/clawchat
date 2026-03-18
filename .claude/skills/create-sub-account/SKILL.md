@@ -9,11 +9,11 @@ user-invocable: true
 ## 执行
 
 ```bash
-source .env && uv run projects create <name> --fund <amount>
+source .env && cd scripts && uv run python projects.py create <name> --fund <amount>
 ```
 
 ## 查看已有
 
 ```bash
-source .env && uv run projects list
+source .env && cd scripts && uv run python projects.py list
 ```

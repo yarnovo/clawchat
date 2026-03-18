@@ -7,7 +7,7 @@ import ccxt
 from datetime import datetime
 from pathlib import Path
 
-DATA_DIR = Path(__file__).parents[4] / "data" / "projects"
+DATA_DIR = Path(__file__).parent.parent / "data" / "projects"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
