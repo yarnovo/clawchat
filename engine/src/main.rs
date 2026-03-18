@@ -7,7 +7,10 @@ pub mod ws_feed;
 
 use config::Config;
 use exchange::Exchange;
-use strategy::{CandleAggregator, MarketMaker, Signal, Strategy, TrendFollower};
+use strategy::{
+    BollingerStrategy, BreakoutStrategy, CandleAggregator, MarketMaker, RSIStrategy,
+    ScalpingStrategy, Signal, Strategy, TrendFollower,
+};
 use types::{MarketEvent, OrderType as StratOrderType, Side as StratSide};
 
 use crate::ws_feed::{start_feed, FeedConfig};
@@ -35,6 +38,22 @@ fn create_strategy(config: &Config) -> Box<dyn Strategy> {
         "market_maker" | "mm" => {
             tracing::info!("using MarketMaker strategy");
             Box::new(MarketMaker::new(&config.symbol, 0.0004, qty))
+        }
+        "scalping" => {
+            tracing::info!("using Scalping strategy");
+            Box::new(ScalpingStrategy::new(&config.symbol, qty))
+        }
+        "breakout" => {
+            tracing::info!("using Breakout strategy");
+            Box::new(BreakoutStrategy::new(&config.symbol, qty))
+        }
+        "rsi" => {
+            tracing::info!("using RSI strategy");
+            Box::new(RSIStrategy::new(&config.symbol, qty))
+        }
+        "bollinger" => {
+            tracing::info!("using Bollinger strategy");
+            Box::new(BollingerStrategy::new(&config.symbol, qty))
         }
         _ => {
             // 默认使用 TrendFollower

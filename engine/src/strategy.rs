@@ -329,6 +329,574 @@ impl Strategy for TrendFollower {
     }
 }
 
+// ── 工具函数 ─────────────────────────────────────────────────
+
+/// 从历史序列计算 EMA
+fn ema_from_slice(data: &[f64], period: usize) -> Option<f64> {
+    if data.len() < period {
+        return None;
+    }
+    let k = 2.0 / (period as f64 + 1.0);
+    let mut ema: f64 = data[..period].iter().sum::<f64>() / period as f64;
+    for &v in &data[period..] {
+        ema = v * k + ema * (1.0 - k);
+    }
+    Some(ema)
+}
+
+/// 从历史序列计算 RSI
+fn rsi_from_slice(closes: &[f64], period: usize) -> Option<f64> {
+    if closes.len() < period + 1 {
+        return None;
+    }
+    let start = closes.len() - period - 1;
+    let mut gains = 0.0;
+    let mut losses = 0.0;
+    for i in (start + 1)..closes.len() {
+        let delta = closes[i] - closes[i - 1];
+        if delta > 0.0 {
+            gains += delta;
+        } else {
+            losses -= delta;
+        }
+    }
+    let avg_gain = gains / period as f64;
+    let avg_loss = losses / period as f64;
+    if avg_loss == 0.0 {
+        return Some(100.0);
+    }
+    let rs = avg_gain / avg_loss;
+    Some(100.0 - (100.0 / (1.0 + rs)))
+}
+
+/// 从历史序列计算 ATR
+fn atr_from_slices(highs: &[f64], lows: &[f64], closes: &[f64], period: usize) -> Option<f64> {
+    if closes.len() < period + 1 {
+        return None;
+    }
+    let n = closes.len();
+    let start = n - period;
+    let mut sum = 0.0;
+    for i in start..n {
+        let hl = highs[i] - lows[i];
+        let hc = (highs[i] - closes[i - 1]).abs();
+        let lc = (lows[i] - closes[i - 1]).abs();
+        sum += hl.max(hc).max(lc);
+    }
+    Some(sum / period as f64)
+}
+
+// ══════════════════════════════════════════════════════════════
+// Scalping 策略 — EMA 快慢线交叉 + RSI 过滤 + 放量确认
+// ══════════════════════════════════════════════════════════════
+
+struct ScalpingPosition {
+    side: Side,
+    sl: f64,
+    tp: f64,
+}
+
+pub struct ScalpingStrategy {
+    pub symbol: String,
+    pub order_qty: f64,
+    fast_period: usize,
+    slow_period: usize,
+    vol_mult: f64,
+    closes: Vec<f64>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
+    volumes: Vec<f64>,
+    pos: Option<ScalpingPosition>,
+}
+
+impl ScalpingStrategy {
+    pub fn new(symbol: &str, order_qty: f64) -> Self {
+        Self {
+            symbol: symbol.to_string(),
+            order_qty,
+            fast_period: 12,
+            slow_period: 50,
+            vol_mult: 1.2,
+            closes: Vec::new(),
+            highs: Vec::new(),
+            lows: Vec::new(),
+            volumes: Vec::new(),
+            pos: None,
+        }
+    }
+}
+
+impl Strategy for ScalpingStrategy {
+    fn on_candle(&mut self, candle: &Candle) -> Option<Signal> {
+        self.closes.push(candle.close);
+        self.highs.push(candle.high);
+        self.lows.push(candle.low);
+        self.volumes.push(candle.volume);
+
+        let n = self.closes.len();
+        if n < self.slow_period + 1 {
+            return Some(Signal::None);
+        }
+
+        let fast_now = ema_from_slice(&self.closes, self.fast_period)?;
+        let slow_now = ema_from_slice(&self.closes, self.slow_period)?;
+        let fast_prev = ema_from_slice(&self.closes[..n - 1], self.fast_period)?;
+        let slow_prev = ema_from_slice(&self.closes[..n - 1], self.slow_period)?;
+        let rsi = rsi_from_slice(&self.closes, 14)?;
+        let atr = atr_from_slices(&self.highs, &self.lows, &self.closes, 14)?;
+
+        // 持仓中：ATR 止损/止盈
+        if let Some(ref pos) = self.pos {
+            let exit = match pos.side {
+                Side::Buy => candle.close <= pos.sl || candle.close >= pos.tp,
+                Side::Sell => candle.close >= pos.sl || candle.close <= pos.tp,
+            };
+            if exit {
+                let side = match pos.side {
+                    Side::Buy => Side::Sell,
+                    Side::Sell => Side::Buy,
+                };
+                self.pos = None;
+                return Some(Signal::Order(OrderRequest {
+                    symbol: self.symbol.clone(),
+                    side,
+                    order_type: OrderType::Market,
+                    qty: self.order_qty,
+                    price: None,
+                }));
+            }
+            return Some(Signal::None);
+        }
+
+        let avg_vol: f64 = self.volumes[n - self.slow_period..].iter().sum::<f64>()
+            / self.slow_period as f64;
+        let vol_ok = candle.volume > avg_vol * self.vol_mult;
+
+        // 做多：快线上穿慢线 + RSI 45-70 + 放量
+        if fast_prev <= slow_prev && fast_now > slow_now && vol_ok && rsi > 45.0 && rsi < 70.0 {
+            self.pos = Some(ScalpingPosition {
+                side: Side::Buy,
+                sl: candle.close - atr * 1.5,
+                tp: candle.close + atr * 3.0,
+            });
+            return Some(Signal::Order(OrderRequest {
+                symbol: self.symbol.clone(),
+                side: Side::Buy,
+                order_type: OrderType::Market,
+                qty: self.order_qty,
+                price: None,
+            }));
+        }
+
+        // 做空：快线下穿慢线 + RSI 30-55
+        if fast_prev >= slow_prev && fast_now < slow_now && rsi > 30.0 && rsi < 55.0 {
+            self.pos = Some(ScalpingPosition {
+                side: Side::Sell,
+                sl: candle.close + atr * 1.5,
+                tp: candle.close - atr * 3.0,
+            });
+            return Some(Signal::Order(OrderRequest {
+                symbol: self.symbol.clone(),
+                side: Side::Sell,
+                order_type: OrderType::Market,
+                qty: self.order_qty,
+                price: None,
+            }));
+        }
+
+        Some(Signal::None)
+    }
+
+    fn name(&self) -> &str {
+        "Scalping"
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+// Breakout 策略 — 价格突破 N 周期高低点 + ATR 过滤 + 移动止损
+// ══════════════════════════════════════════════════════════════
+
+struct BreakoutPosition {
+    side: Side,
+    trail_stop: f64,
+}
+
+pub struct BreakoutStrategy {
+    pub symbol: String,
+    pub order_qty: f64,
+    lookback: usize,
+    atr_period: usize,
+    atr_filter: f64,
+    trail_atr: f64,
+    closes: Vec<f64>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
+    pos: Option<BreakoutPosition>,
+}
+
+impl BreakoutStrategy {
+    pub fn new(symbol: &str, order_qty: f64) -> Self {
+        Self {
+            symbol: symbol.to_string(),
+            order_qty,
+            lookback: 48,
+            atr_period: 14,
+            atr_filter: 0.3,
+            trail_atr: 3.0,
+            closes: Vec::new(),
+            highs: Vec::new(),
+            lows: Vec::new(),
+            pos: None,
+        }
+    }
+}
+
+impl Strategy for BreakoutStrategy {
+    fn on_candle(&mut self, candle: &Candle) -> Option<Signal> {
+        self.closes.push(candle.close);
+        self.highs.push(candle.high);
+        self.lows.push(candle.low);
+
+        let n = self.closes.len();
+        if n < self.lookback + 1 {
+            return Some(Signal::None);
+        }
+
+        let atr = atr_from_slices(&self.highs, &self.lows, &self.closes, self.atr_period)?;
+        if atr == 0.0 {
+            return Some(Signal::None);
+        }
+
+        // 过去 N 根 K 线的高低点（不含当前）
+        let start = n - self.lookback - 1;
+        let end = n - 1;
+        let highest = self.highs[start..end]
+            .iter()
+            .cloned()
+            .fold(f64::NEG_INFINITY, f64::max);
+        let lowest = self.lows[start..end]
+            .iter()
+            .cloned()
+            .fold(f64::INFINITY, f64::min);
+
+        // 持仓中：移动止损
+        if let Some(ref mut pos) = self.pos {
+            match pos.side {
+                Side::Buy => {
+                    let new_stop = candle.close - atr * self.trail_atr;
+                    if new_stop > pos.trail_stop {
+                        pos.trail_stop = new_stop;
+                    }
+                    if candle.close <= pos.trail_stop {
+                        self.pos = None;
+                        return Some(Signal::Order(OrderRequest {
+                            symbol: self.symbol.clone(),
+                            side: Side::Sell,
+                            order_type: OrderType::Market,
+                            qty: self.order_qty,
+                            price: None,
+                        }));
+                    }
+                }
+                Side::Sell => {
+                    let new_stop = candle.close + atr * self.trail_atr;
+                    if new_stop < pos.trail_stop {
+                        pos.trail_stop = new_stop;
+                    }
+                    if candle.close >= pos.trail_stop {
+                        self.pos = None;
+                        return Some(Signal::Order(OrderRequest {
+                            symbol: self.symbol.clone(),
+                            side: Side::Buy,
+                            order_type: OrderType::Market,
+                            qty: self.order_qty,
+                            price: None,
+                        }));
+                    }
+                }
+            }
+            return Some(Signal::None);
+        }
+
+        // 向上突破 + 突破幅度 > ATR * filter
+        if candle.close > highest && (candle.close - highest) > atr * self.atr_filter {
+            self.pos = Some(BreakoutPosition {
+                side: Side::Buy,
+                trail_stop: candle.close - atr * self.trail_atr,
+            });
+            return Some(Signal::Order(OrderRequest {
+                symbol: self.symbol.clone(),
+                side: Side::Buy,
+                order_type: OrderType::Market,
+                qty: self.order_qty,
+                price: None,
+            }));
+        }
+
+        // 向下突破
+        if candle.close < lowest && (lowest - candle.close) > atr * self.atr_filter {
+            self.pos = Some(BreakoutPosition {
+                side: Side::Sell,
+                trail_stop: candle.close + atr * self.trail_atr,
+            });
+            return Some(Signal::Order(OrderRequest {
+                symbol: self.symbol.clone(),
+                side: Side::Sell,
+                order_type: OrderType::Market,
+                qty: self.order_qty,
+                price: None,
+            }));
+        }
+
+        Some(Signal::None)
+    }
+
+    fn name(&self) -> &str {
+        "Breakout"
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+// RSI 策略 — RSI 超买超卖 + 趋势过滤 + ATR 止损止盈
+// ══════════════════════════════════════════════════════════════
+
+struct RSIPosition {
+    side: Side,
+    sl: f64,
+    tp: f64,
+}
+
+pub struct RSIStrategy {
+    pub symbol: String,
+    pub order_qty: f64,
+    rsi_period: usize,
+    oversold: f64,
+    overbought: f64,
+    trend_ema: usize,
+    closes: Vec<f64>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
+    pos: Option<RSIPosition>,
+}
+
+impl RSIStrategy {
+    pub fn new(symbol: &str, order_qty: f64) -> Self {
+        Self {
+            symbol: symbol.to_string(),
+            order_qty,
+            rsi_period: 14,
+            oversold: 25.0,
+            overbought: 75.0,
+            trend_ema: 50,
+            closes: Vec::new(),
+            highs: Vec::new(),
+            lows: Vec::new(),
+            pos: None,
+        }
+    }
+}
+
+impl Strategy for RSIStrategy {
+    fn on_candle(&mut self, candle: &Candle) -> Option<Signal> {
+        self.closes.push(candle.close);
+        self.highs.push(candle.high);
+        self.lows.push(candle.low);
+
+        let n = self.closes.len();
+        let warmup = (self.rsi_period + 1).max(self.trend_ema + 1);
+        if n < warmup {
+            return Some(Signal::None);
+        }
+
+        let rsi = rsi_from_slice(&self.closes, self.rsi_period)?;
+        let trend = ema_from_slice(&self.closes, self.trend_ema)?;
+        let atr = atr_from_slices(&self.highs, &self.lows, &self.closes, 14)?;
+
+        // 持仓中：止损止盈
+        if let Some(ref pos) = self.pos {
+            let exit = match pos.side {
+                Side::Buy => candle.close <= pos.sl || candle.close >= pos.tp,
+                Side::Sell => candle.close >= pos.sl || candle.close <= pos.tp,
+            };
+            if exit {
+                let side = match pos.side {
+                    Side::Buy => Side::Sell,
+                    Side::Sell => Side::Buy,
+                };
+                self.pos = None;
+                return Some(Signal::Order(OrderRequest {
+                    symbol: self.symbol.clone(),
+                    side,
+                    order_type: OrderType::Market,
+                    qty: self.order_qty,
+                    price: None,
+                }));
+            }
+            return Some(Signal::None);
+        }
+
+        // 做多：RSI 超卖 + 价格在趋势线上方
+        if rsi < self.oversold && candle.close > trend {
+            self.pos = Some(RSIPosition {
+                side: Side::Buy,
+                sl: candle.close - atr * 2.0,
+                tp: candle.close + atr * 4.0,
+            });
+            return Some(Signal::Order(OrderRequest {
+                symbol: self.symbol.clone(),
+                side: Side::Buy,
+                order_type: OrderType::Market,
+                qty: self.order_qty,
+                price: None,
+            }));
+        }
+
+        // 做空：RSI 超买 + 价格在趋势线下方
+        if rsi > self.overbought && candle.close < trend {
+            self.pos = Some(RSIPosition {
+                side: Side::Sell,
+                sl: candle.close + atr * 2.0,
+                tp: candle.close - atr * 4.0,
+            });
+            return Some(Signal::Order(OrderRequest {
+                symbol: self.symbol.clone(),
+                side: Side::Sell,
+                order_type: OrderType::Market,
+                qty: self.order_qty,
+                price: None,
+            }));
+        }
+
+        Some(Signal::None)
+    }
+
+    fn name(&self) -> &str {
+        "RSI"
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+// Bollinger 策略 — 布林带突破 + 趋势过滤 + 中轨止盈
+// ══════════════════════════════════════════════════════════════
+
+struct BollingerPosition {
+    side: Side,
+    sl: f64,
+}
+
+pub struct BollingerStrategy {
+    pub symbol: String,
+    pub order_qty: f64,
+    bb_period: usize,
+    num_std: f64,
+    trend_ema: usize,
+    closes: Vec<f64>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
+    pos: Option<BollingerPosition>,
+}
+
+impl BollingerStrategy {
+    pub fn new(symbol: &str, order_qty: f64) -> Self {
+        Self {
+            symbol: symbol.to_string(),
+            order_qty,
+            bb_period: 20,
+            num_std: 2.5,
+            trend_ema: 50,
+            closes: Vec::new(),
+            highs: Vec::new(),
+            lows: Vec::new(),
+            pos: None,
+        }
+    }
+}
+
+impl Strategy for BollingerStrategy {
+    fn on_candle(&mut self, candle: &Candle) -> Option<Signal> {
+        self.closes.push(candle.close);
+        self.highs.push(candle.high);
+        self.lows.push(candle.low);
+
+        let n = self.closes.len();
+        let warmup = self.bb_period.max(self.trend_ema + 1);
+        if n < warmup {
+            return Some(Signal::None);
+        }
+
+        // 布林带
+        let window = &self.closes[n - self.bb_period..];
+        let mean: f64 = window.iter().sum::<f64>() / self.bb_period as f64;
+        let variance: f64 =
+            window.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / self.bb_period as f64;
+        let std = variance.sqrt();
+        let upper = mean + self.num_std * std;
+        let lower = mean - self.num_std * std;
+
+        let trend = ema_from_slice(&self.closes, self.trend_ema)?;
+        let atr = atr_from_slices(&self.highs, &self.lows, &self.closes, 14)?;
+
+        // 持仓中：止损或回到中轨平仓
+        if let Some(ref pos) = self.pos {
+            let exit = match pos.side {
+                Side::Buy => candle.close <= pos.sl || candle.close >= mean,
+                Side::Sell => candle.close >= pos.sl || candle.close <= mean,
+            };
+            if exit {
+                let side = match pos.side {
+                    Side::Buy => Side::Sell,
+                    Side::Sell => Side::Buy,
+                };
+                self.pos = None;
+                return Some(Signal::Order(OrderRequest {
+                    symbol: self.symbol.clone(),
+                    side,
+                    order_type: OrderType::Market,
+                    qty: self.order_qty,
+                    price: None,
+                }));
+            }
+            return Some(Signal::None);
+        }
+
+        // 突破上轨 + 趋势向上 → 做多
+        if candle.close > upper && candle.close > trend {
+            self.pos = Some(BollingerPosition {
+                side: Side::Buy,
+                sl: candle.close - atr * 2.0,
+            });
+            return Some(Signal::Order(OrderRequest {
+                symbol: self.symbol.clone(),
+                side: Side::Buy,
+                order_type: OrderType::Market,
+                qty: self.order_qty,
+                price: None,
+            }));
+        }
+
+        // 突破下轨 + 趋势向下 → 做空
+        if candle.close < lower && candle.close < trend {
+            self.pos = Some(BollingerPosition {
+                side: Side::Sell,
+                sl: candle.close + atr * 2.0,
+            });
+            return Some(Signal::Order(OrderRequest {
+                symbol: self.symbol.clone(),
+                side: Side::Sell,
+                order_type: OrderType::Market,
+                qty: self.order_qty,
+                price: None,
+            }));
+        }
+
+        Some(Signal::None)
+    }
+
+    fn name(&self) -> &str {
+        "Bollinger"
+    }
+}
+
 /// 计算止损/止盈价格
 pub fn calc_sl_tp(entry: f64, atr: f64, is_long: bool, sl_mult: f64, tp_mult: f64) -> (f64, f64) {
     if is_long {
