@@ -741,6 +741,40 @@ fn start_trade_watcher(trade_path: PathBuf, tx: tokio_mpsc::Sender<()>) {
     });
 }
 
+/// 监听 risk.json 文件变化，发送通知到 channel
+fn start_risk_watcher(risk_path: PathBuf, tx: tokio_mpsc::Sender<()>) {
+    std::thread::spawn(move || {
+        let watched_path = risk_path.clone();
+        let tx_clone = tx.clone();
+        let mut watcher = notify::recommended_watcher(
+            move |res: Result<notify::Event, notify::Error>| {
+                let Ok(event) = res else { return };
+                match event.kind {
+                    EventKind::Modify(_) | EventKind::Create(_) => {}
+                    _ => return,
+                }
+                let dominated = event.paths.iter().any(|p| p == &watched_path);
+                if !dominated {
+                    return;
+                }
+                tracing::info!("risk.json changed, reloading config");
+                let _ = tx_clone.blocking_send(());
+            },
+        )
+        .expect("failed to create risk file watcher");
+
+        let watch_dir = risk_path.parent().unwrap_or(&risk_path);
+        watcher
+            .watch(watch_dir, RecursiveMode::NonRecursive)
+            .expect("failed to watch risk directory");
+
+        tracing::info!("risk file watcher started: {:?}", risk_path);
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(3600));
+        }
+    });
+}
+
 /// 从 strategy.json 重新加载参数，创建新策略实例并恢复旧状态
 fn reload_strategy(config: &mut Config, strategy: &mut Box<dyn Strategy>) {
     let Some(ref path) = config.config else { return };
@@ -897,7 +931,7 @@ async fn execute_trade_override(
             }
         }
         TradeAction::Reduce => {
-            let ratio = trade_override.params.ratio.unwrap_or(0.5);
+            let percent = trade_override.params.percent.unwrap_or(0.5);
             match exchange.get_positions().await {
                 Ok(positions) => {
                     for pos in &positions {
@@ -912,9 +946,9 @@ async fn execute_trade_override(
                         if amt.abs() < f64::EPSILON {
                             continue;
                         }
-                        let reduce_amt = amt * ratio;
+                        let reduce_amt = amt * percent;
                         match exchange.close_position(sym, reduce_amt).await {
-                            Ok(_) => tracing::info!("[{strategy_name}] reduced {sym} by {ratio:.0}%: {reduce_amt}"),
+                            Ok(_) => tracing::info!("[{strategy_name}] reduced {sym} by {percent:.0}%: {reduce_amt}"),
                             Err(e) => tracing::error!("[{strategy_name}] reduce {sym} failed: {e}"),
                         }
                     }
@@ -923,7 +957,9 @@ async fn execute_trade_override(
             }
         }
         TradeAction::Add => {
-            let ratio = trade_override.params.ratio.unwrap_or(0.5);
+            let percent = trade_override.params.percent.unwrap_or(0.5);
+            // direction 指定加仓方向："long" 或 "short"，不指定时跟随现有仓位方向
+            let direction = trade_override.params.direction.as_deref();
             match exchange.get_positions().await {
                 Ok(positions) => {
                     for pos in &positions {
@@ -938,14 +974,21 @@ async fn execute_trade_override(
                         if amt.abs() < f64::EPSILON {
                             continue;
                         }
-                        let add_amt = (amt * ratio).abs();
-                        let (side, pos_side) = if amt > 0.0 {
-                            (exchange::Side::Buy, exchange::PositionSide::Long)
-                        } else {
-                            (exchange::Side::Sell, exchange::PositionSide::Short)
+                        let add_amt = (amt * percent).abs();
+                        let (side, pos_side) = match direction {
+                            Some("long") => (exchange::Side::Buy, exchange::PositionSide::Long),
+                            Some("short") => (exchange::Side::Sell, exchange::PositionSide::Short),
+                            _ => {
+                                // 跟随现有仓位方向
+                                if amt > 0.0 {
+                                    (exchange::Side::Buy, exchange::PositionSide::Long)
+                                } else {
+                                    (exchange::Side::Sell, exchange::PositionSide::Short)
+                                }
+                            }
                         };
                         match exchange.market_order(side, pos_side, add_amt).await {
-                            Ok(_) => tracing::info!("[{strategy_name}] added {sym} by {ratio:.0}%: {add_amt}"),
+                            Ok(_) => tracing::info!("[{strategy_name}] added {sym} by {percent:.0}%: {add_amt} direction={direction:?}"),
                             Err(e) => tracing::error!("[{strategy_name}] add {sym} failed: {e}"),
                         }
                     }
@@ -1003,9 +1046,11 @@ async fn main() {
         tracing::info!(action = ?trade_override.action, "loaded trade override");
     }
 
-    // risk.json 加载
-    let risk_config = risk_json_path(&config)
-        .map(|p| RiskConfig::load(&p))
+    // risk.json 路径 + 加载
+    let risk_path = risk_json_path(&config);
+    let mut risk_config = risk_path
+        .as_ref()
+        .map(|p| RiskConfig::load(p))
         .unwrap_or_default();
     let capital = config.capital.unwrap_or(200.0);
     tracing::info!(
@@ -1065,6 +1110,12 @@ async fn main() {
     let (trade_tx, mut trade_rx) = tokio_mpsc::channel::<()>(16);
     if let Some(ref path) = trade_path {
         start_trade_watcher(path.clone(), trade_tx);
+    }
+
+    // 启动 risk.json 文件监听（热更新风控参数）
+    let (risk_tx, mut risk_rx) = tokio_mpsc::channel::<()>(16);
+    if let Some(ref path) = risk_path {
+        start_risk_watcher(path.clone(), risk_tx);
     }
 
     // 启动 user data stream（markPrice + ACCOUNT_UPDATE）
@@ -1267,6 +1318,19 @@ async fn main() {
                     execute_trade_override(
                         &mut trade_override, tp, &exchange, &strategy_name,
                     ).await;
+                }
+            }
+            Some(()) = risk_rx.recv() => {
+                // risk.json 文件变化 → 热更新风控参数
+                if let Some(ref rp) = risk_path {
+                    let new_risk = RiskConfig::load(rp);
+                    tracing::info!(
+                        max_loss = new_risk.max_loss_per_trade,
+                        max_profit = new_risk.max_profit_per_trade,
+                        max_drawdown_stop = new_risk.max_drawdown_stop,
+                        "risk.json reloaded"
+                    );
+                    risk_config = new_risk;
                 }
             }
         }

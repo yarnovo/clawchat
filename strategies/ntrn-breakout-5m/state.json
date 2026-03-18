@@ -1,0 +1,28 @@
+{
+  "last_updated": "2026-03-18T15:44:59Z",
+  "indicators": {
+    "closes": [
+      0.00583
+    ],
+    "highs": [
+      0.00584
+    ],
+    "lows": [
+      0.0058
+    ]
+  },
+  "candle_aggregator": {
+    "open": 0.00583,
+    "high": 0.00583,
+    "low": 0.00583,
+    "close": 0.00583,
+    "volume": 160154.0,
+    "window_start": 1773848700000
+  },
+  "trade_stats": {
+    "total": 0,
+    "wins": 0,
+    "losses": 0,
+    "realized_pnl": 0.0
+  }
+}

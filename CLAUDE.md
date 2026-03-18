@@ -1,8 +1,32 @@
 # ClawChat 量化基金
 
-CLI 工具：`cd cli && uv run clawchat --help` 查看所有命令。
+## 工具
 
-策略配置格式规范见 [engine/SCHEMA.md](engine/SCHEMA.md)（strategy.json + trade.json + risk.json）。
+**CLI 量化分析工具**：回测、扫描、风控检查、状态监控等。
+```bash
+cd cli && uv run clawchat --help
+```
+
+**Rust 交易引擎**：自动接收行情、计算信号、执行交易。
+```bash
+make build   # 编译
+make hft     # 运行
+```
+
+## 配置
+
+三个 JSON 配置控制引擎行为，格式规范用 `/strategy-config` 和 `/trade` 技能查看：
+- `strategy.json` — 策略参数（strategist 写）
+- `trade.json` — 交易指令（trader 写）
+- `risk.json` — 风控规则（strategist 写）
+
+## records/
+
+引擎运行时记录目录（.gitignore 忽略）：
+- `equity.csv` — 权益曲线（时间戳/权益/盈亏/持仓数）
+- `high_water.json` — 高水位持久化
+- `trades.jsonl` — 交易日志（每笔成交）
+- `batch_results.csv` — 批量回测结果
 
 ## 规则
 

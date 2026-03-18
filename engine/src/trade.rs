@@ -19,9 +19,9 @@ pub enum TradeAction {
     Resume,
     /// 全部平仓 + 暂停（停机）
     Stop,
-    /// 减仓（params.ratio 指定比例）
+    /// 减仓（params.percent 指定比例）
     Reduce,
-    /// 加仓（params.ratio 指定比例）
+    /// 加仓（params.percent 指定比例, params.direction 指定方向）
     Add,
 }
 
@@ -67,7 +67,10 @@ pub struct TradeOverride {
 pub struct TradeParams {
     /// 减仓/加仓比例（0.0 ~ 1.0）
     #[serde(default)]
-    pub ratio: Option<f64>,
+    pub percent: Option<f64>,
+    /// 加仓方向（"long" / "short"），仅 Add 时使用
+    #[serde(default)]
+    pub direction: Option<String>,
 }
 
 impl Default for TradeOverride {
@@ -212,11 +215,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("trade.json");
         let mut f = std::fs::File::create(&path).unwrap();
-        write!(f, r#"{{"action":"reduce","params":{{"ratio":0.5}}}}"#).unwrap();
+        write!(f, r#"{{"action":"reduce","params":{{"percent":0.5}}}}"#).unwrap();
 
         let t = TradeOverride::load(&path);
         assert_eq!(t.action, TradeAction::Reduce);
-        assert_eq!(t.params.ratio, Some(0.5));
+        assert_eq!(t.params.percent, Some(0.5));
         assert!(t.needs_execution());
     }
 
@@ -366,5 +369,32 @@ mod tests {
         assert_eq!(t.action, TradeAction::Hold);
         assert!(t.note.is_empty());
         assert!(t.executed_at.is_none());
+    }
+
+    #[test]
+    fn trade_params_percent_and_direction() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("trade.json");
+        let mut f = std::fs::File::create(&path).unwrap();
+        write!(
+            f,
+            r#"{{"action":"add","params":{{"percent":0.3,"direction":"long"}}}}"#
+        )
+        .unwrap();
+
+        let t = TradeOverride::load(&path);
+        assert_eq!(t.action, TradeAction::Add);
+        assert_eq!(t.params.percent, Some(0.3));
+        assert_eq!(t.params.direction.as_deref(), Some("long"));
+        assert!(t.needs_execution());
+    }
+
+    #[test]
+    fn trade_params_direction_none_by_default() {
+        let t: TradeOverride = serde_json::from_str(
+            r#"{"action":"add","params":{"percent":0.5}}"#
+        ).unwrap();
+        assert_eq!(t.params.percent, Some(0.5));
+        assert!(t.params.direction.is_none());
     }
 }
