@@ -625,12 +625,202 @@ class MACDFastStrategy(MACDTrendStrategy):
                          atr_period=14, atr_sl=2.5)
 
 
+class EMA2050TrendStrategy(Strategy):
+    """
+    EMA20/50 趋势跟踪策略
+
+    原理：
+    - EMA20 上穿 EMA50 → 做多，下穿 → 做空
+    - 只在大趋势方向交易：用 EMA20 斜率确认趋势强度
+    - 持仓时间长，用宽松的 ATR 移动止损（2.5x），让利润奔跑
+    - 不设固定止盈，靠移动止损保护利润
+
+    设计目标：少交易、长持仓、抓大趋势
+    """
+
+    def __init__(self, fast_ema=20, slow_ema=50, atr_period=14,
+                 trail_atr=2.5, slope_lookback=5, min_slope=0.001):
+        self.fast_ema = fast_ema
+        self.slow_ema = slow_ema
+        self.atr_period = atr_period
+        self.trail_atr = trail_atr
+        self.slope_lookback = slope_lookback
+        self.min_slope = min_slope
+        self.closes = []
+        self.highs = []
+        self.lows = []
+        self._pos = None  # {'side', 'entry', 'trail_stop', 'peak'}
+
+    def on_candle(self, open, high, low, close, volume):
+        self.closes.append(close)
+        self.highs.append(high)
+        self.lows.append(low)
+
+        n = len(self.closes)
+        if n < self.slow_ema + self.slope_lookback:
+            return None
+
+        fast = _ema(self.closes, self.fast_ema)
+        slow = _ema(self.closes, self.slow_ema)
+        fast_prev = _ema(self.closes[:-1], self.fast_ema)
+        slow_prev = _ema(self.closes[:-1], self.slow_ema)
+        atr = _atr(self.highs, self.lows, self.closes, self.atr_period)
+
+        if any(v is None for v in [fast, slow, fast_prev, slow_prev, atr]) or atr == 0:
+            return None
+
+        # EMA 斜率：fast EMA 最近 N 根变化率
+        fast_back = _ema(self.closes[:-self.slope_lookback], self.fast_ema)
+        if fast_back is None or fast_back == 0:
+            return None
+        slope = (fast - fast_back) / fast_back
+
+        # 持仓中：移动止损
+        if self._pos:
+            if self._pos['side'] == 'long':
+                # 追踪最高价
+                if close > self._pos['peak']:
+                    self._pos['peak'] = close
+                new_stop = self._pos['peak'] - atr * self.trail_atr
+                if new_stop > self._pos['trail_stop']:
+                    self._pos['trail_stop'] = new_stop
+                # 止损触发，或 EMA 死叉
+                if close <= self._pos['trail_stop'] or (fast_prev >= slow_prev and fast < slow):
+                    self._pos = None
+                    return 'sell'
+            else:
+                if close < self._pos['peak']:
+                    self._pos['peak'] = close
+                new_stop = self._pos['peak'] + atr * self.trail_atr
+                if new_stop < self._pos['trail_stop']:
+                    self._pos['trail_stop'] = new_stop
+                if close >= self._pos['trail_stop'] or (fast_prev <= slow_prev and fast > slow):
+                    self._pos = None
+                    return 'buy'
+            return None
+
+        # 做多：金叉 + 斜率向上
+        if fast_prev <= slow_prev and fast > slow and slope > self.min_slope:
+            self._pos = {
+                'side': 'long', 'entry': close,
+                'trail_stop': close - atr * self.trail_atr,
+                'peak': close,
+            }
+            return 'buy'
+
+        # 做空：死叉 + 斜率向下
+        if fast_prev >= slow_prev and fast < slow and slope < -self.min_slope:
+            self._pos = {
+                'side': 'short', 'entry': close,
+                'trail_stop': close + atr * self.trail_atr,
+                'peak': close,
+            }
+            return 'sell'
+
+        return None
+
+
+class VWAPRevertStrategy(Strategy):
+    """
+    VWAP 均值回归策略
+
+    原理：
+    - 计算滚动 VWAP（成交量加权平均价）
+    - 价格偏离 VWAP 超过阈值时反向操作
+    - 偏离 > +2% → 做空（价格会回归均值）
+    - 偏离 < -2% → 做多
+    - ATR 止损保护，回到 VWAP 附近止盈
+
+    设计目标：在震荡行情中低买高卖
+    """
+
+    def __init__(self, vwap_period=48, deviation_pct=0.02, atr_period=14,
+                 atr_sl=2.0):
+        self.vwap_period = vwap_period
+        self.deviation_pct = deviation_pct
+        self.atr_period = atr_period
+        self.atr_sl = atr_sl
+        self.closes = []
+        self.highs = []
+        self.lows = []
+        self.volumes = []
+        self.typical_prices = []  # (H+L+C)/3
+        self._pos = None  # {'side', 'entry', 'vwap_at_entry'}
+
+    def _calc_vwap(self):
+        """滚动 VWAP = sum(TP * vol) / sum(vol)"""
+        n = min(self.vwap_period, len(self.typical_prices))
+        if n < 10:
+            return None
+        tps = self.typical_prices[-n:]
+        vols = self.volumes[-n:]
+        total_vol = sum(vols)
+        if total_vol == 0:
+            return None
+        return sum(tp * v for tp, v in zip(tps, vols)) / total_vol
+
+    def on_candle(self, open, high, low, close, volume):
+        self.closes.append(close)
+        self.highs.append(high)
+        self.lows.append(low)
+        self.volumes.append(volume)
+        self.typical_prices.append((high + low + close) / 3)
+
+        vwap = self._calc_vwap()
+        atr = _atr(self.highs, self.lows, self.closes, self.atr_period)
+
+        if vwap is None or atr is None or vwap == 0:
+            return None
+
+        deviation = (close - vwap) / vwap  # 偏离比例
+
+        # 持仓中：检查止损和止盈（回归 VWAP）
+        if self._pos:
+            if self._pos['side'] == 'long':
+                # 止盈：价格回到 VWAP 附近（偏离 < 0.3%）
+                if deviation > -0.003:
+                    self._pos = None
+                    return 'sell'
+                # 止损
+                if close <= self._pos['entry'] - atr * self.atr_sl:
+                    self._pos = None
+                    return 'sell'
+            else:
+                if deviation < 0.003:
+                    self._pos = None
+                    return 'buy'
+                if close >= self._pos['entry'] + atr * self.atr_sl:
+                    self._pos = None
+                    return 'buy'
+            return None
+
+        # 做多：价格远低于 VWAP
+        if deviation < -self.deviation_pct:
+            self._pos = {
+                'side': 'long', 'entry': close,
+                'vwap_at_entry': vwap,
+            }
+            return 'buy'
+
+        # 做空：价格远高于 VWAP
+        if deviation > self.deviation_pct:
+            self._pos = {
+                'side': 'short', 'entry': close,
+                'vwap_at_entry': vwap,
+            }
+            return 'sell'
+
+        return None
+
+
 STRATEGIES = {
     'trend': TrendFollowStrategy,
     'trend_fast': TrendFastStrategy,
+    'ema2050': EMA2050TrendStrategy,
     'breakout': BreakoutStrategy,
     'macd': MACDTrendStrategy,
     'macd_fast': MACDFastStrategy,
+    'vwap': VWAPRevertStrategy,
     'scalping': ScalpingStrategy,
     'rsi': RSIStrategy,
     'bollinger': BollingerStrategy,
