@@ -72,16 +72,36 @@ project-create: ## Create project (NAME= FUND=0)
 project-info: ## Project info (NAME=)
 	@$(PY) projects.py info $(NAME)
 
-# === Notify ===
+# === Reports ===
 
-report: ## Send status report email
+report-brief: ## Operations brief (every 30m)
 	@cd $(ROOT)/scripts && \
+	PNL=$$(uv run python runner.py pnl 2>&1) && \
+	CHECK=$$(uv run python runner.py check 2>&1) && \
+	PROCS=$$(ps aux | grep -E "grid.py run|rsi.py run|bollinger.py run" | grep -v grep | wc -l | tr -d ' ') && \
+	uv run python notify.py "运营快报" "$$PNL" "$$CHECK" "进程: $$PROCS 个"
+
+report-daily: ## Operations daily (daily 20:00)
+	@cd $(ROOT)/scripts && \
+	PNL=$$(uv run python runner.py pnl 2>&1) && \
 	GRID=$$(uv run python grid.py status 2>&1) && \
 	RSI=$$(uv run python rsi.py status 2>&1) && \
-	MARKET=$$(uv run python market.py watch 2>&1) && \
+	BOLL=$$(uv run python bollinger.py status 2>&1) && \
 	RUNNER=$$(uv run python runner.py status 2>&1) && \
-	PROCS=$$(ps aux | grep -E "grid.py run|rsi.py run" | grep -v grep | wc -l | tr -d ' ') && \
-	uv run python notify.py "ClawChat 状态报告" "$$GRID" "$$RSI" "$$RUNNER" "$$MARKET" "进程: $$PROCS 个"
+	ACCOUNT=$$(uv run python market.py account 2>&1) && \
+	MARKET=$$(uv run python market.py watch 2>&1) && \
+	PROCS=$$(ps aux | grep -E "grid.py run|rsi.py run|bollinger.py run" | grep -v grep | wc -l | tr -d ' ') && \
+	uv run python notify.py "运营日报" "== 实盘盈亏 ==" "$$PNL" "== 策略归因 ==" "$$GRID" "$$RSI" "$$BOLL" "== 策略配置 ==" "$$RUNNER" "== 持仓 ==" "$$ACCOUNT" "== 行情 ==" "$$MARKET" "进程: $$PROCS 个"
+
+report-dev: ## Iteration report (on commit)
+	@cd $(ROOT)/scripts && \
+	LOG=$$(git -C .. log --oneline -5 2>&1) && \
+	DIFF=$$(git -C .. diff --stat HEAD~1 2>&1) && \
+	SKILLS=$$(ls -1 ../.claude/skills/ 2>&1) && \
+	SCRIPTS=$$(ls -1 . 2>&1) && \
+	uv run python notify.py "迭代报告" "最近提交:" "$$LOG" "上次变更:" "$$DIFF" "Skills: $$SKILLS" "Scripts: $$SCRIPTS"
+
+report: report-brief ## Alias for report-brief
 
 notify: ## Send email (SUBJECT= BODY=)
 	@$(PY) notify.py "$(SUBJECT)" "$(BODY)"

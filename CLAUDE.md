@@ -83,6 +83,8 @@ make notify SUBJECT="xx" BODY="xx"     # 发邮件
 
 KPI 体系见 [kpi/framework.md](kpi/framework.md)，涵盖 6 大维度：收益、交易、策略组合、资金、风控、系统。
 
+报告体系见 [kpi/report-framework.md](kpi/report-framework.md)，7 种报告类型。
+
 每日 KPI 记录在 `kpi/` 目录，按日期命名：
 
 - [2026-03-18](kpi/2026-03-18.md) — 首日运营
