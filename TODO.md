@@ -4,7 +4,6 @@
 
 - [ ] engineer: sizing_mode 支持（percent/fixed）
 - [ ] engineer: backtest.py 支持 --params 自定义参数
-- [ ] engineer: hft-engine 也加 notify 监听 strategy.json 热更新
 
 ## 待做
 
@@ -21,6 +20,7 @@
 - [x] risk-engine 文件监听热更新（notify crate，替代 60 秒轮询）
 - [x] 复利去掉 2x 封顶（纯百分比）
 - [x] risk-engine CONFIG_RELOAD_SECS 编译错误修复
+- [x] hft-engine 文件监听 strategy.json 热更新（notify crate）
 - [x] 双 Rust binary（hft-engine + risk-engine）
 - [x] strategy.json 验证（config.rs validate）
 - [x] pre-trade check 集成
