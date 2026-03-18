@@ -271,17 +271,17 @@ strategist 提交策略后，team-lead 必须验证：
 ## 常用命令
 
 ```bash
-make status        # 全局状态面板
-make account       # 查余额
-make pnl           # 查 P&L
-make strategy-pnl  # 按策略 P&L
-make check         # 风控检查
-make scan          # 扫描市场
-make backtest      # 回测
-make build         # 编译引擎
-make transfer      # 现货→合约划转
-make guard         # 启动风控守护（Python）
-make watcher       # 启动策略监听
-make risk-engine   # 启动风控引擎（Rust）
-make help          # 所有命令
+# CLI 量化分析工具（cd cli && uv run clawchat xxx）
+clawchat status         # 全局状态面板
+clawchat account        # 查余额
+clawchat pnl            # 查 P&L
+clawchat check          # 风控检查
+clawchat scan           # 扫描市场
+clawchat backtest       # 回测
+clawchat transfer       # 划转
+
+# Makefile（Rust 运维）
+make build              # 编译引擎
+make hft                # 运行引擎
+make watcher            # 策略监听
 ```
