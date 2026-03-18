@@ -1,18 +1,27 @@
 {
   "name": "ban-breakout-5m",
-  "symbol": "BAN/USDT",
-  "strategy": "breakout",
-  "timeframe": "5m",
-  "market": "binance_futures",
+  "engine_strategy": "breakout",
+  "symbol": "BANUSDT",
+  "timeframe_ms": 300000,
   "leverage": 2,
+  "order_qty": 1.0,
   "position_size": 0.5,
   "capital": 200,
-  "fees": {
-    "taker": 0.0004,
-    "maker": 0.0002
+  "params": {
+    "lookback": 48,
+    "atr_period": 14,
+    "atr_filter": 0.3,
+    "trail_atr": 3.0
   },
-  "slippage": 0.0005,
+  "backtest": {
+    "days": 14,
+    "return_pct": 86.02,
+    "sharpe": 27.75,
+    "max_drawdown_pct": 13.94,
+    "trades": 7,
+    "win_rate": 0.714,
+    "profit_factor": 5.29
+  },
   "status": "suspended",
-  "suspend_reason": "trades=7 (need >=10)",
-  "approved_date": "2026-03-18"
+  "suspend_reason": "trades=7 (need >=10)"
 }

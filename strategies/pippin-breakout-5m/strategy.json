@@ -1,25 +1,27 @@
 {
   "name": "pippin-breakout-5m",
-  "symbol": "PIPPIN/USDT",
-  "strategy": "breakout",
-  "timeframe": "5m",
-  "market": "binance_futures",
+  "engine_strategy": "breakout",
+  "symbol": "PIPPINUSDT",
+  "timeframe_ms": 300000,
   "leverage": 2,
   "order_qty": 100,
   "position_size": 0.5,
   "capital": 200,
-  "fees": {
-    "taker": 0.0004,
-    "maker": 0.0002
-  },
-  "slippage": 0.0005,
   "params": {
     "lookback": 48,
     "atr_period": 14,
     "atr_filter": 0.3,
     "trail_atr": 3.0
   },
+  "backtest": {
+    "days": 14,
+    "return_pct": 40.78,
+    "sharpe": 15.03,
+    "max_drawdown_pct": 14.78,
+    "trades": 12,
+    "win_rate": 0.667,
+    "profit_factor": 1.44
+  },
   "status": "suspended",
-  "suspend_reason": "profit_factor=1.44 (need >2)",
-  "approved_date": "2026-03-18"
+  "suspend_reason": "profit_factor=1.44 (need >2)"
 }

@@ -1,24 +1,26 @@
 {
   "name": "ban-bollinger-5m",
-  "symbol": "BAN/USDT",
-  "strategy": "bollinger",
-  "timeframe": "5m",
-  "market": "binance_futures",
+  "engine_strategy": "bollinger",
+  "symbol": "BANUSDT",
+  "timeframe_ms": 300000,
   "leverage": 5,
   "order_qty": 1.0,
   "position_size": 0.5,
   "capital": 200,
-  "fees": {
-    "taker": 0.0004,
-    "maker": 0.0002
-  },
-  "slippage": 0.0005,
   "params": {
     "bb_period": 20,
     "num_std": 2.5,
     "trend_ema": 50
   },
+  "backtest": {
+    "days": 14,
+    "return_pct": 63.18,
+    "sharpe": 18.43,
+    "max_drawdown_pct": 15.45,
+    "trades": 34,
+    "win_rate": 0.50,
+    "profit_factor": 4.86
+  },
   "status": "suspended",
-  "suspend_reason": "win_rate=50% (need >50%), drawdown=15.45% (need <15%)",
-  "approved_date": "2026-03-18"
+  "suspend_reason": "win_rate=50% (need >50%), drawdown=15.45% (need <15%)"
 }

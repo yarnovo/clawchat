@@ -1,17 +1,29 @@
 {
   "name": "pippin-ema2050-5m",
-  "symbol": "PIPPIN/USDT",
-  "strategy": "ema2050",
-  "timeframe": "5m",
-  "market": "binance_futures",
+  "engine_strategy": "ema2050",
+  "symbol": "PIPPINUSDT",
+  "timeframe_ms": 300000,
   "leverage": 2,
+  "order_qty": 100,
   "position_size": 0.5,
   "capital": 200,
-  "fees": {
-    "taker": 0.0004,
-    "maker": 0.0002
+  "params": {
+    "fast_ema": 20,
+    "slow_ema": 50,
+    "atr_period": 14,
+    "trail_atr": 2.5,
+    "slope_lookback": 5,
+    "min_slope": 0.001
   },
-  "slippage": 0.0005,
+  "backtest": {
+    "days": 14,
+    "return_pct": 44.16,
+    "sharpe": 17.53,
+    "max_drawdown_pct": 11.05,
+    "trades": 13,
+    "win_rate": 0.538,
+    "profit_factor": 2.41
+  },
   "status": "approved",
   "approved_date": "2026-03-18"
 }

@@ -1,26 +1,29 @@
 {
   "name": "btc-trend-1h",
-  "symbol": "BTC/USDT",
-  "strategy": "trend",
-  "timeframe": "1h",
-  "market": "binance_futures",
+  "engine_strategy": "default",
+  "symbol": "BTCUSDT",
+  "timeframe_ms": 3600000,
   "leverage": 5,
   "order_qty": 0.001,
   "position_size": 0.3,
   "capital": 200,
-  "fees": {
-    "taker": 0.0004,
-    "maker": 0.0002
-  },
-  "slippage": 0.0005,
   "params": {
     "ema_fast": 21,
     "ema_slow": 55,
+    "rsi_period": 14,
     "atr_period": 14,
     "atr_sl_mult": 1.5,
     "atr_tp_mult": 2.5
   },
+  "backtest": {
+    "days": 14,
+    "return_pct": 5.90,
+    "sharpe": 3.34,
+    "max_drawdown_pct": 3.87,
+    "trades": 2,
+    "win_rate": 0.50,
+    "profit_factor": 3.31
+  },
   "status": "suspended",
-  "suspend_reason": "return=5.9% (need >20%), sharpe=3.34 (need >5), trades=2 (need >=10), win_rate=50% (need >50%)",
-  "approved_date": "2026-03-18"
+  "suspend_reason": "return=5.9% (need >20%), sharpe=3.34 (need >5), trades=2 (need >=10), win_rate=50% (need >50%)"
 }

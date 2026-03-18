@@ -1,24 +1,26 @@
 {
   "name": "pippin-scalping-5m",
-  "symbol": "PIPPIN/USDT",
-  "strategy": "scalping",
-  "timeframe": "5m",
-  "market": "binance_futures",
+  "engine_strategy": "scalping",
+  "symbol": "PIPPINUSDT",
+  "timeframe_ms": 300000,
   "leverage": 5,
   "order_qty": 100,
   "position_size": 0.3,
   "capital": 200,
-  "fees": {
-    "taker": 0.0004,
-    "maker": 0.0002
-  },
-  "slippage": 0.0005,
   "params": {
     "ema_fast": 12,
     "ema_slow": 50,
     "volume_multiplier": 1.2
   },
+  "backtest": {
+    "days": 14,
+    "return_pct": 60.25,
+    "sharpe": 22.13,
+    "max_drawdown_pct": 13.42,
+    "trades": 9,
+    "win_rate": 0.667,
+    "profit_factor": 2.24
+  },
   "status": "suspended",
-  "suspend_reason": "trades=9 (need >=10)",
-  "approved_date": "2026-03-18"
+  "suspend_reason": "trades=9 (need >=10)"
 }

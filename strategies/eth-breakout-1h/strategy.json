@@ -1,25 +1,27 @@
 {
   "name": "eth-breakout-1h",
-  "symbol": "ETH/USDT",
-  "strategy": "breakout",
-  "timeframe": "1h",
-  "market": "binance_futures",
+  "engine_strategy": "breakout",
+  "symbol": "ETHUSDT",
+  "timeframe_ms": 3600000,
   "leverage": 5,
   "order_qty": 0.01,
   "position_size": 0.3,
   "capital": 200,
-  "fees": {
-    "taker": 0.0004,
-    "maker": 0.0002
-  },
-  "slippage": 0.0005,
   "params": {
     "lookback": 48,
     "atr_period": 14,
     "atr_filter": 0.3,
     "trail_atr": 3.0
   },
+  "backtest": {
+    "days": 14,
+    "return_pct": 20.91,
+    "sharpe": 5.82,
+    "max_drawdown_pct": 11.92,
+    "trades": 3,
+    "win_rate": 0.667,
+    "profit_factor": 4.71
+  },
   "status": "suspended",
-  "suspend_reason": "trades=3 (need >=10)",
-  "approved_date": "2026-03-18"
+  "suspend_reason": "trades=3 (need >=10)"
 }
