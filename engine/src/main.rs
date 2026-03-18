@@ -409,7 +409,7 @@ async fn main() {
     });
     exchange.order_id_prefix = format!("{}-{}", strategy_name, config.symbol);
 
-    // 注册引擎到 /tmp/hft-engines.json（供 risk_guard 读取策略映射）
+    // 注册引擎到 /tmp/hft-engines.json（供 risk-engine 读取策略映射）
     register_engine(&registry_name, &config.symbol, &strategy_name);
 
     let candle_ms = config.timeframe_ms.unwrap_or(300_000); // default 5m

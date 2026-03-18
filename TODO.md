@@ -2,29 +2,32 @@
 
 ## 进行中
 
-- [x] backtest.py 支持 --params 自定义参数（team-lead 自己做了）
-- [ ] strategist: NTRN trend 5m 3x 上架 + 旧策略处理建议
+- [x] engineer: state.json 在 make status 中展示策略运行状态
+- [x] engineer: 修复 risk-engine 编译错误（sizing_mode 改了签名未同步）
+- [ ] strategist: 继续找 14 天达标新策略
 
 ## 待做（策略生命周期）
 
+- [ ] risk-engine 自动更新 strategy status：实盘表现差 → 自动改 status=suspended
 - [ ] 实盘评估机制：自动对比实盘表现 vs 回测表现
 - [ ] 自动淘汰规则：实盘连续 3 天低于回测 30% → suspend
 - [ ] 生命周期状态：discovery → backtest → approved → live → degraded → suspended → archived
-- [ ] 策略归档：suspended 超期 → 移入 strategies/archived/（需分析是否必要）
+- [ ] 策略归档：suspended 超期 → 移入 strategies/archived/
 
 ## 待做（技术）
 
-- [ ] state.json 在 make status 中展示策略运行状态
-- [ ] risk-engine state.json 持久化（daily_loss/consecutive_losses）
-- [ ] 删除 Python risk_guard（Rust 已替代）
 - [ ] 策略表现栏等交易日志产生数据后验证
-- [ ] sizing_mode 支持（percent/fixed 由 strategist 选）
 
 ## 已完成
 
+- [x] sizing_mode 支持（percent/fixed）— review 通过，但 risk-engine 需修
+- [x] risk-engine state.json 持久化（daily_loss/consecutive_losses）
+- [x] 删除 Python risk_guard（Rust 已替代）
+- [x] backtest.py 支持 --params 自定义参数
+- [x] NTRN trend 5m 3x 上架（14 天达标）
+- [x] suspend 4 个旧策略（14 天不达标）
 - [x] 分页拉取（backtest.py 突破 1000 根限制）
 - [x] 均值回归策略（backtest.py + Rust 引擎）
-- [x] 87→81 测试全通过（删除过时 compound 测试）
 - [x] risk-engine 文件监听热更新（notify crate）
 - [x] hft-engine 文件监听 strategy.json 热更新（notify crate）
 - [x] 百分比下单（position_size），移除复利/dynamic_qty

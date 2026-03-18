@@ -23,6 +23,7 @@
     "win_rate": 0.486,
     "profit_factor": 1.92
   },
-  "status": "approved",
+  "status": "suspended",
+  "suspend_reason": "WR 48.6% (<50%) + PF 1.92 (<2) 不达标，被 ntrn-trend-fast-5m 替代",
   "approved_date": "2026-03-18"
 }

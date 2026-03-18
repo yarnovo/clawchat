@@ -14,6 +14,7 @@ STRATEGIES_DIR = ROOT / "strategies"
 ENGINE_REGISTRY = Path("/tmp/hft-engines.json")
 EQUITY_CSV = ROOT / "reports" / "equity.csv"
 TRADES_FILE = ROOT / "reports" / "trades.jsonl"
+RISK_STATE_FILE = ROOT / "reports" / "risk_engine_state.json"
 
 
 def now():
@@ -133,15 +134,27 @@ def show_positions():
 def show_risk():
     section("风控")
     rust_alive = is_process_alive("risk-engine")
-    py_alive = is_process_alive("risk_guard.py")
     if rust_alive:
         print(f"  Rust risk-engine:  [RUNNING]")
     else:
         print(f"  Rust risk-engine:  [STOPPED]")
-    if py_alive:
-        print(f"  Python risk_guard: [RUNNING]")
-    else:
-        print(f"  Python risk_guard: [STOPPED]")
+
+    # risk-engine 持久化状态
+    if RISK_STATE_FILE.exists():
+        try:
+            rs = json.loads(RISK_STATE_FILE.read_text())
+            updated = rs.get("last_updated", "?")
+            strategies = rs.get("strategies", {})
+            if strategies:
+                print(f"  风控状态 (updated={updated}):")
+                for name, s in sorted(strategies.items()):
+                    dpnl = s.get("daily_realized_pnl", 0.0)
+                    dt = s.get("daily_trades", 0)
+                    cl = s.get("consecutive_losses", 0)
+                    sign = "+" if dpnl >= 0 else ""
+                    print(f"    {name:<28} daily_pnl={sign}${dpnl:.4f}  trades={dt}  consecutive_losses={cl}")
+        except Exception:
+            pass
 
     # 最近一次 equity 记录
     if EQUITY_CSV.exists():
@@ -183,6 +196,7 @@ def show_strategies():
             continue
         try:
             cfg = json.loads(sf.read_text())
+            cfg["_dir"] = d
             strategies.append(cfg)
         except Exception:
             pass
@@ -201,7 +215,10 @@ def show_strategies():
             name = s.get("name", "?")
             sym = s.get("symbol", "?")
             strat = s.get("engine_strategy", "?")
+            state_info = _read_state_summary(s.get("_dir"))
             print(f"    {name:<28} {sym:<14} {strat}")
+            if state_info:
+                print(f"      {state_info}")
 
     if suspended:
         print(f"  suspended ({len(suspended)}):")
@@ -215,6 +232,36 @@ def show_strategies():
         print(f"  other ({len(other)}):")
         for s in other:
             print(f"    {s.get('name', '?'):<28} status={s.get('status', '?')}")
+
+
+def _read_state_summary(strategy_dir):
+    """Read state.json and return a one-line summary, or None."""
+    if strategy_dir is None:
+        return None
+    state_file = strategy_dir / "state.json"
+    if not state_file.exists():
+        return None
+    try:
+        state = json.loads(state_file.read_text())
+    except Exception:
+        return None
+
+    updated = state.get("last_updated", "?")
+    ts = state.get("trade_stats", {})
+    total = ts.get("total", 0)
+    wins = ts.get("wins", 0)
+    losses = ts.get("losses", 0)
+    pnl = ts.get("realized_pnl", 0.0)
+
+    indicators = state.get("indicators", {})
+    if isinstance(indicators, dict):
+        candle_count = indicators.get("candle_count", "?")
+    else:
+        candle_count = "?"
+
+    sign = "+" if pnl >= 0 else ""
+    wr = f"{wins / total:.0%}" if total > 0 else "N/A"
+    return f"updated={updated}  trades={total} ({wins}W/{losses}L {wr})  pnl={sign}${pnl:.4f}  candles={candle_count}"
 
 
 def show_performance():

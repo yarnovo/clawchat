@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use std::path::Path;
 
-// ── risk.json 配置（与 Python risk_guard 共用同一格式）─────────
+// ── risk.json 配置 ──────────────────────────────────────────────
 
 /// 从 strategies/{name}/risk.json 加载的风控配置
 #[derive(Debug, Clone, Deserialize)]

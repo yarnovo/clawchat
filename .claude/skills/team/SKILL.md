@@ -173,6 +173,7 @@ TeamCreate(team_name="clawchat")
 
 **所有成员 spawn prompt 通用规则：**
 - 不要修改 TODO.md（只有 team-lead 维护）
+- 不要 git commit（只有 team-lead review 后提交）
 - 不要修改其他成员的文件
 - 完成任务向 team-lead 汇报，等待验收
 

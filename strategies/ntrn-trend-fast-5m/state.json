@@ -1,10 +1,10 @@
 {
   "last_updated": "2026-03-18T13:19:59Z",
   "indicators": {
-    "atr": 0.00005864296296296308,
-    "candle_count": 4,
-    "ema_fast": 0.005927513148009015,
-    "ema_slow": 0.005928966381195336,
+    "atr": 0.00001000000000000046,
+    "candle_count": 1,
+    "ema_fast": 0.00592,
+    "ema_slow": 0.00592,
     "prev_close": 0.00592,
     "prev_fast_above": false
   },

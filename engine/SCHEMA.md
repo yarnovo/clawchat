@@ -77,7 +77,7 @@
 
 ## risk.json
 
-风控守护进程（risk_guard.py）按策略独立读取。
+风控引擎（risk-engine）按策略独立读取。
 
 ```json
 {
