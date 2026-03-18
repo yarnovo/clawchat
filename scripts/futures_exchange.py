@@ -30,6 +30,7 @@ def get_futures_exchange():
             'options': {
                 'defaultType': 'future',
                 'fetchMarkets': ['linear'],
+                'fetchCurrencies': False,
             },
         })
         ex.set_sandbox_mode(True)
@@ -41,6 +42,7 @@ def get_futures_exchange():
         'options': {
             'defaultType': 'future',
             'fetchMarkets': ['linear'],
+            'fetchCurrencies': False,
         },
     })
 
