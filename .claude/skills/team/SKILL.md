@@ -66,7 +66,7 @@ strategist risk bull bear engineer
 
 | **trader** | 交易员：通过 trade.json 控制引擎（加仓/减仓/暂停/平仓） | 引擎文件监听执行 |
 | **architect** | 系统架构师：技术方案设计、架构评审（只设计不实现） | team-lead 讨论后派 engineer 实现 |
-| **tester** | 测试工程师：engineer 提交后验证代码、跑测试、查 bug | team-lead review 前先过 tester |
+| **qa** | 质量保障：代码审查、跑测试、功能验证、回归检查 | team-lead review 前先过 qa |
 
 > **技术支持**：strategist 和 risk 如需新脚本/工具/数据支持，告诉 team-lead，team-lead 派 engineer 实现。
 > **架构讨论**：技术方案先找 architect 讨论设计，确认后派 engineer 实现。
@@ -228,10 +228,10 @@ make status   # 一屏看全局
 ## Code Review
 
 engineer 提交代码后的验收流程：
-1. **tester 先测**：跑 `cargo test --lib && cargo test --bin risk-engine`、手动验证功能、检查边界情况
+1. **qa 先测**：跑 `cargo test --lib && cargo test --bin risk-engine`、手动验证功能、检查边界情况
 2. **team-lead review**：`git diff` 看实际改动、确认逻辑正确
 3. **team-lead 提交**：统一 git commit
-- 不能只听汇报，tester 和 team-lead 都要验证
+- 不能只听汇报，qa 和 team-lead 都要验证
 
 strategist 提交策略后，team-lead 必须验证：
 - `make backtest` 亲自跑一遍确认回测数据真实
