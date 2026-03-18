@@ -139,6 +139,14 @@ impl Exchange {
         }
     }
 
+    pub fn api_key(&self) -> &str {
+        &self.api_key
+    }
+
+    pub fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
     /// Create an Exchange client from raw credentials (for risk engine).
     pub fn from_credentials(
         api_key: String,

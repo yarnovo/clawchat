@@ -1,12 +1,20 @@
-//! 独立 Rust 风控引擎 — 每 N 秒检查持仓，触发止损/止盈/利润保护自动平仓
+//! 独立 Rust 风控引擎 — WebSocket 实时监控，毫秒级止损/止盈/利润保护
 //!
 //! 架构：
 //!   交易引擎（Rust）— 负责交易
-//!   风控引擎（Rust）— 负责止损止盈，独立进程  ← 本文件
-//!   Python 守护     — 30 秒兜底
+//!   风控引擎（Rust）— 实时风控，独立进程  ← 本文件
+//!
+//! 数据源：
+//!   1. markPrice@1s — 所有持仓 symbol 的实时标记价格
+//!   2. user data stream (listenKey) — ACCOUNT_UPDATE 持仓变化
+//!
+//! 每次收到价格更新或持仓变化时立即检查风控规则。
 
+use futures_util::{SinkExt, StreamExt};
 use hft_engine::exchange::Exchange;
 use hft_engine::risk::RiskConfig;
+use tokio::sync::mpsc;
+use tokio_tungstenite::connect_async;
 
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -14,7 +22,34 @@ use std::path::{Path, PathBuf};
 
 const ENGINE_REGISTRY: &str = "/tmp/hft-engines.json";
 const HIGH_WATER_FILE: &str = "reports/high_water_rust.json";
-const CHECK_INTERVAL_SECS: u64 = 10;
+const BINANCE_FSTREAM_WS: &str = "wss://fstream.binance.com";
+/// 风控配置热更新间隔（秒）
+const CONFIG_RELOAD_SECS: u64 = 60;
+/// listenKey keepalive 间隔（分钟）
+const KEEPALIVE_MINUTES: u64 = 20;
+
+// ── 风控事件 ─────────────────────────────────────────────────
+
+#[derive(Debug)]
+enum RiskEvent {
+    /// 标记价格更新
+    MarkPrice {
+        symbol: String,
+        mark_price: f64,
+    },
+    /// 持仓更新（从 user data stream ACCOUNT_UPDATE）
+    PositionUpdate {
+        symbol: String,
+        position_side: String,
+        position_amt: f64,
+        entry_price: f64,
+        unrealized_pnl: f64,
+    },
+    /// 余额更新
+    BalanceUpdate {
+        wallet_balance: f64,
+    },
+}
 
 // ── 策略目录扫描 ─────────────────────────────────────────────
 
@@ -28,26 +63,20 @@ struct StrategyJson {
 /// {normalized_symbol: (strategy_name, risk_config, capital)}
 type RiskMap = HashMap<String, (String, RiskConfig, f64)>;
 
-/// 扫描 strategies/ 目录 + engine registry，构建风控配置映射
 fn load_risk_configs(strategies_dir: &Path) -> RiskMap {
     let mut map = RiskMap::new();
-
-    // 读 engine registry 获取活跃策略
     let registry = read_engine_registry();
 
-    // 扫描 strategies/*/
     if let Ok(entries) = std::fs::read_dir(strategies_dir) {
         for entry in entries.flatten() {
             let dir = entry.path();
             if !dir.is_dir() {
                 continue;
             }
-
             let strategy_file = dir.join("strategy.json");
             if !strategy_file.exists() {
                 continue;
             }
-
             let Ok(contents) = std::fs::read_to_string(&strategy_file) else {
                 continue;
             };
@@ -55,7 +84,9 @@ fn load_risk_configs(strategies_dir: &Path) -> RiskMap {
                 continue;
             };
 
-            let name = cfg.name.unwrap_or_else(|| dir.file_name().unwrap().to_string_lossy().to_string());
+            let name = cfg
+                .name
+                .unwrap_or_else(|| dir.file_name().unwrap().to_string_lossy().to_string());
             let symbol = cfg
                 .symbol
                 .map(|s| normalize_symbol(&s))
@@ -66,18 +97,14 @@ fn load_risk_configs(strategies_dir: &Path) -> RiskMap {
                 continue;
             }
 
-            // 加载 risk.json
             let risk_file = dir.join("risk.json");
             let risk_config = RiskConfig::load(&risk_file);
-
             map.insert(symbol.clone(), (name, risk_config, capital));
         }
     }
 
-    // 补充 registry 中的策略（如果 strategies/ 没覆盖到）
     for (reg_name, norm_symbol, _) in &registry {
         if !map.contains_key(norm_symbol) && !norm_symbol.is_empty() {
-            tracing::info!("registry strategy {reg_name}/{norm_symbol} has no strategies/ dir, using defaults");
             map.insert(
                 norm_symbol.clone(),
                 (reg_name.clone(), RiskConfig::default(), 200.0),
@@ -116,12 +143,16 @@ fn read_engine_registry() -> Vec<(String, String, String)> {
                     .to_string();
                 (key, symbol, strategy)
             } else {
-                // 旧格式: key=symbol, val=strategy_name
                 let strategy = val.as_str().unwrap_or("").to_string();
                 (strategy.clone(), key, strategy)
             }
         })
         .collect()
+}
+
+/// 从 RiskMap 中提取需要监控的 symbol 列表
+fn monitored_symbols(risk_map: &RiskMap) -> Vec<String> {
+    risk_map.keys().map(|s| s.to_lowercase()).collect()
 }
 
 // ── 高水位管理 ───────────────────────────────────────────────
@@ -143,232 +174,466 @@ fn save_high_water(hwm: &HighWaterMarks) {
         let _ = std::fs::create_dir_all(parent);
     }
     if let Ok(json) = serde_json::to_string_pretty(hwm) {
-        if let Err(e) = std::fs::write(path, json) {
-            tracing::warn!("failed to save high water marks: {e}");
-        }
+        let _ = std::fs::write(path, json);
     }
 }
 
-// ── 风控检查逻辑 ─────────────────────────────────────────────
+// ── 持仓状态跟踪 ─────────────────────────────────────────────
 
-struct PositionInfo {
+#[derive(Debug, Clone)]
+struct TrackedPosition {
     symbol: String,
-    position_side: String, // "LONG" / "SHORT" / "BOTH"
+    position_side: String,
     position_amt: f64,
-    #[allow(dead_code)]
     entry_price: f64,
     unrealized_pnl: f64,
-    notional: f64,
+    /// 最新标记价格
+    mark_price: f64,
 }
 
-fn parse_positions(raw: &[serde_json::Value]) -> Vec<PositionInfo> {
-    raw.iter()
-        .filter_map(|p| {
-            let amt: f64 = p
-                .get("positionAmt")
-                .and_then(|v| v.as_str())
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(0.0);
-            if amt.abs() < f64::EPSILON {
-                return None;
-            }
-            Some(PositionInfo {
-                symbol: p
-                    .get("symbol")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .to_string(),
-                position_side: p
-                    .get("positionSide")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("BOTH")
-                    .to_string(),
-                position_amt: amt,
-                entry_price: p
-                    .get("entryPrice")
-                    .and_then(|v| v.as_str())
-                    .and_then(|s| s.parse().ok())
-                    .unwrap_or(0.0),
-                unrealized_pnl: p
-                    .get("unrealizedProfit")
-                    .and_then(|v| v.as_str())
-                    .and_then(|s| s.parse().ok())
-                    .unwrap_or(0.0),
-                notional: p
-                    .get("notional")
-                    .and_then(|v| v.as_str())
-                    .and_then(|s| s.parse::<f64>().ok())
-                    .unwrap_or(0.0)
-                    .abs(),
-            })
-        })
-        .collect()
-}
-
-/// 执行一轮风控检查，返回被平仓的 symbol 列表
-async fn run_check(
-    exchange: &Exchange,
-    risk_map: &RiskMap,
-    hwm: &mut HighWaterMarks,
-    total_balance: f64,
-) -> Vec<String> {
-    let mut closed = Vec::new();
-    let mut hwm_updated = false;
-
-    let positions = match exchange.get_positions().await {
-        Ok(p) => p,
-        Err(e) => {
-            tracing::error!("failed to get positions: {e}");
-            return closed;
+impl TrackedPosition {
+    /// 根据标记价格重新计算未实现盈亏
+    fn recalc_pnl(&mut self) {
+        if self.mark_price <= 0.0 || self.entry_price <= 0.0 {
+            return;
         }
-    };
-
-    let parsed = parse_positions(&positions);
-    if parsed.is_empty() {
-        // 清理不再有持仓的高水位
-        if !hwm.is_empty() {
-            hwm.clear();
-            save_high_water(hwm);
-        }
-        return closed;
+        let price_diff = self.mark_price - self.entry_price;
+        self.unrealized_pnl = if self.position_amt > 0.0 {
+            price_diff * self.position_amt
+        } else {
+            -price_diff * self.position_amt.abs()
+        };
     }
 
-    let now = chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
-    tracing::info!("[{now}] checking {} positions, balance=${total_balance:.2}", parsed.len());
+    fn key(&self) -> String {
+        format!("{}:{}", self.symbol, self.position_side)
+    }
+}
 
-    for pos in &parsed {
-        let norm_sym = &pos.symbol;
-        let key = format!("{}:{}", pos.symbol, pos.position_side);
+/// 持仓管理器
+struct PositionTracker {
+    /// key = "BTCUSDT:LONG" → TrackedPosition
+    positions: HashMap<String, TrackedPosition>,
+}
 
-        // 查找风控配置
-        let (strategy_name, risk_cfg, capital) = match risk_map.get(norm_sym) {
-            Some(r) => (&r.0, &r.1, r.2),
-            None => {
-                tracing::debug!("no risk config for {norm_sym}, skipping");
+impl PositionTracker {
+    fn new() -> Self {
+        Self {
+            positions: HashMap::new(),
+        }
+    }
+
+    /// 从 ACCOUNT_UPDATE 更新持仓
+    fn update_position(
+        &mut self,
+        symbol: &str,
+        position_side: &str,
+        position_amt: f64,
+        entry_price: f64,
+        unrealized_pnl: f64,
+    ) {
+        let key = format!("{symbol}:{position_side}");
+        if position_amt.abs() < f64::EPSILON {
+            // 仓位清零，移除
+            self.positions.remove(&key);
+            return;
+        }
+        let pos = self.positions.entry(key).or_insert_with(|| TrackedPosition {
+            symbol: symbol.to_string(),
+            position_side: position_side.to_string(),
+            position_amt: 0.0,
+            entry_price: 0.0,
+            unrealized_pnl: 0.0,
+            mark_price: 0.0,
+        });
+        pos.position_amt = position_amt;
+        pos.entry_price = entry_price;
+        pos.unrealized_pnl = unrealized_pnl;
+    }
+
+    /// 根据标记价格更新所有相关持仓的 PnL
+    fn update_mark_price(&mut self, symbol: &str, mark_price: f64) {
+        for pos in self.positions.values_mut() {
+            if pos.symbol == symbol {
+                pos.mark_price = mark_price;
+                pos.recalc_pnl();
+            }
+        }
+    }
+
+    /// 获取某 symbol 的所有持仓
+    fn get_positions_for_symbol(&self, symbol: &str) -> Vec<&TrackedPosition> {
+        self.positions
+            .values()
+            .filter(|p| p.symbol == symbol)
+            .collect()
+    }
+
+    /// 获取所有活跃持仓
+    fn all_positions(&self) -> Vec<&TrackedPosition> {
+        self.positions.values().collect()
+    }
+
+    /// 移除持仓
+    fn remove(&mut self, key: &str) {
+        self.positions.remove(key);
+    }
+}
+
+// ── WebSocket: markPrice 流 ──────────────────────────────────
+
+async fn start_mark_price_feed(
+    symbols: Vec<String>,
+    tx: mpsc::Sender<RiskEvent>,
+) {
+    if symbols.is_empty() {
+        tracing::warn!("no symbols to monitor for mark price");
+        return;
+    }
+
+    let streams: Vec<String> = symbols
+        .iter()
+        .map(|s| format!("{}@markPrice@1s", s.to_lowercase()))
+        .collect();
+    let url = format!("{BINANCE_FSTREAM_WS}/stream?streams={}", streams.join("/"));
+
+    let mut retry_delay = std::time::Duration::from_secs(1);
+    let max_delay = std::time::Duration::from_secs(30);
+
+    loop {
+        tracing::info!(url = %url, "connecting to markPrice ws");
+
+        match connect_async(&url).await {
+            Ok((ws, _)) => {
+                tracing::info!("markPrice ws connected ({} symbols)", symbols.len());
+                retry_delay = std::time::Duration::from_secs(1);
+
+                let (mut write, mut read) = ws.split();
+
+                while let Some(msg) = read.next().await {
+                    match msg {
+                        Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
+                            if let Some(event) = parse_mark_price_msg(&text) {
+                                let _ = tx.try_send(event);
+                            }
+                        }
+                        Ok(tokio_tungstenite::tungstenite::Message::Ping(data)) => {
+                            let _ = write
+                                .send(tokio_tungstenite::tungstenite::Message::Pong(data))
+                                .await;
+                        }
+                        Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => {
+                            tracing::warn!("markPrice ws closed");
+                            break;
+                        }
+                        Err(e) => {
+                            tracing::error!("markPrice ws error: {e}");
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            Err(e) => {
+                tracing::error!("markPrice ws connect failed: {e}");
+            }
+        }
+
+        if tx.is_closed() {
+            return;
+        }
+
+        tracing::warn!(delay = ?retry_delay, "markPrice ws reconnecting");
+        tokio::time::sleep(retry_delay).await;
+        retry_delay = (retry_delay * 2).min(max_delay);
+    }
+}
+
+fn parse_mark_price_msg(raw: &str) -> Option<RiskEvent> {
+    let v: serde_json::Value = serde_json::from_str(raw).ok()?;
+    let data = v.get("data")?;
+    let symbol = data.get("s")?.as_str()?.to_string();
+    let mark_price: f64 = data.get("p")?.as_str()?.parse().ok()?;
+    Some(RiskEvent::MarkPrice { symbol, mark_price })
+}
+
+// ── WebSocket: User Data Stream ──────────────────────────────
+
+async fn start_user_data_feed(
+    exchange: &Exchange,
+    tx: mpsc::Sender<RiskEvent>,
+) {
+    let mut retry_delay = std::time::Duration::from_secs(1);
+    let max_delay = std::time::Duration::from_secs(30);
+
+    loop {
+        // 获取 listenKey
+        let listen_key = match exchange.create_listen_key().await {
+            Ok(k) => k,
+            Err(e) => {
+                tracing::error!("failed to create listenKey: {e}");
+                tokio::time::sleep(retry_delay).await;
+                retry_delay = (retry_delay * 2).min(max_delay);
                 continue;
             }
         };
 
-        let pnl = pos.unrealized_pnl;
+        let ws_base = exchange.ws_base_url();
+        let url = format!("{ws_base}/ws/{listen_key}");
+        tracing::info!(url = %url, "connecting to user data stream");
 
-        // ── 1. 单笔止损检查 ──
-        if capital > 0.0 && pnl < 0.0 {
-            let loss_ratio = -pnl / capital;
-            if loss_ratio >= risk_cfg.max_loss_per_trade {
-                tracing::warn!(
-                    "[{now}] [STOP LOSS] [{strategy_name}] {norm_sym} {} loss={pnl:.4} ({:.2}% >= {:.2}%)",
-                    pos.position_side,
-                    loss_ratio * 100.0,
-                    risk_cfg.max_loss_per_trade * 100.0
-                );
-                match exchange.close_position(norm_sym, pos.position_amt).await {
-                    Ok(_) => {
-                        tracing::info!("  {norm_sym} closed (stop loss)");
-                        closed.push(norm_sym.clone());
-                        hwm.remove(&key);
-                        hwm_updated = true;
-                    }
-                    Err(e) => tracing::error!("  {norm_sym} close failed: {e}"),
-                }
-                continue;
+        // 启动 keepalive 任务
+        let lk = listen_key.clone();
+        let exchange_key = exchange.api_key().to_string();
+        let exchange_base = exchange.base_url().to_string();
+        let keepalive_handle = tokio::spawn(async move {
+            let client = reqwest::Client::new();
+            let mut interval =
+                tokio::time::interval(std::time::Duration::from_secs(KEEPALIVE_MINUTES * 60));
+            loop {
+                interval.tick().await;
+                let url = format!("{}/fapi/v1/listenKey", exchange_base);
+                let _ = client
+                    .put(&url)
+                    .header("X-MBX-APIKEY", &exchange_key)
+                    .query(&[("listenKey", &lk)])
+                    .send()
+                    .await;
+                tracing::debug!("listenKey keepalive sent");
             }
-        }
+        });
 
-        // ── 2. 单笔止盈检查 ──
-        if capital > 0.0 && pnl > 0.0 {
-            let profit_ratio = pnl / capital;
-            if profit_ratio >= risk_cfg.max_profit_per_trade {
-                tracing::warn!(
-                    "[{now}] [TAKE PROFIT] [{strategy_name}] {norm_sym} {} profit={pnl:.4} ({:.2}% >= {:.2}%)",
-                    pos.position_side,
-                    profit_ratio * 100.0,
-                    risk_cfg.max_profit_per_trade * 100.0
-                );
-                match exchange.close_position(norm_sym, pos.position_amt).await {
-                    Ok(_) => {
-                        tracing::info!("  {norm_sym} closed (take profit)");
-                        closed.push(norm_sym.clone());
-                        hwm.remove(&key);
-                        hwm_updated = true;
-                    }
-                    Err(e) => tracing::error!("  {norm_sym} close failed: {e}"),
-                }
-                continue;
-            }
-        }
+        match connect_async(&url).await {
+            Ok((ws, _)) => {
+                tracing::info!("user data stream connected");
+                retry_delay = std::time::Duration::from_secs(1);
 
-        // ── 3. 仓位占比检查 ──
-        if total_balance > 0.0 && pos.notional > 0.0 {
-            let ratio = pos.notional / total_balance;
-            if ratio > risk_cfg.max_position_ratio {
-                tracing::warn!(
-                    "[{now}] [POSITION LIMIT] [{strategy_name}] {norm_sym} ratio={:.2}% > {:.2}%",
-                    ratio * 100.0,
-                    risk_cfg.max_position_ratio * 100.0
-                );
-                // 警告但不自动平仓（仓位过大可能是正常杠杆操作）
-            }
-        }
+                let (mut write, mut read) = ws.split();
 
-        // ── 4. 高水位利润保护 ──
-        if pnl > 0.0 {
-            let prev_hwm = *hwm.get(&key).unwrap_or(&0.0);
-            if pnl > prev_hwm {
-                hwm.insert(key.clone(), pnl);
-                hwm_updated = true;
-            }
-
-            let current_hwm = *hwm.get(&key).unwrap_or(&0.0);
-            if current_hwm > 0.0 {
-                let protection_line = current_hwm * (1.0 - risk_cfg.max_drawdown_stop);
-                if pnl <= protection_line {
-                    tracing::warn!(
-                        "[{now}] [PROFIT PROTECT] [{strategy_name}] {norm_sym} {} hwm=+${current_hwm:.4} → +${pnl:.4}, protecting profit",
-                        pos.position_side
-                    );
-                    match exchange.close_position(norm_sym, pos.position_amt).await {
-                        Ok(_) => {
-                            tracing::info!("  {norm_sym} closed (profit protection)");
-                            closed.push(norm_sym.clone());
-                            hwm.remove(&key);
-                            hwm_updated = true;
+                while let Some(msg) = read.next().await {
+                    match msg {
+                        Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
+                            for event in parse_user_data_msg(&text) {
+                                let _ = tx.try_send(event);
+                            }
                         }
-                        Err(e) => tracing::error!("  {norm_sym} close failed: {e}"),
+                        Ok(tokio_tungstenite::tungstenite::Message::Ping(data)) => {
+                            let _ = write
+                                .send(tokio_tungstenite::tungstenite::Message::Pong(data))
+                                .await;
+                        }
+                        Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => {
+                            tracing::warn!("user data stream closed");
+                            break;
+                        }
+                        Err(e) => {
+                            tracing::error!("user data stream error: {e}");
+                            break;
+                        }
+                        _ => {}
                     }
-                    continue;
                 }
             }
-        } else {
-            // 亏损时清除高水位
-            if hwm.contains_key(&key) {
-                hwm.remove(&key);
-                hwm_updated = true;
+            Err(e) => {
+                tracing::error!("user data stream connect failed: {e}");
+            }
+        }
+
+        keepalive_handle.abort();
+
+        if tx.is_closed() {
+            return;
+        }
+
+        tracing::warn!(delay = ?retry_delay, "user data stream reconnecting");
+        tokio::time::sleep(retry_delay).await;
+        retry_delay = (retry_delay * 2).min(max_delay);
+    }
+}
+
+/// 解析 user data stream 消息（ACCOUNT_UPDATE 等）
+fn parse_user_data_msg(raw: &str) -> Vec<RiskEvent> {
+    let mut events = Vec::new();
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) else {
+        return events;
+    };
+
+    let event_type = v.get("e").and_then(|e| e.as_str()).unwrap_or("");
+
+    match event_type {
+        "ACCOUNT_UPDATE" => {
+            if let Some(data) = v.get("a") {
+                // 余额更新
+                if let Some(balances) = data.get("B").and_then(|b| b.as_array()) {
+                    for b in balances {
+                        let asset = b.get("a").and_then(|v| v.as_str()).unwrap_or("");
+                        if asset == "USDT" {
+                            if let Some(wb) = b
+                                .get("wb")
+                                .and_then(|v| v.as_str())
+                                .and_then(|s| s.parse::<f64>().ok())
+                            {
+                                events.push(RiskEvent::BalanceUpdate {
+                                    wallet_balance: wb,
+                                });
+                            }
+                        }
+                    }
+                }
+                // 持仓更新
+                if let Some(positions) = data.get("P").and_then(|p| p.as_array()) {
+                    for p in positions {
+                        let symbol = p.get("s").and_then(|v| v.as_str()).unwrap_or("");
+                        let ps = p.get("ps").and_then(|v| v.as_str()).unwrap_or("BOTH");
+                        let pa: f64 = p
+                            .get("pa")
+                            .and_then(|v| v.as_str())
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(0.0);
+                        let ep: f64 = p
+                            .get("ep")
+                            .and_then(|v| v.as_str())
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(0.0);
+                        let up: f64 = p
+                            .get("up")
+                            .and_then(|v| v.as_str())
+                            .and_then(|s| s.parse().ok())
+                            .unwrap_or(0.0);
+
+                        if !symbol.is_empty() {
+                            events.push(RiskEvent::PositionUpdate {
+                                symbol: symbol.to_string(),
+                                position_side: ps.to_string(),
+                                position_amt: pa,
+                                entry_price: ep,
+                                unrealized_pnl: up,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        "listenKeyExpired" => {
+            tracing::warn!("listenKey expired, will reconnect");
+        }
+        _ => {
+            tracing::debug!("user data event: {event_type}");
+        }
+    }
+
+    events
+}
+
+// ── 风控检查 ─────────────────────────────────────────────────
+
+async fn check_position_risk(
+    pos: &TrackedPosition,
+    risk_map: &RiskMap,
+    hwm: &mut HighWaterMarks,
+    exchange: &Exchange,
+    total_balance: f64,
+) -> Option<String> {
+    let norm_sym = &pos.symbol;
+    let key = pos.key();
+
+    let (strategy_name, risk_cfg, capital) = match risk_map.get(norm_sym) {
+        Some(r) => (&r.0, &r.1, r.2),
+        None => return None,
+    };
+
+    let pnl = pos.unrealized_pnl;
+
+    // ── 1. 单笔止损 ──
+    if capital > 0.0 && pnl < 0.0 {
+        let loss_ratio = -pnl / capital;
+        if loss_ratio >= risk_cfg.max_loss_per_trade {
+            tracing::warn!(
+                "[STOP LOSS] [{strategy_name}] {norm_sym} {} loss=${pnl:.4} ({:.2}% >= {:.2}%)",
+                pos.position_side,
+                loss_ratio * 100.0,
+                risk_cfg.max_loss_per_trade * 100.0
+            );
+            match exchange.close_position(norm_sym, pos.position_amt).await {
+                Ok(_) => {
+                    tracing::info!("  {norm_sym} closed (stop loss)");
+                    hwm.remove(&key);
+                    save_high_water(hwm);
+                    return Some(norm_sym.clone());
+                }
+                Err(e) => tracing::error!("  {norm_sym} close failed: {e}"),
             }
         }
     }
 
-    // 清理不再存在的持仓的高水位
-    let active_keys: std::collections::HashSet<String> = parsed
-        .iter()
-        .map(|p| format!("{}:{}", p.symbol, p.position_side))
-        .collect();
-    let stale: Vec<String> = hwm
-        .keys()
-        .filter(|k| !active_keys.contains(*k))
-        .cloned()
-        .collect();
-    if !stale.is_empty() {
-        for k in &stale {
-            hwm.remove(k);
+    // ── 2. 单笔止盈 ──
+    if capital > 0.0 && pnl > 0.0 {
+        let profit_ratio = pnl / capital;
+        if profit_ratio >= risk_cfg.max_profit_per_trade {
+            tracing::warn!(
+                "[TAKE PROFIT] [{strategy_name}] {norm_sym} {} profit=${pnl:.4} ({:.2}% >= {:.2}%)",
+                pos.position_side,
+                profit_ratio * 100.0,
+                risk_cfg.max_profit_per_trade * 100.0
+            );
+            match exchange.close_position(norm_sym, pos.position_amt).await {
+                Ok(_) => {
+                    tracing::info!("  {norm_sym} closed (take profit)");
+                    hwm.remove(&key);
+                    save_high_water(hwm);
+                    return Some(norm_sym.clone());
+                }
+                Err(e) => tracing::error!("  {norm_sym} close failed: {e}"),
+            }
         }
-        hwm_updated = true;
     }
 
-    if hwm_updated {
+    // ── 3. 仓位占比警告 ──
+    if total_balance > 0.0 && pos.entry_price > 0.0 {
+        let notional = pos.position_amt.abs() * pos.mark_price;
+        let ratio = notional / total_balance;
+        if ratio > risk_cfg.max_position_ratio {
+            tracing::warn!(
+                "[POSITION LIMIT] [{strategy_name}] {norm_sym} ratio={:.2}% > {:.2}%",
+                ratio * 100.0,
+                risk_cfg.max_position_ratio * 100.0
+            );
+        }
+    }
+
+    // ── 4. 高水位利润保护 ──
+    if pnl > 0.0 {
+        let prev_hwm = *hwm.get(&key).unwrap_or(&0.0);
+        if pnl > prev_hwm {
+            hwm.insert(key.clone(), pnl);
+            save_high_water(hwm);
+        }
+
+        let current_hwm = *hwm.get(&key).unwrap_or(&0.0);
+        if current_hwm > 0.0 {
+            let protection_line = current_hwm * (1.0 - risk_cfg.max_drawdown_stop);
+            if pnl <= protection_line {
+                tracing::warn!(
+                    "[PROFIT PROTECT] [{strategy_name}] {norm_sym} {} hwm=+${current_hwm:.4} → +${pnl:.4}",
+                    pos.position_side
+                );
+                match exchange.close_position(norm_sym, pos.position_amt).await {
+                    Ok(_) => {
+                        tracing::info!("  {norm_sym} closed (profit protection)");
+                        hwm.remove(&key);
+                        save_high_water(hwm);
+                        return Some(norm_sym.clone());
+                    }
+                    Err(e) => tracing::error!("  {norm_sym} close failed: {e}"),
+                }
+            }
+        }
+    } else if hwm.contains_key(&key) {
+        hwm.remove(&key);
         save_high_water(hwm);
     }
 
-    closed
+    None
 }
 
 // ── main ─────────────────────────────────────────────────────
@@ -384,7 +649,6 @@ async fn main() {
 
     let _ = dotenvy::dotenv();
 
-    // 读取 API 凭证
     let api_key = std::env::var("BINANCE_API_KEY").expect("BINANCE_API_KEY not set");
     let api_secret = std::env::var("BINANCE_API_SECRET").expect("BINANCE_API_SECRET not set");
     let base_url = std::env::var("BINANCE_BASE_URL")
@@ -395,54 +659,194 @@ async fn main() {
 
     let exchange = Exchange::from_credentials(api_key, api_secret, base_url, dry_run);
 
-    // 策略目录
     let strategies_dir = PathBuf::from(
         std::env::var("STRATEGIES_DIR").unwrap_or_else(|_| "strategies".to_string()),
     );
 
+    // 加载风控配置
+    let mut risk_map = load_risk_configs(&strategies_dir);
+    let symbols = monitored_symbols(&risk_map);
+
     tracing::info!("========================================");
-    tracing::info!("  Rust 风控引擎启动");
-    tracing::info!("  间隔: {}s", CHECK_INTERVAL_SECS);
+    tracing::info!("  Rust 风控引擎启动（WebSocket 实时）");
+    tracing::info!("  监控 symbols: {:?}", symbols);
     tracing::info!("  策略目录: {}", strategies_dir.display());
-    tracing::info!("  高水位: {HIGH_WATER_FILE}");
     tracing::info!("  dry_run: {dry_run}");
     tracing::info!("========================================");
 
-    // 加载高水位
+    // 加载高水位 + 初始持仓
     let mut hwm = load_high_water();
     if !hwm.is_empty() {
         tracing::info!("恢复 {} 个高水位记录", hwm.len());
     }
 
-    // 主循环
-    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(CHECK_INTERVAL_SECS));
+    // 初始化持仓跟踪器（从交易所拉一次初始持仓）
+    let mut tracker = PositionTracker::new();
+    let mut total_balance = 0.0;
+    match exchange.get_account().await {
+        Ok(account) => {
+            total_balance = account
+                .get("totalWalletBalance")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0.0);
 
-    loop {
-        interval.tick().await;
-
-        // 每轮重新加载风控配置（支持热更新）
-        let risk_map = load_risk_configs(&strategies_dir);
-        if !risk_map.is_empty() {
-            tracing::debug!("loaded {} risk configs: {:?}", risk_map.len(), risk_map.keys().collect::<Vec<_>>());
-        }
-
-        // 获取账户余额
-        let total_balance = match exchange.get_balance().await {
-            Ok(b) => b,
-            Err(e) => {
-                tracing::error!("failed to get balance: {e}");
-                continue;
+            if let Some(positions) = account.get("positions").and_then(|p| p.as_array()) {
+                for p in positions {
+                    let amt: f64 = p
+                        .get("positionAmt")
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(0.0);
+                    if amt.abs() < f64::EPSILON {
+                        continue;
+                    }
+                    let sym = p.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
+                    let ps = p
+                        .get("positionSide")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("BOTH");
+                    let ep: f64 = p
+                        .get("entryPrice")
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(0.0);
+                    let up: f64 = p
+                        .get("unrealizedProfit")
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| s.parse().ok())
+                        .unwrap_or(0.0);
+                    tracker.update_position(sym, ps, amt, ep, up);
+                }
             }
-        };
+            tracing::info!(
+                "初始持仓: {} 个, 余额: ${:.2}",
+                tracker.all_positions().len(),
+                total_balance
+            );
+        }
+        Err(e) => {
+            tracing::error!("failed to load initial account: {e}");
+        }
+    }
 
-        // 执行风控检查
-        let closed = run_check(&exchange, &risk_map, &mut hwm, total_balance).await;
+    // 启动事件通道
+    let (tx, mut rx) = mpsc::channel::<RiskEvent>(4096);
 
-        if closed.is_empty() {
-            let now = chrono::Utc::now().format("%H:%M:%S");
-            tracing::info!("[{now}] OK  balance=${total_balance:.2}  configs={}", risk_map.len());
-        } else {
-            tracing::warn!("closed {} positions: {:?}", closed.len(), closed);
+    // 启动 markPrice WebSocket
+    let tx_mark = tx.clone();
+    let syms = symbols.clone();
+    tokio::spawn(async move {
+        start_mark_price_feed(syms, tx_mark).await;
+    });
+
+    // 启动 user data stream WebSocket
+    let tx_user = tx.clone();
+    // Exchange 不能 move 进 spawn（需要在主循环用），所以 user data stream
+    // 需要自己的 API key。从环境变量重新读取。
+    let api_key2 = std::env::var("BINANCE_API_KEY").unwrap();
+    let api_secret2 = std::env::var("BINANCE_API_SECRET").unwrap();
+    let base_url2 = std::env::var("BINANCE_BASE_URL")
+        .unwrap_or_else(|_| "https://fapi.binance.com".to_string());
+    let exchange2 = Exchange::from_credentials(api_key2, api_secret2, base_url2, dry_run);
+    tokio::spawn(async move {
+        start_user_data_feed(&exchange2, tx_user).await;
+    });
+
+    // 风控配置热更新定时器
+    let mut config_reload = tokio::time::interval(std::time::Duration::from_secs(CONFIG_RELOAD_SECS));
+    config_reload.tick().await; // 跳过第一次立即触发
+
+    // 状态日志计数器
+    let mut event_count: u64 = 0;
+    let mut last_status_log = std::time::Instant::now();
+
+    // ── 主事件循环 ──
+    loop {
+        tokio::select! {
+            Some(event) = rx.recv() => {
+                event_count += 1;
+                match event {
+                    RiskEvent::MarkPrice { ref symbol, mark_price } => {
+                        // 更新标记价格并检查所有相关持仓
+                        tracker.update_mark_price(symbol, mark_price);
+
+                        let positions: Vec<TrackedPosition> = tracker
+                            .get_positions_for_symbol(symbol)
+                            .into_iter()
+                            .cloned()
+                            .collect();
+
+                        for pos in &positions {
+                            if let Some(closed_sym) = check_position_risk(
+                                pos, &risk_map, &mut hwm, &exchange, total_balance,
+                            ).await {
+                                tracker.remove(&pos.key());
+                                tracing::warn!("position closed: {closed_sym}");
+                            }
+                        }
+                    }
+                    RiskEvent::PositionUpdate {
+                        ref symbol,
+                        ref position_side,
+                        position_amt,
+                        entry_price,
+                        unrealized_pnl,
+                    } => {
+                        tracing::info!(
+                            "ACCOUNT_UPDATE: {symbol} {position_side} amt={position_amt} ep={entry_price} pnl={unrealized_pnl:.4}"
+                        );
+                        tracker.update_position(
+                            symbol,
+                            position_side,
+                            position_amt,
+                            entry_price,
+                            unrealized_pnl,
+                        );
+
+                        // 仓位变化时也检查风控
+                        if position_amt.abs() > f64::EPSILON {
+                            let key = format!("{symbol}:{position_side}");
+                            if let Some(pos) = tracker.positions.get(&key).cloned() {
+                                if let Some(closed_sym) = check_position_risk(
+                                    &pos, &risk_map, &mut hwm, &exchange, total_balance,
+                                ).await {
+                                    tracker.remove(&key);
+                                    tracing::warn!("position closed on update: {closed_sym}");
+                                }
+                            }
+                        } else {
+                            // 仓位清零，清除高水位
+                            let key = format!("{symbol}:{position_side}");
+                            if hwm.remove(&key).is_some() {
+                                save_high_water(&hwm);
+                            }
+                        }
+                    }
+                    RiskEvent::BalanceUpdate { wallet_balance } => {
+                        tracing::info!("balance update: ${wallet_balance:.2}");
+                        total_balance = wallet_balance;
+                    }
+                }
+
+                // 每 30 秒输出状态日志
+                if last_status_log.elapsed() >= std::time::Duration::from_secs(30) {
+                    let n_pos = tracker.all_positions().len();
+                    tracing::info!(
+                        "[STATUS] events={event_count} positions={n_pos} balance=${total_balance:.2} hwm={}",
+                        hwm.len()
+                    );
+                    last_status_log = std::time::Instant::now();
+                }
+            }
+            _ = config_reload.tick() => {
+                // 热更新风控配置
+                let new_map = load_risk_configs(&strategies_dir);
+                if new_map.len() != risk_map.len() {
+                    tracing::info!("risk config reloaded: {} strategies", new_map.len());
+                }
+                risk_map = new_map;
+            }
         }
     }
 }
