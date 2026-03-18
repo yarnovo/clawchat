@@ -2,8 +2,6 @@
 
 ## 进行中
 
-- [x] engineer: state.json 在 make status 中展示策略运行状态
-- [x] engineer: 修复 risk-engine 编译错误（sizing_mode 改了签名未同步）
 - [ ] strategist: 继续找 14 天达标新策略
 
 ## 待做（策略生命周期）
@@ -20,16 +18,20 @@
 
 ## 已完成
 
-- [x] sizing_mode 支持（percent/fixed）— review 通过，但 risk-engine 需修
-- [x] risk-engine state.json 持久化（daily_loss/consecutive_losses）
-- [x] 删除 Python risk_guard（Rust 已替代）
-- [x] backtest.py 支持 --params 自定义参数
-- [x] NTRN trend 5m 3x 上架（14 天达标）
+- [x] sizing_mode 支持（percent/fixed）— 78 lib 测试通过，review 通过
+- [x] risk-engine state.json 持久化 — daily_loss/consecutive_losses，94 测试通过
+- [x] 删除 Python risk_guard — Rust risk-engine 已替代
+- [x] state.json 在 make status 中展示 — 策略运行状态 + 风控状态
+- [x] risk-engine 编译错误修复
+- [x] ntrn-trend-fast-5m 上架（14 天严格达标 +38%）
+- [x] ntrn-trend-5m suspended（被 fast 版替代）
 - [x] suspend 4 个旧策略（14 天不达标）
+- [x] backtest.py 支持 --params 自定义参数
+- [x] NTRN trend 5m 3x 上架
 - [x] 分页拉取（backtest.py 突破 1000 根限制）
 - [x] 均值回归策略（backtest.py + Rust 引擎）
 - [x] risk-engine 文件监听热更新（notify crate）
-- [x] hft-engine 文件监听 strategy.json 热更新（notify crate）
+- [x] hft-engine 文件监听 strategy.json 热更新
 - [x] 百分比下单（position_size），移除复利/dynamic_qty
 - [x] 双 Rust binary（hft-engine + risk-engine）
 - [x] strategy.json 验证（config.rs validate）
