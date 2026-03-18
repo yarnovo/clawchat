@@ -1,9 +1,10 @@
 SHELL := /bin/bash
 export BASH_ENV := .env
 
-PY := cd scripts && uv run python
+ROOT := $(shell pwd)
+PY := cd $(ROOT)/scripts && uv run python
 
-.PHONY: install clean watch account klines scan status backtest start stop projects project-create project-info report notify help
+.PHONY: install clean watch account klines scan status backtest start stop projects project-create project-info promote demote report notify help
 
 # === Setup ===
 
@@ -30,22 +31,29 @@ scan: ## Scan high volatility coins
 
 # === Strategy ===
 
-status: ## Grid strategy status
+status: ## All strategy status
 	@$(PY) grid.py status
+	@$(PY) rsi.py status
+	@$(PY) bollinger.py status
+	@$(PY) runner.py status
+
+start: ## Start all strategies
+	@$(PY) runner.py start
+
+stop: ## Stop all strategies
+	@$(PY) runner.py stop
+
+check: ## Check auto-promote conditions
+	@$(PY) runner.py check
+
+promote: ## Promote to live (SYMBOL=)
+	@$(PY) runner.py promote $(SYMBOL)
+
+demote: ## Demote to dryrun (SYMBOL=)
+	@$(PY) runner.py demote $(SYMBOL)
 
 backtest: ## Backtest (SYMBOL= LOWER= UPPER= GRIDS=10 AMOUNT=50 DAYS=30)
 	@$(PY) grid.py backtest --symbol $(or $(SYMBOL),BTC/USDT) --lower $(LOWER) --upper $(UPPER) --grids $(or $(GRIDS),10) --amount $(or $(AMOUNT),50) --days $(or $(DAYS),30)
-
-start: ## Start all grids (dry-run)
-	@pkill -f "grid.py run" 2>/dev/null || true
-	@cd scripts && \
-	nohup uv run python grid.py run --symbol BTC/USDT --lower 70000 --upper 80000 --grids 10 --amount 10 --interval 120 --dry-run > ../data/btc-grid.log 2>&1 & \
-	nohup uv run python grid.py run --symbol ETH/USDT --lower 2000 --upper 2800 --grids 10 --amount 10 --interval 120 --dry-run > ../data/eth-grid.log 2>&1 & \
-	nohup uv run python grid.py run --symbol HYPER/USDT --lower 0.09 --upper 0.13 --grids 20 --amount 5 --interval 60 --dry-run > ../data/hyper-grid.log 2>&1 & \
-	echo "started"
-
-stop: ## Stop all grids
-	@pkill -f "grid.py run" 2>/dev/null && echo "stopped" || echo "nothing running"
 
 # === Projects ===
 
@@ -61,12 +69,13 @@ project-info: ## Project info (NAME=)
 # === Notify ===
 
 report: ## Send status report email
-	@cd scripts && \
+	@cd $(ROOT)/scripts && \
 	GRID=$$(uv run python grid.py status 2>&1) && \
+	RSI=$$(uv run python rsi.py status 2>&1) && \
 	MARKET=$$(uv run python market.py watch 2>&1) && \
-	PROJ=$$(uv run python projects.py list 2>&1) && \
-	PROCS=$$(ps aux | grep "grid.py run" | grep -v grep | wc -l | tr -d ' ') && \
-	uv run python notify.py "ClawChat 状态报告" "$$PROJ" "$$GRID" "$$MARKET" "进程: $$PROCS 个 | dry-run"
+	RUNNER=$$(uv run python runner.py status 2>&1) && \
+	PROCS=$$(ps aux | grep -E "grid.py run|rsi.py run" | grep -v grep | wc -l | tr -d ' ') && \
+	uv run python notify.py "ClawChat 状态报告" "$$GRID" "$$RSI" "$$RUNNER" "$$MARKET" "进程: $$PROCS 个"
 
 notify: ## Send email (SUBJECT= BODY=)
 	@$(PY) notify.py "$(SUBJECT)" "$(BODY)"

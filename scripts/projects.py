@@ -44,6 +44,8 @@ def create_project(name, fund=0):
     project = {
         'name': name, 'email': email, 'fund': 0,
         'strategy': None, 'status': 'active',
+        'mode': 'testnet',  # testnet → live
+        'promote_threshold': 10.0,  # 利润达标后可 promote
         'created_at': datetime.now().isoformat(),
     }
 
@@ -98,14 +100,33 @@ def show_info(name):
     except Exception:
         assets = []
 
+    mode = project.get('mode', 'testnet')
+    threshold = project.get('promote_threshold', 10.0)
     print(f"\n  项目: {project['name']}  子账户: {project['email']}")
     print(f"  资金: {project['fund']}U  策略: {project.get('strategy') or '-'}  状态: {project['status']}")
+    print(f"  模式: {mode}  promote 阈值: ${threshold}")
     if assets:
         for a in assets:
             free = float(a.get('free', 0))
             if free > 0:
                 print(f"  {a['asset']:<8} {free}")
     print()
+
+
+def promote_project(name):
+    """测试网验证通过，切换到实盘"""
+    project = load_project(name)
+    if not project:
+        print(f"  项目 {name} 不存在")
+        return
+    if project.get('mode') == 'live':
+        print(f"  项目 {name} 已经是实盘模式")
+        return
+    project['mode'] = 'live'
+    project['promoted_at'] = datetime.now().isoformat()
+    save_project(name, project)
+    print(f"  项目 {name} 已 promote 到实盘！")
+    print(f"  注意：需要重启策略进程使其连接主网")
 
 
 def close_project(name):
@@ -125,10 +146,11 @@ def show_list():
     if not projects:
         print("  暂无项目")
         return
-    print(f"\n  {'项目':<15} {'资金':>8} {'策略':<10} {'状态':<8}")
-    print(f"  {'─'*45}")
+    print(f"\n  {'项目':<15} {'资金':>8} {'策略':<10} {'模式':<10} {'状态':<8}")
+    print(f"  {'─'*55}")
     for p in projects:
-        print(f"  {p['name']:<15} {p['fund']:>6}U  {p.get('strategy') or '-':<10} {p['status']:<8}")
+        mode = p.get('mode', 'testnet')
+        print(f"  {p['name']:<15} {p['fund']:>6}U  {p.get('strategy') or '-':<10} {mode:<10} {p['status']:<8}")
     print()
 
 
@@ -150,6 +172,9 @@ def main():
     p.add_argument('name')
     p.add_argument('--amount', type=float, required=True)
 
+    p = sub.add_parser('promote')
+    p.add_argument('name')
+
     p = sub.add_parser('close')
     p.add_argument('name')
 
@@ -162,6 +187,8 @@ def main():
         show_info(args.name)
     elif args.cmd == 'fund':
         fund_project(args.name, args.amount)
+    elif args.cmd == 'promote':
+        promote_project(args.name)
     elif args.cmd == 'close':
         close_project(args.name)
     else:
