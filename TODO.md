@@ -12,6 +12,12 @@
 - [ ] 生命周期状态：discovery → backtest → approved → live → degraded → suspended → archived
 - [ ] 策略归档：suspended 超期 → 移入 strategies/archived/
 
+## 待做（交易员）
+
+- [ ] risk.json 新增 override 字段（action: hold/close_all/pause/resume/stop/reduce + params）
+- [ ] risk-engine 读取 override 执行人工干预指令
+- [ ] 优先级：override > risk rules > strategy signals
+
 ## 待做（技术）
 
 - [ ] 策略表现栏等交易日志产生数据后验证
