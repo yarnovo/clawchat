@@ -67,6 +67,7 @@ strategist risk bull bear engineer
 | **bull** | 积极派分析师：找机会，论证该行动的理由 | team-lead 决策参考 |
 | **bear** | 谨慎派分析师：找风险，论证要谨慎的理由 | team-lead 决策参考 |
 | **architect** | 系统架构师：技术方案设计、架构评审（只设计不实现） | team-lead 讨论后派 engineer 实现 |
+| **tester** | 测试工程师：engineer 提交后验证代码、跑测试、查 bug | team-lead review 前先过 tester |
 
 > **技术支持**：strategist 和 risk 如需新脚本/工具/数据支持，告诉 team-lead，team-lead 派 engineer 实现。
 > **决策讨论**：team-lead 重要决策前同时问 bull 和 bear，听两边分析后决策。
@@ -233,10 +234,11 @@ make status   # 一屏看全局
 
 ## Code Review
 
-engineer 提交代码后，team-lead 必须 review：
-- `git diff HEAD~1` 看实际改动
-- `cargo test --lib && cargo test --bin risk-engine` 验证测试
-- 不能只听汇报，要看代码
+engineer 提交代码后的验收流程：
+1. **tester 先测**：跑 `cargo test --lib && cargo test --bin risk-engine`、手动验证功能、检查边界情况
+2. **team-lead review**：`git diff` 看实际改动、确认逻辑正确
+3. **team-lead 提交**：统一 git commit
+- 不能只听汇报，tester 和 team-lead 都要验证
 
 strategist 提交策略后，team-lead 必须验证：
 - `make backtest` 亲自跑一遍确认回测数据真实
