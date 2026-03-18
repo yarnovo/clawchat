@@ -245,18 +245,20 @@ quant 提交策略后，team-lead 必须验证：
 
 ```
 1. make status — 全局状态
-2. 评估策略表现 — 读 equity.csv + make strategy-pnl，分析每个策略盈亏
-3. 决策 & 行动：
-   ┌─ 策略亏钱 → 改 status=suspended → watcher 自动停引擎
-   ├─ 策略赚钱 → 保持
-   ├─ 策略不够 / 有空闲资金 → 让 quant 找新策略（别让他闲着）
-   ├─ 新策略类型 → 让 engineer Rust 实现
-   ├─ 策略赚钱 → 让 trader 评估是否加仓（trade.json add）
-   ├─ 风控规则需调整 → 让 quant 更新 risk.json
-   ├─ 成员需要技术支持 → 派 engineer 实现
-   ├─ 守护挂了 → 重启
-   └─ 异常 → 协调团队处理
-4. 每 10 轮 → 输出运营摘要给 CEO
+2. 评估策略表现 — 分析盈亏
+3. 读 TODO.md — 检查待办，空闲成员派活：
+   ├─ engineer 空闲 → 派 TODO 里下一个 P0 技术任务
+   ├─ quant 空闲 → 派找策略/review/报告
+   ├─ trader 空闲 → 派检查持仓/加仓评估
+   ├─ architect 空闲 → 派设计待做方案
+   └─ qa 空闲 → 派验证最新改动
+4. 决策 & 行动：
+   ├─ 策略亏钱 → suspend
+   ├─ 策略赚钱 → trader 评估加仓
+   ├─ 空闲资金 → quant 找新策略
+   ├─ 引擎异常 → engineer 修
+   └─ 守护挂了 → 重启
+5. 每 10 轮 → 输出运营摘要给 CEO
 ```
 
 ### 策略表现评估
