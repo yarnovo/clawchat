@@ -53,6 +53,14 @@ pub trait Strategy {
     }
 
     fn name(&self) -> &str;
+
+    /// 导出策略内部指标状态（用于持久化）
+    fn export_state(&self) -> serde_json::Value {
+        serde_json::Value::Null
+    }
+
+    /// 从持久化状态恢复指标（跳过预热）
+    fn restore_state(&mut self, _state: &serde_json::Value) {}
 }
 
 // ── CandleAggregator ─────────────────────────────────────────
@@ -71,6 +79,32 @@ impl CandleAggregator {
             current: None,
             window_start: 0,
         }
+    }
+
+    /// 导出当前聚合状态
+    pub fn export_state(&self) -> Option<crate::state::CandleAggregatorState> {
+        self.current.as_ref().map(|c| crate::state::CandleAggregatorState {
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            volume: c.volume,
+            window_start: self.window_start,
+        })
+    }
+
+    /// 从持久化状态恢复
+    pub fn restore_state(&mut self, state: &crate::state::CandleAggregatorState) {
+        self.window_start = state.window_start;
+        self.current = Some(Candle {
+            open: state.open,
+            high: state.high,
+            low: state.low,
+            close: state.close,
+            volume: 0.0, // volume 不需要精确恢复
+            timestamp: state.window_start,
+        });
+        tracing::info!(window_start = state.window_start, "candle aggregator state restored");
     }
 
     /// 喂入一笔 tick，如果跨区间则返回完成的 K 线
@@ -147,6 +181,19 @@ impl MarketMaker {
 }
 
 impl Strategy for MarketMaker {
+    fn export_state(&self) -> serde_json::Value {
+        serde_json::json!({
+            "pending_bid": self.pending_bid,
+            "pending_ask": self.pending_ask,
+        })
+    }
+
+    fn restore_state(&mut self, state: &serde_json::Value) {
+        self.pending_bid = state.get("pending_bid").and_then(|v| v.as_f64());
+        self.pending_ask = state.get("pending_ask").and_then(|v| v.as_f64());
+        tracing::info!("MarketMaker state restored");
+    }
+
     fn on_candle(&mut self, _candle: &Candle) -> Option<Signal> {
         // 做市策略基于 depth 驱动，不使用 K 线
         Some(Signal::None)
@@ -307,6 +354,43 @@ impl TrendFollower {
 }
 
 impl Strategy for TrendFollower {
+    fn export_state(&self) -> serde_json::Value {
+        serde_json::json!({
+            "ema_fast": self.ema_fast,
+            "ema_slow": self.ema_slow,
+            "atr": self.atr,
+            "prev_close": self.prev_close,
+            "prev_fast_above": self.prev_fast_above,
+            "candle_count": self.candle_count,
+        })
+    }
+
+    fn restore_state(&mut self, state: &serde_json::Value) {
+        if let Some(v) = state.get("ema_fast").and_then(|v| v.as_f64()) {
+            self.ema_fast = Some(v);
+        }
+        if let Some(v) = state.get("ema_slow").and_then(|v| v.as_f64()) {
+            self.ema_slow = Some(v);
+        }
+        if let Some(v) = state.get("atr").and_then(|v| v.as_f64()) {
+            self.atr = Some(v);
+        }
+        if let Some(v) = state.get("prev_close").and_then(|v| v.as_f64()) {
+            self.prev_close = Some(v);
+        }
+        if let Some(v) = state.get("prev_fast_above").and_then(|v| v.as_bool()) {
+            self.prev_fast_above = Some(v);
+        }
+        if let Some(v) = state.get("candle_count").and_then(|v| v.as_u64()) {
+            self.candle_count = v as usize;
+        }
+        tracing::info!(
+            ema_fast = ?self.ema_fast, ema_slow = ?self.ema_slow,
+            candle_count = self.candle_count,
+            "TrendFollower state restored"
+        );
+    }
+
     fn on_candle(&mut self, candle: &Candle) -> Option<Signal> {
         self.candle_count += 1;
 
@@ -472,6 +556,31 @@ impl ScalpingStrategy {
 }
 
 impl Strategy for ScalpingStrategy {
+    fn export_state(&self) -> serde_json::Value {
+        serde_json::json!({
+            "closes": self.closes,
+            "highs": self.highs,
+            "lows": self.lows,
+            "volumes": self.volumes,
+        })
+    }
+
+    fn restore_state(&mut self, state: &serde_json::Value) {
+        if let Some(arr) = state.get("closes").and_then(|v| v.as_array()) {
+            self.closes = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        if let Some(arr) = state.get("highs").and_then(|v| v.as_array()) {
+            self.highs = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        if let Some(arr) = state.get("lows").and_then(|v| v.as_array()) {
+            self.lows = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        if let Some(arr) = state.get("volumes").and_then(|v| v.as_array()) {
+            self.volumes = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        tracing::info!(candles = self.closes.len(), "Scalping state restored");
+    }
+
     fn on_candle(&mut self, candle: &Candle) -> Option<Signal> {
         self.closes.push(candle.close);
         self.highs.push(candle.high);
@@ -612,6 +721,27 @@ impl BreakoutStrategy {
 }
 
 impl Strategy for BreakoutStrategy {
+    fn export_state(&self) -> serde_json::Value {
+        serde_json::json!({
+            "closes": self.closes,
+            "highs": self.highs,
+            "lows": self.lows,
+        })
+    }
+
+    fn restore_state(&mut self, state: &serde_json::Value) {
+        if let Some(arr) = state.get("closes").and_then(|v| v.as_array()) {
+            self.closes = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        if let Some(arr) = state.get("highs").and_then(|v| v.as_array()) {
+            self.highs = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        if let Some(arr) = state.get("lows").and_then(|v| v.as_array()) {
+            self.lows = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        tracing::info!(candles = self.closes.len(), "Breakout state restored");
+    }
+
     fn on_candle(&mut self, candle: &Candle) -> Option<Signal> {
         self.closes.push(candle.close);
         self.highs.push(candle.high);
@@ -772,6 +902,27 @@ impl RSIStrategy {
 }
 
 impl Strategy for RSIStrategy {
+    fn export_state(&self) -> serde_json::Value {
+        serde_json::json!({
+            "closes": self.closes,
+            "highs": self.highs,
+            "lows": self.lows,
+        })
+    }
+
+    fn restore_state(&mut self, state: &serde_json::Value) {
+        if let Some(arr) = state.get("closes").and_then(|v| v.as_array()) {
+            self.closes = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        if let Some(arr) = state.get("highs").and_then(|v| v.as_array()) {
+            self.highs = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        if let Some(arr) = state.get("lows").and_then(|v| v.as_array()) {
+            self.lows = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        tracing::info!(candles = self.closes.len(), "RSI state restored");
+    }
+
     fn on_candle(&mut self, candle: &Candle) -> Option<Signal> {
         self.closes.push(candle.close);
         self.highs.push(candle.high);
@@ -902,6 +1053,27 @@ impl BollingerStrategy {
 }
 
 impl Strategy for BollingerStrategy {
+    fn export_state(&self) -> serde_json::Value {
+        serde_json::json!({
+            "closes": self.closes,
+            "highs": self.highs,
+            "lows": self.lows,
+        })
+    }
+
+    fn restore_state(&mut self, state: &serde_json::Value) {
+        if let Some(arr) = state.get("closes").and_then(|v| v.as_array()) {
+            self.closes = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        if let Some(arr) = state.get("highs").and_then(|v| v.as_array()) {
+            self.highs = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        if let Some(arr) = state.get("lows").and_then(|v| v.as_array()) {
+            self.lows = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        tracing::info!(candles = self.closes.len(), "Bollinger state restored");
+    }
+
     fn on_candle(&mut self, candle: &Candle) -> Option<Signal> {
         self.closes.push(candle.close);
         self.highs.push(candle.high);
@@ -1100,6 +1272,33 @@ impl MACDStrategy {
 }
 
 impl Strategy for MACDStrategy {
+    fn export_state(&self) -> serde_json::Value {
+        serde_json::json!({
+            "closes": self.closes,
+            "highs": self.highs,
+            "lows": self.lows,
+            "prev_histogram": self.prev_histogram,
+        })
+    }
+
+    fn restore_state(&mut self, state: &serde_json::Value) {
+        if let Some(arr) = state.get("closes").and_then(|v| v.as_array()) {
+            self.closes = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        if let Some(arr) = state.get("highs").and_then(|v| v.as_array()) {
+            self.highs = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        if let Some(arr) = state.get("lows").and_then(|v| v.as_array()) {
+            self.lows = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        self.prev_histogram = state.get("prev_histogram").and_then(|v| v.as_f64());
+        tracing::info!(
+            candles = self.closes.len(),
+            prev_histogram = ?self.prev_histogram,
+            "MACD state restored"
+        );
+    }
+
     fn on_candle(&mut self, candle: &Candle) -> Option<Signal> {
         self.closes.push(candle.close);
         self.highs.push(candle.high);
@@ -1271,5 +1470,94 @@ mod tests {
         assert!((c.high - 102.0).abs() < 1e-9);
         assert!((c.close - 102.0).abs() < 1e-9);
         assert!((c.volume - 3.0).abs() < 1e-9);
+    }
+
+    // ── state export/restore round-trip tests ──
+
+    #[test]
+    fn trend_follower_state_roundtrip() {
+        let mut tf = TrendFollower::new("BTCUSDT", 1.0);
+        // 喂入足够多的 K 线使 EMA 有值
+        for i in 0..60 {
+            tf.on_candle(&sample_candle(100.0 + i as f64 * 0.1, i * 300_000));
+        }
+
+        let exported = tf.export_state();
+        assert!(exported.get("ema_fast").and_then(|v| v.as_f64()).is_some());
+        assert!(exported.get("ema_slow").and_then(|v| v.as_f64()).is_some());
+        assert!(exported.get("candle_count").and_then(|v| v.as_u64()).is_some());
+
+        // 创建新实例并恢复
+        let mut tf2 = TrendFollower::new("BTCUSDT", 1.0);
+        tf2.restore_state(&exported);
+
+        let re_exported = tf2.export_state();
+        assert_eq!(
+            exported.get("ema_fast").and_then(|v| v.as_f64()),
+            re_exported.get("ema_fast").and_then(|v| v.as_f64()),
+        );
+        assert_eq!(
+            exported.get("ema_slow").and_then(|v| v.as_f64()),
+            re_exported.get("ema_slow").and_then(|v| v.as_f64()),
+        );
+        assert_eq!(
+            exported.get("candle_count").and_then(|v| v.as_u64()),
+            re_exported.get("candle_count").and_then(|v| v.as_u64()),
+        );
+    }
+
+    #[test]
+    fn macd_state_roundtrip() {
+        let mut macd = MACDStrategy::new("BTCUSDT", 1.0);
+        for i in 0..250 {
+            macd.on_candle(&sample_candle(100.0 + (i as f64 * 0.05).sin() * 5.0, i * 300_000));
+        }
+
+        let exported = macd.export_state();
+        let closes: Vec<f64> = exported.get("closes")
+            .and_then(|v| v.as_array())
+            .unwrap()
+            .iter()
+            .filter_map(|v| v.as_f64())
+            .collect();
+        assert_eq!(closes.len(), 250);
+
+        let mut macd2 = MACDStrategy::new("BTCUSDT", 1.0);
+        macd2.restore_state(&exported);
+
+        assert_eq!(macd2.closes.len(), 250);
+        assert_eq!(macd.prev_histogram, macd2.prev_histogram);
+    }
+
+    #[test]
+    fn candle_aggregator_state_roundtrip() {
+        let mut agg = CandleAggregator::new(60_000);
+        agg.update(&TickData {
+            symbol: "BTC".into(), price: 100.0, qty: 1.0, timestamp: 0, is_buyer_maker: false,
+        });
+        agg.update(&TickData {
+            symbol: "BTC".into(), price: 102.0, qty: 2.0, timestamp: 30_000, is_buyer_maker: false,
+        });
+
+        let state = agg.export_state().unwrap();
+        assert!((state.open - 100.0).abs() < 1e-9);
+        assert!((state.high - 102.0).abs() < 1e-9);
+
+        let mut agg2 = CandleAggregator::new(60_000);
+        agg2.restore_state(&state);
+
+        let state2 = agg2.export_state().unwrap();
+        assert!((state2.open - state.open).abs() < 1e-9);
+        assert!((state2.high - state.high).abs() < 1e-9);
+        assert_eq!(state2.window_start, state.window_start);
+    }
+
+    #[test]
+    fn strategy_default_export_is_null() {
+        // MarketMaker with no pending orders should still export valid state
+        let mm = MarketMaker::new("BTCUSDT", 0.0004, 1.0);
+        let exported = mm.export_state();
+        assert!(exported.get("pending_bid").unwrap().is_null());
+        assert!(exported.get("pending_ask").unwrap().is_null());
     }
 }

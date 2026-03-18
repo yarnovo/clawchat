@@ -1,5 +1,6 @@
 use hft_engine::config::Config;
 use hft_engine::exchange::{self, Exchange};
+use hft_engine::state::{EngineState, TradeStats};
 use hft_engine::strategy::{
     BollingerStrategy, BreakoutStrategy, CandleAggregator, MACDStrategy, MarketMaker,
     RSIStrategy, ScalpingStrategy, Signal, Strategy, TrendFollower,
@@ -9,6 +10,7 @@ use hft_engine::ws_feed::{start_feed, FeedConfig};
 
 use std::fs::OpenOptions;
 use std::io::Write;
+use std::path::PathBuf;
 
 const ENGINE_REGISTRY: &str = "/tmp/hft-engines.json";
 const TRADES_LOG: &str = "reports/trades.jsonl";
@@ -237,6 +239,29 @@ async fn execute_signal(signal: &Signal, exchange: &Exchange, strategy_name: &st
     }
 }
 
+/// 确定 state.json 路径：strategies/{name}/state.json
+fn state_json_path(config: &Config) -> Option<PathBuf> {
+    let config_path = config.config.as_ref()?;
+    let dir = config_path.parent()?;
+    Some(dir.join("state.json"))
+}
+
+/// 保存引擎状态
+fn save_state(
+    path: &std::path::Path,
+    strategy: &dyn Strategy,
+    aggregator: &CandleAggregator,
+    trade_stats: &TradeStats,
+) {
+    let state = EngineState {
+        last_updated: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+        indicators: strategy.export_state(),
+        candle_aggregator: aggregator.export_state(),
+        trade_stats: trade_stats.clone(),
+    };
+    state.save(path);
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
@@ -272,6 +297,31 @@ async fn main() {
     let candle_ms = config.timeframe_ms.unwrap_or(300_000); // default 5m
     let mut aggregator = CandleAggregator::new(candle_ms);
 
+    // state.json 路径
+    let state_path = state_json_path(&config);
+
+    // 恢复状态（如果存在）
+    let mut trade_stats = TradeStats::default();
+    if let Some(ref sp) = state_path {
+        if let Some(saved) = EngineState::load(sp) {
+            // 恢复策略指标
+            strategy.restore_state(&saved.indicators);
+            // 恢复 K 线聚合器
+            if let Some(ref agg_state) = saved.candle_aggregator {
+                aggregator.restore_state(agg_state);
+            }
+            // 恢复交易统计
+            trade_stats = saved.trade_stats;
+            tracing::info!(
+                total = trade_stats.total,
+                wins = trade_stats.wins,
+                losses = trade_stats.losses,
+                pnl = trade_stats.realized_pnl,
+                "trade stats restored"
+            );
+        }
+    }
+
     tracing::info!("strategy={} candle_interval={}ms", strategy.name(), candle_ms);
 
     // 启动行情 WebSocket 流
@@ -296,7 +346,15 @@ async fn main() {
                         if signal != Signal::None {
                             tracing::info!(?signal, "candle signal");
                             execute_signal(&signal, &exchange, &strategy_name).await;
+                            // 成交后保存状态
+                            if let Some(ref sp) = state_path {
+                                save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
+                            }
                         }
+                    }
+                    // K 线收盘后保存状态（指标更新了）
+                    if let Some(ref sp) = state_path {
+                        save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
                     }
                 }
 
@@ -305,6 +363,10 @@ async fn main() {
                     if signal != Signal::None {
                         tracing::info!(?signal, "tick signal");
                         execute_signal(&signal, &exchange, &strategy_name).await;
+                        // 成交后保存状态
+                        if let Some(ref sp) = state_path {
+                            save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
+                        }
                     }
                 }
             }
@@ -313,6 +375,10 @@ async fn main() {
                     if signal != Signal::None {
                         tracing::info!(?signal, "depth signal");
                         execute_signal(&signal, &exchange, &strategy_name).await;
+                        // 成交后保存状态
+                        if let Some(ref sp) = state_path {
+                            save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
+                        }
                     }
                 }
             }
