@@ -10,8 +10,7 @@
 
 ## 进行中
 
-- [ ] engineer: records 数据补全（risk_events.jsonl + signals.jsonl）
-- [ ] engineer2: `clawchat report daily/weekly` 报告工具
+- [ ] engineer: 下一个 P0 任务待派
 
 ## 待做（P0）
 
