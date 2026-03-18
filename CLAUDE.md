@@ -1,8 +1,8 @@
 # ClawChat 量化基金
 
-所有操作通过 Makefile 执行，`make help` 查看完整列表。
+CLI 工具：`cd cli && uv run clawchat --help` 查看所有命令。
 
-策略配置格式规范见 [engine/SCHEMA.md](engine/SCHEMA.md)（strategy.json + risk.json）。
+策略配置格式规范见 [engine/SCHEMA.md](engine/SCHEMA.md)（strategy.json + trade.json + risk.json）。
 
 ## 规则
 
