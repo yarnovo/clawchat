@@ -118,19 +118,46 @@ make status   # 一屏看：引擎/账户/持仓/风控/watcher/策略
 - watcher [RUNNING]
 - 账户有余额
 
-### Step 5: 驱动团队持续工作
+### Step 5: 启动心跳循环
 
-strategist 持续找新策略：
-- `make scan` 扫描 → `make backtest` 回测 → 达标写入 strategies/ → watcher 自动上架
-- 新策略类型需要 engineer 在 Rust 实现 → `make build` → watcher 自动启动
+```
+/loop 1m 心跳：策略管理
+```
 
-risk 持续监控：
-- `make check` 检查风控
-- 调整 risk.json 阈值（守护进程热加载）
+## 心跳 — 交易总监的策略管理循环
 
-engineer 按需开发：
-- 新策略类型 → 实现到 engine/src/strategy.rs
-- 系统问题 → 排查修复
+心跳是 team-lead 的核心工作，每 1 分钟一轮。本质是**读数据、判断、做决策**。
+
+### 每轮做什么
+
+```
+1. make status — 全局状态
+2. 评估策略表现 — 读 equity.csv，分析每个策略的盈亏趋势
+3. 决策 & 行动：
+   ┌─ 策略亏钱 → 改 status=suspended → watcher 自动停引擎
+   ├─ 策略赚钱 → 保持/考虑加仓
+   ├─ 策略不够 → 让 strategist 找新的
+   ├─ 新策略类型 → 让 engineer 实现
+   ├─ 守护挂了 → 重启 watcher/guard
+   └─ 异常情况 → 协调团队处理
+4. 每 10 轮 → 输出运营摘要给 CEO
+```
+
+### 策略表现评估标准
+
+- 实盘运行 > 1 小时后开始评估
+- 持续亏损且未实现盈亏 < -5% → 考虑 suspend
+- 稳定盈利 → 保持
+- 盈利但回撤加大 → 让 risk 调 risk.json 阈值
+
+### 团队驱动
+
+| 场景 | 指令 |
+|------|------|
+| 策略不够/表现差 | → strategist 找新策略 |
+| 新策略类型 | → engineer Rust 实现 + make build |
+| 风控规则需调整 | → risk 更新 risk.json |
+| 系统故障 | → engineer 排查修复 |
 
 ## 常用命令
 
