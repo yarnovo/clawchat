@@ -12,8 +12,10 @@
 
 ## 进行中
 
-- [ ] engineer: `clawchat risk-log` 风控事件查询
-- [ ] engineer2: trade.json expires_at + condition 条件触发
+- [ ] quant: 报告引擎业务需求（需要哪些报告 + 频率 + 指标）
+- [ ] strategist: SUI trend 15m 策略创建（已达标）+ floki 优化
+- [ ] engineer2: 报告引擎（Report Engine）实现
+- [ ] engineer: risk.json max_unrealized_loss 实现（architect 设计完成）
 
 ## 待做（P0）
 
@@ -55,3 +57,12 @@
 - [x] STOP_MARKET 条件单
 - [x] WS 超时重连修复
 - [x] ETH 二次减仓锁利
+- [x] clawchat risk-log 风控事件查询
+- [x] trade.json expires_at + condition 条件触发
+- [x] floki-trend-15m risk.json 审核（不达标：胜率50%/盈亏比1.82）
+- [x] bard-ema2050-15m / bard-trend-v2-15m 审核（均因胜率不达标 suspended）
+- [x] 报告引擎技术方案设计（architect 完成，Python 调度器方案）
+- [x] BARD/LYN 引擎超时排查（devops 确认正常，15m K线收盘间隔导致显示延迟）
+- [x] risk.json 扩展方案设计（architect 完成：max_unrealized_loss + max_correlation_exposure）
+- [x] SUI trend 15m 策略发现、验证、批准上架（第 7 个运行策略）
+- [x] clawchat funding CLI + funding_rate_history.csv 引擎记录（engineer2 完成，413 tests）

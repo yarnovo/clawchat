@@ -21,11 +21,12 @@
     "sharpe": 8.87,
     "max_drawdown_pct": 14.87,
     "trades": 26,
-    "win_rate": 0.500,
+    "win_rate": 0.5,
     "profit_factor": 6.03
   },
-  "status": "pending",
+  "status": "suspended",
   "lifecycle": {
     "created": "2026-03-19"
-  }
+  },
+  "suspend_reason": "胜率50%(需>50%)"
 }

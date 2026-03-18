@@ -25,8 +25,9 @@
     "win_rate": 0.455,
     "profit_factor": 2.69
   },
-  "status": "pending",
+  "status": "suspended",
   "lifecycle": {
     "created": "2026-03-19"
-  }
+  },
+  "suspend_reason": "胜率45.5%(需>50%)"
 }

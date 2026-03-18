@@ -1,0 +1,30 @@
+{
+  "name": "ntrn-ema2050-5m",
+  "engine_strategy": "default",
+  "symbol": "NTRNUSDT",
+  "timeframe": "5m",
+  "timeframe_ms": 300000,
+  "leverage": 3,
+  "position_size": 0.3,
+  "sizing_mode": "percent",
+  "capital": 200,
+  "params": {
+    "ema_fast": 22,
+    "ema_slow": 40,
+    "atr_period": 14,
+    "trail_atr": 4.0
+  },
+  "backtest": {
+    "days": 30,
+    "return_pct": 166.0,
+    "sharpe": 9.98,
+    "max_drawdown_pct": 10.52,
+    "trades": 93,
+    "win_rate": 0.516,
+    "profit_factor": 2.67
+  },
+  "status": "approved",
+  "lifecycle": {
+    "created": "2026-03-19"
+  }
+}

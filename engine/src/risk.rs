@@ -49,6 +49,10 @@ pub struct RiskConfig {
     /// None = 不检查
     #[serde(default)]
     pub funding_rate_limit: Option<f64>,
+    /// 未实现亏损上限（占权益比例），如 0.05 = 5%。浮亏达阈值时平仓。
+    /// None = 不检查
+    #[serde(default)]
+    pub max_unrealized_loss: Option<f64>,
 }
 
 fn default_max_loss_per_trade() -> f64 { 0.05 }
@@ -81,6 +85,7 @@ impl Default for RiskConfig {
             trailing_stop: 0.02,
             max_portfolio_exposure: 0.80,
             funding_rate_limit: None,
+            max_unrealized_loss: None,
         }
     }
 }
@@ -398,7 +403,25 @@ pub fn check_position_ratio(
     RiskVerdict::Pass
 }
 
-/// 综合风控门：依次检查止损/止盈/高水位/仓位占比
+/// 纯函数：检查未实现亏损（浮亏占权益比例）
+pub fn check_unrealized_loss(
+    unrealized_pnl: f64,
+    capital: f64,
+    max_unrealized_loss: f64,
+) -> RiskVerdict {
+    if capital > 0.0 && unrealized_pnl < 0.0 {
+        let loss_ratio = -unrealized_pnl / capital;
+        if loss_ratio >= max_unrealized_loss {
+            return RiskVerdict::ClosePosition(format!(
+                "unrealized_loss: {:.2}% >= {:.2}%",
+                loss_ratio * 100.0, max_unrealized_loss * 100.0
+            ));
+        }
+    }
+    RiskVerdict::Pass
+}
+
+/// 综合风控门：依次检查止损/止盈/高水位/仓位占比/未实现亏损
 /// 返回第一个非 Pass 的结果，全部通过返回 Pass
 pub fn risk_gate(
     pnl: f64,
@@ -413,6 +436,9 @@ pub fn risk_gate(
         check_take_profit(pnl, capital, config.max_profit_per_trade),
         check_hwm_protection(pnl, hwm, config.max_drawdown_stop),
         check_position_ratio(notional, total_balance, config.max_position_ratio),
+        config.max_unrealized_loss
+            .map(|limit| check_unrealized_loss(pnl, capital, limit))
+            .unwrap_or(RiskVerdict::Pass),
     ];
     for v in checks {
         if v != RiskVerdict::Pass {
@@ -562,6 +588,7 @@ mod tests {
         assert!((cfg.trailing_stop - 0.02).abs() < f64::EPSILON);
         assert!((cfg.max_portfolio_exposure - 0.80).abs() < f64::EPSILON);
         assert!(cfg.funding_rate_limit.is_none());
+        assert!(cfg.max_unrealized_loss.is_none());
     }
 
     #[test]
@@ -583,7 +610,8 @@ mod tests {
             "max_hold_time_hours": 48,
             "trailing_stop": 0.03,
             "max_portfolio_exposure": 0.60,
-            "funding_rate_limit": 0.001
+            "funding_rate_limit": 0.001,
+            "max_unrealized_loss": 0.05
         }}"#).unwrap();
 
         let cfg = RiskConfig::load(&path);
@@ -599,6 +627,7 @@ mod tests {
         assert!((cfg.trailing_stop - 0.03).abs() < f64::EPSILON);
         assert!((cfg.max_portfolio_exposure - 0.60).abs() < f64::EPSILON);
         assert!((cfg.funding_rate_limit.unwrap() - 0.001).abs() < f64::EPSILON);
+        assert!((cfg.max_unrealized_loss.unwrap() - 0.05).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -868,6 +897,69 @@ mod tests {
         // notional=200, balance=1000, limit=0.30 → ratio=20% < 30%
         let v = check_position_ratio(200.0, 1000.0, 0.30);
         assert_eq!(v, RiskVerdict::Pass);
+    }
+
+    // ── check_unrealized_loss ──────────────────────────────────
+
+    #[test]
+    fn unrealized_loss_none_skips_check() {
+        // max_unrealized_loss = None → risk_gate should pass
+        let config = RiskConfig::default(); // None by default
+        let _v = risk_gate(-50.0, 200.0, 0.0, 0.0, 200.0, &config);
+        // stop_loss triggers first at 25%, but unrealized_loss itself is not the cause
+        // Test the pure function directly: None means no check
+        // (risk_gate handles None via unwrap_or(Pass))
+        assert_eq!(
+            config.max_unrealized_loss
+                .map(|limit| check_unrealized_loss(-50.0, 200.0, limit))
+                .unwrap_or(RiskVerdict::Pass),
+            RiskVerdict::Pass
+        );
+    }
+
+    #[test]
+    fn unrealized_loss_below_threshold_passes() {
+        // 4% loss < 5% threshold → Pass
+        let v = check_unrealized_loss(-8.0, 200.0, 0.05);
+        assert_eq!(v, RiskVerdict::Pass);
+    }
+
+    #[test]
+    fn unrealized_loss_at_threshold_triggers() {
+        // 5% loss >= 5% threshold → ClosePosition
+        let v = check_unrealized_loss(-10.0, 200.0, 0.05);
+        assert!(matches!(v, RiskVerdict::ClosePosition(_)));
+        if let RiskVerdict::ClosePosition(msg) = v {
+            assert!(msg.contains("unrealized_loss"));
+        }
+    }
+
+    #[test]
+    fn unrealized_loss_capital_zero_safe() {
+        // capital = 0 → no division, should pass
+        let v = check_unrealized_loss(-10.0, 0.0, 0.05);
+        assert_eq!(v, RiskVerdict::Pass);
+    }
+
+    #[test]
+    fn unrealized_loss_positive_pnl_passes() {
+        // Profitable → should never trigger
+        let v = check_unrealized_loss(10.0, 200.0, 0.05);
+        assert_eq!(v, RiskVerdict::Pass);
+    }
+
+    #[test]
+    fn unrealized_loss_integrated_in_risk_gate() {
+        // Verify it triggers through risk_gate when configured
+        let mut config = RiskConfig::default();
+        config.max_unrealized_loss = Some(0.03); // 3%
+        config.max_loss_per_trade = 1.0; // disable stop_loss so unrealized_loss fires
+        // pnl = -8, capital = 200 → 4% > 3% → should trigger
+        let v = risk_gate(-8.0, 200.0, 0.0, 0.0, 200.0, &config);
+        assert!(matches!(v, RiskVerdict::ClosePosition(_)));
+        if let RiskVerdict::ClosePosition(msg) = v {
+            assert!(msg.contains("unrealized_loss"));
+        }
     }
 
     #[test]

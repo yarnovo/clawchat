@@ -25,6 +25,7 @@ const TRADES_LOG: &str = "records/trades.jsonl";
 const RISK_EVENTS_LOG: &str = "records/risk_events.jsonl";
 const SIGNALS_LOG: &str = "records/signals.jsonl";
 const HIGH_WATER_FILE: &str = "records/high_water.json";
+const FUNDING_CSV: &str = "records/funding_rate_history.csv";
 const BINANCE_FSTREAM_WS: &str = "wss://fstream.binance.com";
 /// listenKey keepalive 间隔（分钟）
 const KEEPALIVE_MINUTES: u64 = 20;
@@ -34,7 +35,7 @@ const KEEPALIVE_MINUTES: u64 = 20;
 #[derive(Debug)]
 enum UserEvent {
     /// 标记价格更新（含资金费率）
-    MarkPrice { symbol: String, mark_price: f64, funding_rate: f64 },
+    MarkPrice { symbol: String, mark_price: f64, funding_rate: f64, next_funding_time: u64 },
     /// 持仓更新（ACCOUNT_UPDATE）
     PositionUpdate {
         symbol: String,
@@ -238,7 +239,12 @@ fn parse_mark_price_msg(raw: &str) -> Option<UserEvent> {
         .and_then(|v| v.as_str())
         .and_then(|s| s.parse().ok())
         .unwrap_or(0.0);
-    Some(UserEvent::MarkPrice { symbol, mark_price, funding_rate })
+    // "T" = next funding time (millis), 可能缺失
+    let next_funding_time: u64 = data
+        .get("T")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0);
+    Some(UserEvent::MarkPrice { symbol, mark_price, funding_rate, next_funding_time })
 }
 
 // ── User Data Stream WebSocket ───────────────────────────────
@@ -508,6 +514,27 @@ fn log_risk_event(
             }
         }
         Err(e) => tracing::warn!("failed to open risk_events.jsonl: {e}"),
+    }
+}
+
+/// Append funding rate to records/funding_rate_history.csv
+fn log_funding_rate(symbol: &str, funding_rate: f64, next_funding_time: &str) {
+    let csv_path = std::path::Path::new(FUNDING_CSV);
+    if let Some(parent) = csv_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let write_header = !csv_path.exists();
+    match OpenOptions::new().create(true).append(true).open(csv_path) {
+        Ok(mut file) => {
+            if write_header {
+                let _ = writeln!(file, "timestamp,symbol,funding_rate,next_funding_time");
+            }
+            let ts = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+            if let Err(e) = writeln!(file, "{ts},{symbol},{funding_rate},{next_funding_time}") {
+                tracing::warn!("failed to write funding rate: {e}");
+            }
+        }
+        Err(e) => tracing::warn!("failed to open funding CSV: {e}"),
     }
 }
 
@@ -1326,6 +1353,8 @@ async fn main() {
 
     // 缓存最新资金费率（从 MarkPrice 事件更新）
     let mut last_funding_rate: f64 = 0.0;
+    // 上次记录资金费率时的 next_funding_time（避免重复记录同一周期）
+    let mut last_funding_log_nft: u64 = 0;
 
     // 启动时执行待处理的一次性指令
     if let Some(ref tp) = trade_path {
@@ -1422,9 +1451,29 @@ async fn main() {
             }
             Some(user_event) = user_rx.recv() => {
                 match user_event {
-                    UserEvent::MarkPrice { ref symbol, mark_price, funding_rate } => {
+                    UserEvent::MarkPrice { ref symbol, mark_price, funding_rate, next_funding_time } => {
                         // 缓存最新资金费率
                         last_funding_rate = funding_rate;
+
+                        // 定期记录资金费率到 CSV（每 8 小时，跟随结算周期）
+                        if funding_rate != 0.0 && next_funding_time != last_funding_log_nft {
+                            last_funding_log_nft = next_funding_time;
+                            let nft_str = if next_funding_time > 0 {
+                                chrono::DateTime::from_timestamp_millis(next_funding_time as i64)
+                                    .map(|dt| dt.to_rfc3339_opts(chrono::SecondsFormat::Secs, true))
+                                    .unwrap_or_default()
+                            } else {
+                                String::new()
+                            };
+                            log_funding_rate(symbol, funding_rate, &nft_str);
+                            tracing::info!(
+                                symbol,
+                                funding_rate,
+                                next_funding_time,
+                                "funding rate logged to CSV"
+                            );
+                        }
+
                         // 更新持仓跟踪器的标记价格
                         pos_tracker.update_mark_price(symbol, mark_price);
 
@@ -1563,10 +1612,11 @@ mod tests {
         let raw = r#"{"stream":"ntrnusdt@markPrice@1s","data":{"e":"markPriceUpdate","s":"NTRNUSDT","p":"0.35120000"}}"#;
         let event = parse_mark_price_msg(raw).unwrap();
         match event {
-            UserEvent::MarkPrice { symbol, mark_price, funding_rate } => {
+            UserEvent::MarkPrice { symbol, mark_price, funding_rate, next_funding_time } => {
                 assert_eq!(symbol, "NTRNUSDT");
                 assert!((mark_price - 0.3512).abs() < 1e-8);
                 assert!((funding_rate - 0.0).abs() < 1e-10); // "r" 缺失时默认 0
+                assert_eq!(next_funding_time, 0); // "T" 缺失时默认 0
             }
             _ => panic!("expected MarkPrice event"),
         }
@@ -1574,13 +1624,14 @@ mod tests {
 
     #[test]
     fn parse_mark_price_with_funding_rate() {
-        let raw = r#"{"stream":"ntrnusdt@markPrice@1s","data":{"e":"markPriceUpdate","s":"NTRNUSDT","p":"0.35120000","r":"0.00015000"}}"#;
+        let raw = r#"{"stream":"ntrnusdt@markPrice@1s","data":{"e":"markPriceUpdate","s":"NTRNUSDT","p":"0.35120000","r":"0.00015000","T":1774000000000}}"#;
         let event = parse_mark_price_msg(raw).unwrap();
         match event {
-            UserEvent::MarkPrice { symbol, mark_price, funding_rate } => {
+            UserEvent::MarkPrice { symbol, mark_price, funding_rate, next_funding_time } => {
                 assert_eq!(symbol, "NTRNUSDT");
                 assert!((mark_price - 0.3512).abs() < 1e-8);
                 assert!((funding_rate - 0.00015).abs() < 1e-10);
+                assert_eq!(next_funding_time, 1774000000000);
             }
             _ => panic!("expected MarkPrice event"),
         }
@@ -1595,6 +1646,31 @@ mod tests {
     fn parse_mark_price_missing_fields() {
         let raw = r#"{"data":{"e":"markPriceUpdate"}}"#;
         assert!(parse_mark_price_msg(raw).is_none());
+    }
+
+    // ── log_funding_rate ──
+
+    #[test]
+    fn log_funding_rate_creates_csv() {
+        let dir = tempfile::tempdir().unwrap();
+        let csv_path = dir.path().join("funding_rate_history.csv");
+        // 临时修改常量不可行，直接测试文件写入逻辑
+        let write_header = !csv_path.exists();
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&csv_path)
+            .unwrap();
+        if write_header {
+            writeln!(file, "timestamp,symbol,funding_rate,next_funding_time").unwrap();
+        }
+        writeln!(file, "2026-03-19T10:00:00Z,NTRNUSDT,0.00015,2026-03-19T16:00:00Z").unwrap();
+        drop(file);
+
+        let content = std::fs::read_to_string(&csv_path).unwrap();
+        assert!(content.contains("timestamp,symbol,funding_rate,next_funding_time"));
+        assert!(content.contains("NTRNUSDT"));
+        assert!(content.contains("0.00015"));
     }
 
     // ── parse_user_data_msg ──

@@ -240,24 +240,21 @@ quant 提交策略后，team-lead 必须验证：
 ### 每轮做什么
 
 ```
-1. make status — 全局状态
-2. 评估策略表现 — 分析盈亏
-3. 读 TODO.md — 检查待办，空闲成员派活：
+1. make status — 看全局状态（引擎/持仓/PnL/风控）
+2. 读 TODO.md — 检查待办进度
+3. 空闲成员派活：
    ├─ strategist 空闲 → 派跑回测找策略
    ├─ engineer 空闲 → 派 TODO 里下一个 P0 技术任务
    ├─ devops 空闲 → 派运维检查（引擎/行情/K线）
    ├─ trader 空闲 → 派检查持仓/加仓评估
-   ├─ quant 空闲 → 派分析/评审/报告
+   ├─ quant 空闲 → 派分析/评审
    ├─ architect 空闲 → 派设计待做方案
    └─ qa 空闲 → 派验证最新改动
-4. 定时任务（检查 make status 输出的时间）：
-   ├─ 每日 9:00 → 跑 clawchat review + clawchat report daily
-   └─ 每周一 9:00 → 跑 clawchat report weekly
-5. 决策 & 行动：
+4. 策略决策：
    ├─ 策略亏钱 → suspend
-   ├─ 策略赚钱 → trader 评估加仓
-   ├─ 空闲资金 → strategist 找新策略
-   └─ 引擎异常 → devops 排查修复
+   ├─ 策略赚钱 → 保持 / trader 评估加仓
+   ├─ 引擎异常 → devops 排查
+   └─ 成员汇报完成 → review + 验收
 ```
 
 ### 策略表现评估

@@ -28,8 +28,10 @@ cd cli && uv run clawchat --help
 
 ## reports/
 
-给人看的报告（CLI 生成，.gitignore 忽略）：
-- 日报/周报/策略报告（`clawchat report` 生成）
+报告引擎定时生成（.gitignore 忽略）：
+- `daily-YYYY-MM-DD.md` — 日报（每日 9:00 自动生成）
+- `weekly-YYYY-MM-DD.md` — 周报（每周一 9:00 自动生成）
+- 报告引擎由 `/team` 启动，独立于交易引擎运行
 
 ## KPI
 
