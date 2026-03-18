@@ -2,10 +2,9 @@
 
 ## 进行中
 
-- [ ] engineer: 分页拉取（backtest.py 突破 1000 根限制）
 - [ ] engineer: 文件监听热更新（notify crate，strategy.json + risk.json）
 - [ ] engineer: sizing_mode 支持（percent/fixed）
-- [ ] engineer: 均值回归策略（backtest.py + Rust 引擎）
+- [ ] engineer: backtest.py 支持 --params 自定义参数
 
 ## 待做
 
@@ -16,6 +15,9 @@
 
 ## 已完成
 
+- [x] 分页拉取（backtest.py 突破 1000 根限制）
+- [x] 均值回归策略（backtest.py + Rust 引擎）
+- [x] 87 个测试全通过（71 lib + 16 risk-engine）
 - [x] 双 Rust binary（hft-engine + risk-engine）
 - [x] strategy.json 验证（config.rs validate）
 - [x] pre-trade check 集成
