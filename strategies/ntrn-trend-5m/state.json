@@ -1,0 +1,25 @@
+{
+  "last_updated": "2026-03-18T13:14:58Z",
+  "indicators": {
+    "atr": 0.00006151111111111123,
+    "candle_count": 3,
+    "ema_fast": 0.005928264462809917,
+    "ema_slow": 0.005929298469387756,
+    "prev_close": 0.00592,
+    "prev_fast_above": false
+  },
+  "candle_aggregator": {
+    "open": 0.00591,
+    "high": 0.00591,
+    "low": 0.00591,
+    "close": 0.00591,
+    "volume": 1714.0,
+    "window_start": 1773839700000
+  },
+  "trade_stats": {
+    "total": 0,
+    "wins": 0,
+    "losses": 0,
+    "realized_pnl": 0.0
+  }
+}

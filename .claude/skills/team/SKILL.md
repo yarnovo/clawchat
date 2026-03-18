@@ -169,6 +169,12 @@ TeamCreate(team_name="clawchat")
 **engineer spawn prompt 要点：**
 - `make build` 编译引擎 + 检查系统
 - 等待 team-lead 派发技术任务
+- **不要修改 TODO.md**，完成任务向 team-lead 汇报，由 team-lead review 后更新
+
+**所有成员 spawn prompt 通用规则：**
+- 不要修改 TODO.md（只有 team-lead 维护）
+- 不要修改其他成员的文件
+- 完成任务向 team-lead 汇报，等待验收
 
 ### Step 2: 启动守护进程
 
@@ -205,11 +211,19 @@ make status   # 一屏看全局
 
 ## TODO 管理
 
-team-lead 维护 `TODO.md`（项目根目录），记录所有待办任务：
-- 派发任务时写入 TODO.md
-- 任务完成验收后打 [x]
+**TODO.md 只有 team-lead 维护**，成员不能直接修改：
+- team-lead 派发任务时写入
+- 成员完成后向 team-lead 汇报
+- team-lead review + 验证后才打 [x]
 - 心跳时检查进度，避免遗漏
 - 多线程并行任务必须记录，不能靠记忆
+
+## Code Review
+
+engineer 提交代码后，team-lead 必须 review：
+- `git diff HEAD~1` 看实际改动
+- `cargo test --lib && cargo test --bin risk-engine` 验证测试
+- 不能只听汇报，要看代码
 
 ## 心跳 — 交易总监的策略管理循环
 

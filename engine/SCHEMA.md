@@ -43,7 +43,8 @@
 | `symbol` | 是 | 交易对，引擎格式如 `PIPPINUSDT`（也接受 `PIPPIN/USDT` 自动转换） |
 | `timeframe` | 是 | K 线周期：`1m` / `5m` / `15m` / `1h` / `4h`（也可用 `timeframe_ms` 毫秒） |
 | `leverage` | 是 | 杠杆倍数 |
-| `order_qty` | 是 | 每笔下单量（PIPPIN=100, BAN=1.0, ETH=0.01, BTC=0.001） |
+| `position_size` | 推荐 | 权益百分比下单（如 0.3 = 30%），设置后 order_qty 由引擎自动计算 |
+| `order_qty` | 否 | 固定下单量（向后兼容），设了 position_size 则忽略 |
 | `params` | 是 | 策略参数，传给 Rust `from_params()`，见下表 |
 | `backtest` | 否 | 回测指标汇总 |
 | `status` | 是 | `approved` = 自动上架 / `suspended` = 不启动 |

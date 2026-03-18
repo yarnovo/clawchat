@@ -13,6 +13,8 @@
 use futures_util::{SinkExt, StreamExt};
 use hft_engine::exchange::Exchange;
 use hft_engine::risk::RiskConfig;
+use hft_engine::state::RiskEngineState;
+use notify::{EventKind, RecursiveMode, Watcher};
 use tokio::sync::mpsc;
 use tokio_tungstenite::connect_async;
 
@@ -22,10 +24,8 @@ use std::path::{Path, PathBuf};
 
 const ENGINE_REGISTRY: &str = "/tmp/hft-engines.json";
 const HIGH_WATER_FILE: &str = "reports/high_water_rust.json";
-const DYNAMIC_QTY_FILE: &str = "/tmp/dynamic_qty.json";
+const RISK_STATE_FILE: &str = "reports/risk_engine_state.json";
 const BINANCE_FSTREAM_WS: &str = "wss://fstream.binance.com";
-/// 风控配置热更新间隔（秒）
-const CONFIG_RELOAD_SECS: u64 = 60;
 /// listenKey keepalive 间隔（分钟）
 const KEEPALIVE_MINUTES: u64 = 20;
 // ── 风控事件 ─────────────────────────────────────────────────
@@ -49,6 +49,8 @@ enum RiskEvent {
     BalanceUpdate {
         wallet_balance: f64,
     },
+    /// 风控配置文件变化（risk.json / strategy.json）
+    ConfigChanged,
 }
 
 // ── 策略目录扫描 ─────────────────────────────────────────────
@@ -58,16 +60,14 @@ struct StrategyJson {
     name: Option<String>,
     symbol: Option<String>,
     capital: Option<f64>,
-    order_qty: Option<f64>,
 }
 
-/// 每个 symbol 的风控+复利配置
+/// 每个 symbol 的风控配置
 #[derive(Debug, Clone)]
 struct SymbolRiskConfig {
     strategy_name: String,
     risk: RiskConfig,
     capital: f64,
-    base_qty: f64,
 }
 
 /// {normalized_symbol: SymbolRiskConfig}
@@ -102,7 +102,6 @@ fn load_risk_configs(strategies_dir: &Path) -> RiskMap {
                 .map(|s| normalize_symbol(&s))
                 .unwrap_or_default();
             let capital = cfg.capital.unwrap_or(200.0);
-            let base_qty = cfg.order_qty.unwrap_or(1.0);
 
             if symbol.is_empty() {
                 continue;
@@ -116,7 +115,6 @@ fn load_risk_configs(strategies_dir: &Path) -> RiskMap {
                     strategy_name: name,
                     risk: risk_config,
                     capital,
-                    base_qty,
                 },
             );
         }
@@ -130,7 +128,6 @@ fn load_risk_configs(strategies_dir: &Path) -> RiskMap {
                     strategy_name: reg_name.clone(),
                     risk: RiskConfig::default(),
                     capital: 200.0,
-                    base_qty: 1.0,
                 },
             );
         }
@@ -204,45 +201,45 @@ fn save_high_water(hwm: &HighWaterMarks) {
 
 // ── 复利动态 order_qty ───────────────────────────────────────
 
-/// 计算动态 order_qty 并写入 /tmp/dynamic_qty.json
-/// hft-engine 读取此文件获取实时调整后的下单量
-///
-/// order_qty = base_qty × (equity / initial_capital)
-fn update_dynamic_qty(risk_map: &RiskMap, equity: f64) {
-    let mut qty_map: serde_json::Map<String, serde_json::Value> = serde_json::Map::new();
+// ── 文件监听（策略配置热更新）────────────────────────────────
 
-    for (symbol, cfg) in risk_map {
-        if cfg.capital <= 0.0 || cfg.base_qty <= 0.0 {
-            continue;
+/// 监听 strategies/ 目录下 risk.json / strategy.json 的变化
+/// 文件修改后发送 ConfigChanged 事件，主循环立即重新加载配置
+fn start_config_watcher(strategies_dir: PathBuf, tx: mpsc::Sender<RiskEvent>) {
+    std::thread::spawn(move || {
+        let tx_clone = tx.clone();
+        let mut watcher = notify::recommended_watcher(
+            move |res: Result<notify::Event, notify::Error>| {
+                let Ok(event) = res else { return };
+                // 只关心写入/创建/删除事件
+                match event.kind {
+                    EventKind::Modify(_) | EventKind::Create(_) | EventKind::Remove(_) => {}
+                    _ => return,
+                }
+                // 只关心 risk.json 和 strategy.json
+                let dominated = event.paths.iter().any(|p| {
+                    let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                    name == "risk.json" || name == "strategy.json"
+                });
+                if !dominated {
+                    return;
+                }
+                tracing::info!("config file changed: {:?}", event.paths);
+                let _ = tx_clone.blocking_send(RiskEvent::ConfigChanged);
+            },
+        )
+        .expect("failed to create file watcher");
+
+        watcher
+            .watch(&strategies_dir, RecursiveMode::Recursive)
+            .expect("failed to watch strategies directory");
+
+        tracing::info!("file watcher started: {:?}", strategies_dir);
+        // 保持 watcher 存活（阻塞线程）
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(3600));
         }
-        let multiplier = equity / cfg.capital;
-        let dynamic_qty = cfg.base_qty * multiplier;
-
-        qty_map.insert(
-            symbol.clone(),
-            serde_json::json!({
-                "base_qty": cfg.base_qty,
-                "dynamic_qty": dynamic_qty,
-                "multiplier": multiplier,
-                "equity": equity,
-                "capital": cfg.capital,
-            }),
-        );
-
-        tracing::debug!(
-            "{symbol}: base={:.4} × {:.3} = {:.4}",
-            cfg.base_qty,
-            multiplier,
-            dynamic_qty
-        );
-    }
-
-    let json = serde_json::Value::Object(qty_map);
-    if let Ok(contents) = serde_json::to_string_pretty(&json) {
-        if let Err(e) = std::fs::write(DYNAMIC_QTY_FILE, contents) {
-            tracing::warn!("failed to write dynamic_qty.json: {e}");
-        }
-    }
+    });
 }
 
 // ── 持仓状态跟踪 ─────────────────────────────────────────────
@@ -594,12 +591,48 @@ fn parse_user_data_msg(raw: &str) -> Vec<RiskEvent> {
 
 // ── 风控检查 ─────────────────────────────────────────────────
 
+/// UTC 当日零点的 unix 毫秒时间戳
+fn today_start_ts() -> u64 {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let day_secs = now - (now % 86400);
+    day_secs * 1000
+}
+
+/// 记录平仓到 risk_state 并持久化
+fn record_close_and_save(risk_state: &mut RiskEngineState, strategy_name: &str, pnl: f64) {
+    let today = today_start_ts();
+    {
+        let entry = risk_state
+            .strategies
+            .entry(strategy_name.to_string())
+            .or_default();
+        entry.maybe_reset_day(today);
+        entry.record_close(pnl);
+    }
+    risk_state.last_updated =
+        chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    risk_state.save(Path::new(RISK_STATE_FILE));
+    let entry = &risk_state.strategies[strategy_name];
+    tracing::info!(
+        strategy = strategy_name,
+        pnl,
+        daily_pnl = entry.daily_realized_pnl,
+        daily_trades = entry.daily_trades,
+        consecutive_losses = entry.consecutive_losses,
+        "risk state updated"
+    );
+}
+
 async fn check_position_risk(
     pos: &TrackedPosition,
     risk_map: &RiskMap,
     hwm: &mut HighWaterMarks,
     exchange: &Exchange,
     total_balance: f64,
+    risk_state: &mut RiskEngineState,
 ) -> Option<String> {
     let norm_sym = &pos.symbol;
     let key = pos.key();
@@ -614,6 +647,38 @@ async fn check_position_risk(
 
     let pnl = pos.unrealized_pnl;
 
+    // ── 0. 当日亏损熔断 + 连续亏损熔断 ──
+    {
+        let today = today_start_ts();
+        let entry = risk_state
+            .strategies
+            .entry(strategy_name.clone())
+            .or_default();
+        entry.maybe_reset_day(today);
+
+        // 当日总亏损检查
+        if capital > 0.0 && entry.daily_realized_pnl < 0.0 {
+            let daily_loss_ratio = -entry.daily_realized_pnl / capital;
+            if daily_loss_ratio >= risk_cfg.max_daily_loss {
+                tracing::warn!(
+                    "[DAILY LOSS] [{strategy_name}] {norm_sym} daily_loss={:.2}% >= {:.2}%, blocking",
+                    daily_loss_ratio * 100.0,
+                    risk_cfg.max_daily_loss * 100.0
+                );
+                return None;
+            }
+        }
+
+        // 连续亏损熔断（5 笔）
+        if entry.consecutive_losses >= 5 {
+            tracing::warn!(
+                "[CONSECUTIVE LOSS] [{strategy_name}] {norm_sym} consecutive_losses={}, blocking",
+                entry.consecutive_losses
+            );
+            return None;
+        }
+    }
+
     // ── 1. 单笔止损 ──
     if capital > 0.0 && pnl < 0.0 {
         let loss_ratio = -pnl / capital;
@@ -627,6 +692,7 @@ async fn check_position_risk(
             match exchange.close_position(norm_sym, pos.position_amt).await {
                 Ok(_) => {
                     tracing::info!("  {norm_sym} closed (stop loss)");
+                    record_close_and_save(risk_state, strategy_name, pnl);
                     hwm.remove(&key);
                     save_high_water(hwm);
                     return Some(norm_sym.clone());
@@ -649,6 +715,7 @@ async fn check_position_risk(
             match exchange.close_position(norm_sym, pos.position_amt).await {
                 Ok(_) => {
                     tracing::info!("  {norm_sym} closed (take profit)");
+                    record_close_and_save(risk_state, strategy_name, pnl);
                     hwm.remove(&key);
                     save_high_water(hwm);
                     return Some(norm_sym.clone());
@@ -690,6 +757,7 @@ async fn check_position_risk(
                 match exchange.close_position(norm_sym, pos.position_amt).await {
                     Ok(_) => {
                         tracing::info!("  {norm_sym} closed (profit protection)");
+                        record_close_and_save(risk_state, strategy_name, pnl);
                         hwm.remove(&key);
                         save_high_water(hwm);
                         return Some(norm_sym.clone());
@@ -930,10 +998,21 @@ async fn main() {
     tracing::info!("  dry_run: {dry_run}");
     tracing::info!("========================================");
 
-    // 加载高水位 + 初始持仓
+    // 加载高水位 + 风控状态 + 初始持仓
     let mut hwm = load_high_water();
     if !hwm.is_empty() {
         tracing::info!("恢复 {} 个高水位记录", hwm.len());
+    }
+
+    let mut risk_state = RiskEngineState::load(Path::new(RISK_STATE_FILE));
+    if !risk_state.strategies.is_empty() {
+        tracing::info!("恢复 {} 个策略风控状态", risk_state.strategies.len());
+        for (name, s) in &risk_state.strategies {
+            tracing::info!(
+                "  {name}: daily_pnl={:.2} trades={} consecutive_losses={}",
+                s.daily_realized_pnl, s.daily_trades, s.consecutive_losses
+            );
+        }
     }
 
     // 初始化持仓跟踪器（从交易所拉一次初始持仓）
@@ -980,8 +1059,6 @@ async fn main() {
                 tracker.all_positions().len(),
                 total_balance
             );
-            // 初始复利计算
-            update_dynamic_qty(&risk_map, total_balance);
         }
         Err(e) => {
             tracing::error!("failed to load initial account: {e}");
@@ -1011,9 +1088,9 @@ async fn main() {
         start_user_data_feed(&exchange2, tx_user).await;
     });
 
-    // 风控配置热更新定时器
-    let mut config_reload = tokio::time::interval(std::time::Duration::from_secs(CONFIG_RELOAD_SECS));
-    config_reload.tick().await; // 跳过第一次立即触发
+    // 文件监听：strategies/ 目录下 risk.json / strategy.json 变化时立即重新加载
+    let tx_watcher = tx.clone();
+    start_config_watcher(strategies_dir.clone(), tx_watcher);
 
     // 状态日志计数器
     let mut event_count: u64 = 0;
@@ -1038,6 +1115,7 @@ async fn main() {
                         for pos in &positions {
                             if let Some(closed_sym) = check_position_risk(
                                 pos, &risk_map, &mut hwm, &exchange, total_balance,
+                                &mut risk_state,
                             ).await {
                                 tracker.remove(&pos.key());
                                 tracing::warn!("position closed: {closed_sym}");
@@ -1068,6 +1146,7 @@ async fn main() {
                             if let Some(pos) = tracker.positions.get(&key).cloned() {
                                 if let Some(closed_sym) = check_position_risk(
                                     &pos, &risk_map, &mut hwm, &exchange, total_balance,
+                                    &mut risk_state,
                                 ).await {
                                     tracker.remove(&key);
                                     tracing::warn!("position closed on update: {closed_sym}");
@@ -1084,8 +1163,12 @@ async fn main() {
                     RiskEvent::BalanceUpdate { wallet_balance } => {
                         tracing::info!("balance update: ${wallet_balance:.2}");
                         total_balance = wallet_balance;
-                        // 复利：余额变化时更新动态 order_qty
-                        update_dynamic_qty(&risk_map, total_balance);
+                    }
+                    RiskEvent::ConfigChanged => {
+                        // 文件监听触发：立即重新加载风控配置
+                        let new_map = load_risk_configs(&strategies_dir);
+                        tracing::info!("risk config reloaded (file changed): {} strategies", new_map.len());
+                        risk_map = new_map;
                     }
                 }
 
@@ -1097,18 +1180,6 @@ async fn main() {
                         hwm.len()
                     );
                     last_status_log = std::time::Instant::now();
-                }
-            }
-            _ = config_reload.tick() => {
-                // 热更新风控配置
-                let new_map = load_risk_configs(&strategies_dir);
-                if new_map.len() != risk_map.len() {
-                    tracing::info!("risk config reloaded: {} strategies", new_map.len());
-                }
-                risk_map = new_map;
-                // 复利重算（配置可能变了 base_qty / capital）
-                if total_balance > 0.0 {
-                    update_dynamic_qty(&risk_map, total_balance);
                 }
             }
         }

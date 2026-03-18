@@ -567,58 +567,6 @@ mod tests {
     }
 
     // ══════════════════════════════════════════════════════════════
-    // 复利计算测试
-    // ══════════════════════════════════════════════════════════════
-
-    /// Helper: compute compound qty using the same formula as risk-engine
-    fn compound_qty(base_qty: f64, equity: f64, capital: f64) -> f64 {
-        let multiplier = equity / capital;
-        base_qty * multiplier
-    }
-
-    #[test]
-    fn compound_equity_equals_capital() {
-        // equity == capital → 1x
-        let qty = compound_qty(100.0, 200.0, 200.0);
-        assert!((qty - 100.0).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn compound_equity_above_capital() {
-        // equity $300, capital $200 → 1.5x
-        let qty = compound_qty(100.0, 300.0, 200.0);
-        assert!((qty - 150.0).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn compound_equity_high_multiplier() {
-        // equity $500, capital $200 → 2.5x (no cap)
-        let qty = compound_qty(100.0, 500.0, 200.0);
-        assert!((qty - 250.0).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn compound_equity_below_capital() {
-        // equity $150, capital $200 → 0.75x (auto scale down)
-        let qty = compound_qty(100.0, 150.0, 200.0);
-        assert!((qty - 75.0).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn compound_equity_2x() {
-        // equity $400, capital $200 → 2x
-        let qty = compound_qty(100.0, 400.0, 200.0);
-        assert!((qty - 200.0).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn compound_small_equity() {
-        // equity $50, capital $200 → 0.25x
-        let qty = compound_qty(100.0, 50.0, 200.0);
-        assert!((qty - 25.0).abs() < f64::EPSILON);
-    }
-
-    // ══════════════════════════════════════════════════════════════
     // 风控规则测试（止损/止盈/高水位保护）
     // ══════════════════════════════════════════════════════════════
 

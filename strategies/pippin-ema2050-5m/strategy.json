@@ -24,6 +24,7 @@
     "win_rate": 0.538,
     "profit_factor": 2.41
   },
-  "status": "approved",
+  "status": "suspended",
+  "suspend_reason": "14天回测不达标",
   "approved_date": "2026-03-18"
 }
