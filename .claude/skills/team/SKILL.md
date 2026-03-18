@@ -80,7 +80,11 @@ strategies/
 ### 状态流转
 
 ```
-quant 产出 → status=pending → team-lead review → status=approved → watcher 启动引擎
+strategist 产出 strategy.json (status=pending)
+  → risk 创建/审核 risk.json
+  → team-lead review 回测数据
+  → team-lead 改 status=approved
+  → watcher 自动启动引擎
 ```
 
 **quant 只能写 status=pending，不能直接写 approved。** team-lead review 达标后才改 approved。
