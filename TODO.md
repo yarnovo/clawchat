@@ -2,9 +2,10 @@
 
 ## 日常（持续进行）
 
-- [ ] quant: 找新策略（batch-backtest + grid-search，30 天达标）
+- [ ] strategist: 找新策略（batch-backtest + grid-search，30 天达标）
 - [ ] quant: 每日 9:00 跑 `clawchat review` 评估策略健康
 - [ ] quant: 每周一 9:00 生成周报（`clawchat report weekly`）
+- [ ] quant: 业务分析、策略评审、风控建议
 - [ ] trader: 持续监控持仓，判断加仓/减仓/锁利
 - [ ] team-lead: 定期检查提示词/文档是否过时，同步到最新架构
 
