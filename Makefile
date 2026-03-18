@@ -78,8 +78,9 @@ report-brief: ## Operations brief (every 30m)
 	@cd $(ROOT)/scripts && \
 	PNL=$$(uv run python runner.py pnl 2>&1) && \
 	CHECK=$$(uv run python runner.py check 2>&1) && \
+	LIVE=$$(cat $(ROOT)/data/strategies.json 2>/dev/null | python3 -c "import json,sys;d=json.load(sys.stdin);print(f'实盘:{sum(1 for s in d if s.get(\"mode\")==\"live\")} 模拟:{sum(1 for s in d if s.get(\"mode\")!=\"live\")} 总:{len(d)}')" 2>/dev/null || echo '-') && \
 	PROCS=$$(ps aux | grep -E "grid.py run|rsi.py run|bollinger.py run" | grep -v grep | wc -l | tr -d ' ') && \
-	uv run python notify.py "运营快报" "$$PNL" "$$CHECK" "进程: $$PROCS 个"
+	uv run python notify.py "运营快报" "== KPI 进度 ==" "$$PNL" "策略: $$LIVE | 进程: $$PROCS 个" "== promote + 风控 ==" "$$CHECK"
 
 report-daily: ## Operations daily (daily 20:00)
 	@cd $(ROOT)/scripts && \

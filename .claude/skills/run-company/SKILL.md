@@ -6,18 +6,18 @@ user-invocable: true
 
 # 启动量化交易公司
 
-创建一个 Team，分工协作自动管理投资组合。
+用户执行 `/run-company` 后，一键启动整个量化基金运营。
 
-## 团队成员
+## 团队
 
 | 角色 | 名称 | 职责 |
 |------|------|------|
-| CEO | team-lead（你） | 维护 skills/scripts、审批决策、汇报用户 |
+| CEO | main（team-lead） | 维护 skills/scripts、审批决策、发报告 |
 | 分析师 | analyst | make scan 扫描选币、推荐策略 |
 | 交易员 | trader | make status 管理策略、评估调整 |
-| 风控 | risk | make account 监控风险、make report 发报告 |
+| 风控 | risk | make account 监控风险、make report-brief 发报告 |
 
-## 执行步骤
+## 启动流程
 
 ### 1. 创建团队 + 启动策略
 
@@ -26,69 +26,62 @@ TeamCreate(team_name="clawchat-fund")
 make start
 ```
 
-### 2. 创建任务分配给团队
+### 2. 分配任务
 
-- **analyst**: `make scan` 扫描选币，发现机会通知 trader
-- **trader**: `make status` 检查策略，根据 analyst 建议调整，通知 risk
-- **risk**: `make account` + `make status` 监控风险，`make report` 发报告
+- **analyst**: make scan 选币 → 推荐给 trader
+- **trader**: make status 检查 → 评估调整 → 通知 risk
+- **risk**: make account + make check → make report-brief 发报告
 
-### 3. 设置三份定时报告
-
-**报告 1 — 运营报告（每 30 分钟）：**
-CEO 汇总策略状态、团队进展、KPI 进度，通过 `make report` 发邮件。
-
-**报告 2 — 迭代报告（每 1 小时）：**
-git 提交记录、skills/scripts 变更，通过 `make notify` 发邮件。
-
-**报告 3 — 团队工作报告（每 30 分钟）：**
-CEO 向三个 teammates 要报告，汇总后发给用户：
-- 向 analyst 要市场分析报告
-- 向 trader 要策略运行报告
-- 向 risk 要风控报告 + 发 make report 邮件
+### 3. 设置定时任务
 
 ```
-/loop 30m 运营报告 + 团队报告：向 analyst/trader/risk 要报告，汇总后 make report
-/loop 1h 迭代报告：git log + skills 变更，make notify 发邮件
+/loop 1m make check（KPI 心跳 + 自动 promote + 止损检查）
+/loop 30m make report-brief（运营快报，含 KPI 进度）
+/loop 1h commit + make report-dev（迭代报告）
+/loop 1h make scan（定时选币）
+每日 20:00 make report-daily（运营日报）
 ```
 
-### 4. KPI 心跳（每 1 分钟）
+### 4. 报告体系
 
-CEO 每分钟检查利润进度。规则：
-- 执行 `make check` 自动检查 promote 条件（动态阈值：amount * 2% + 至少 5 笔交易）
-- 达标自动 promote + `make notify` 通知用户
-- 更新 `kpi/` 目录下的当日 KPI 文件
+| 报告 | 频率 | 命令 | 内容 |
+|------|------|------|------|
+| 运营快报 | 每 30 分钟 | make report-brief | 实盘 P&L + KPI 进度 + promote/风控 |
+| 运营日报 | 每日 20:00 | make report-daily | 完整：P&L + 策略归因 + 持仓 + 风控 |
+| 迭代报告 | 每次 commit | make report-dev | git log + skills/scripts 变更 |
+| 风控预警 | 异常时 | 自动 | 止损触发 / promote 通知 |
 
-### 5. 定时选币（每 1 小时）
+所有报告同时发邮件 + 存本地 data/reports/。
 
-- 执行 `make scan` 扫描高波动币种
-- 对比当前策略，替换无效策略（如 0 交易的）
-- 更新 `data/strategies.json` 并 `make start` 重启
-
-```
-/loop 1m make check（KPI 心跳 + 自动 promote）
-/loop 30m 运营报告 + 团队报告
-/loop 1h 迭代报告 + 定时选币
-```
-
-### 5. 汇报用户
-
-团队启动后立即发送三份报告，之后定时自动发送。
-
-## 策略上线流程
+### 5. 策略上线流程
 
 ```
-测试网 (testnet)    →    dry-run    →    实盘 (live)
-验证代码没 bug          验证策略能赚钱       promote 上线赚钱
+dryrun（主网行情模拟）→ 利润达标 → 自动 promote → 实盘
 ```
 
-- 新策略先在 testnet 跑一遍确认代码无 bug
-- 然后用主网行情 dry-run 验证盈利能力
-- 单策略 dry-run 利润达 $1 → 自动 promote 到实盘
-- `make promote SYMBOL=xxx` 手动 promote
-- `make demote SYMBOL=xxx` 降回模拟
+- 动态 promote 阈值：amount * 2% + 至少 5 笔交易
+- 达标自动 promote，无需用户审批
+- make promote SYMBOL=xxx 手动 promote
+- make demote SYMBOL=xxx 降回模拟
 
-## 注意
+### 6. 三层止损
 
-- 团队仅在当前会话存活，关闭 Claude 后需重新启动
-- dry-run 利润达标后自动 promote，无需用户审批
-- skills/scripts 维护由 CEO（main）负责，teammates 只调用 make 命令
+- **策略级**：亏损 > amount*10% → 自动 demote
+- **标的级**：价格跌出网格下限 5% → 预警
+- **全局级**：总浮亏 > $20（总资金 10%）→ 全部停机
+
+### 7. 团队报告（每 30 分钟）
+
+向 analyst/trader/risk 要工作报告，汇总后通知用户。
+
+### 8. KPI
+
+用 `/kpi` 管理目标，心跳自动检查进度。运营快报里包含 KPI 完成进度。
+
+## 维护规则
+
+- **/run-company 是唯一入口**：新会话只需执行这一个命令
+- **及时更新此 skill**：每次流程变更必须同步更新这个文件
+- **提交自己做**：有改动就 commit，不用问用户
+- **迭代报告 = commit + 邮件**
+- **报告存本地**：data/reports/YYYY-MM-DD/HH-MM-SS.md
