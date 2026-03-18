@@ -4,7 +4,7 @@ export BASH_ENV := .env
 ROOT := $(shell pwd)
 PY := cd $(ROOT)/scripts && uv run python
 
-.PHONY: install clean watch account scan backtest pnl check build hft transfer notify report-dev help
+.PHONY: install clean watch account scan backtest pnl check guard build hft transfer notify report-dev help
 
 # === Setup ===
 
@@ -41,6 +41,9 @@ pnl: ## Real P&L from exchange trades
 
 check: ## Risk check (stop loss / position / liquidation)
 	@$(PY) check.py $(if $(AUTO_STOP),--auto-stop)
+
+guard: ## Risk guard daemon (30s interval, auto stop-loss + equity log)
+	@$(PY) risk_guard.py
 
 # === Engine (Rust) ===
 
