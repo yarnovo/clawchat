@@ -62,7 +62,7 @@ build: ## Build Rust engine (release)
 hft: ## Run Rust HFT engine
 	cd engine && cargo run --release --bin hft-engine
 
-risk-engine: ## Run Rust risk engine (independent process, 10s interval)
+risk-engine: ## Run Rust risk engine (WebSocket real-time, independent process)
 	cd engine && cargo run --release --bin risk-engine
 
 # === Help ===
