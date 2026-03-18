@@ -709,6 +709,192 @@ async fn check_position_risk(
     None
 }
 
+// ── tests ─────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── normalize_symbol ──
+
+    #[test]
+    fn normalize_symbol_slash() {
+        assert_eq!(normalize_symbol("PIPPIN/USDT"), "PIPPINUSDT");
+    }
+
+    #[test]
+    fn normalize_symbol_colon() {
+        assert_eq!(normalize_symbol("PIPPIN/USDT:USDT"), "PIPPINUSDT");
+    }
+
+    #[test]
+    fn normalize_symbol_clean() {
+        assert_eq!(normalize_symbol("BTCUSDT"), "BTCUSDT");
+    }
+
+    // ── parse_mark_price_msg ──
+
+    #[test]
+    fn parse_mark_price_valid() {
+        let raw = r#"{"stream":"btcusdt@markPrice@1s","data":{"e":"markPriceUpdate","s":"BTCUSDT","p":"65000.50","T":1234567890}}"#;
+        let event = parse_mark_price_msg(raw).unwrap();
+        match event {
+            RiskEvent::MarkPrice { symbol, mark_price } => {
+                assert_eq!(symbol, "BTCUSDT");
+                assert!((mark_price - 65000.50).abs() < 0.01);
+            }
+            _ => panic!("expected MarkPrice"),
+        }
+    }
+
+    #[test]
+    fn parse_mark_price_invalid_json() {
+        assert!(parse_mark_price_msg("not json").is_none());
+    }
+
+    #[test]
+    fn parse_mark_price_missing_fields() {
+        let raw = r#"{"stream":"test","data":{}}"#;
+        assert!(parse_mark_price_msg(raw).is_none());
+    }
+
+    // ── parse_user_data_msg ──
+
+    #[test]
+    fn parse_user_data_account_update() {
+        let raw = r#"{
+            "e": "ACCOUNT_UPDATE",
+            "a": {
+                "B": [{"a": "USDT", "wb": "250.50"}],
+                "P": [{"s": "BTCUSDT", "ps": "LONG", "pa": "0.001", "ep": "65000", "up": "5.50"}]
+            }
+        }"#;
+        let events = parse_user_data_msg(raw);
+        assert_eq!(events.len(), 2);
+
+        match &events[0] {
+            RiskEvent::BalanceUpdate { wallet_balance } => {
+                assert!((wallet_balance - 250.50).abs() < 0.01);
+            }
+            _ => panic!("expected BalanceUpdate"),
+        }
+
+        match &events[1] {
+            RiskEvent::PositionUpdate { symbol, position_side, position_amt, entry_price, unrealized_pnl } => {
+                assert_eq!(symbol, "BTCUSDT");
+                assert_eq!(position_side, "LONG");
+                assert!((*position_amt - 0.001).abs() < 1e-9);
+                assert!((*entry_price - 65000.0).abs() < 0.01);
+                assert!((*unrealized_pnl - 5.50).abs() < 0.01);
+            }
+            _ => panic!("expected PositionUpdate"),
+        }
+    }
+
+    #[test]
+    fn parse_user_data_unknown_event() {
+        let raw = r#"{"e": "ORDER_TRADE_UPDATE", "o": {}}"#;
+        let events = parse_user_data_msg(raw);
+        assert!(events.is_empty());
+    }
+
+    #[test]
+    fn parse_user_data_invalid_json() {
+        let events = parse_user_data_msg("not json");
+        assert!(events.is_empty());
+    }
+
+    // ── TrackedPosition ──
+
+    #[test]
+    fn tracked_position_recalc_pnl_long() {
+        let mut pos = TrackedPosition {
+            symbol: "BTCUSDT".to_string(),
+            position_side: "LONG".to_string(),
+            position_amt: 0.01,
+            entry_price: 65000.0,
+            unrealized_pnl: 0.0,
+            mark_price: 66000.0,
+        };
+        pos.recalc_pnl();
+        assert!((pos.unrealized_pnl - 10.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn tracked_position_recalc_pnl_short() {
+        let mut pos = TrackedPosition {
+            symbol: "BTCUSDT".to_string(),
+            position_side: "SHORT".to_string(),
+            position_amt: -0.01,
+            entry_price: 65000.0,
+            unrealized_pnl: 0.0,
+            mark_price: 64000.0,
+        };
+        pos.recalc_pnl();
+        assert!((pos.unrealized_pnl - 10.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn tracked_position_key_format() {
+        let pos = TrackedPosition {
+            symbol: "BTCUSDT".to_string(),
+            position_side: "LONG".to_string(),
+            position_amt: 0.01,
+            entry_price: 65000.0,
+            unrealized_pnl: 0.0,
+            mark_price: 0.0,
+        };
+        assert_eq!(pos.key(), "BTCUSDT:LONG");
+    }
+
+    // ── PositionTracker ──
+
+    #[test]
+    fn position_tracker_add_and_get() {
+        let mut tracker = PositionTracker::new();
+        tracker.update_position("BTCUSDT", "LONG", 0.01, 65000.0, 5.0);
+
+        let positions = tracker.get_positions_for_symbol("BTCUSDT");
+        assert_eq!(positions.len(), 1);
+        assert!((positions[0].position_amt - 0.01).abs() < 1e-9);
+    }
+
+    #[test]
+    fn position_tracker_remove_on_zero_amt() {
+        let mut tracker = PositionTracker::new();
+        tracker.update_position("BTCUSDT", "LONG", 0.01, 65000.0, 5.0);
+        assert_eq!(tracker.all_positions().len(), 1);
+
+        tracker.update_position("BTCUSDT", "LONG", 0.0, 0.0, 0.0);
+        assert_eq!(tracker.all_positions().len(), 0);
+    }
+
+    #[test]
+    fn position_tracker_mark_price_updates_pnl() {
+        let mut tracker = PositionTracker::new();
+        tracker.update_position("BTCUSDT", "LONG", 0.01, 65000.0, 0.0);
+
+        tracker.update_mark_price("BTCUSDT", 66000.0);
+
+        let positions = tracker.get_positions_for_symbol("BTCUSDT");
+        assert_eq!(positions.len(), 1);
+        assert!((positions[0].unrealized_pnl - 10.0).abs() < 0.01);
+        assert!((positions[0].mark_price - 66000.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn position_tracker_multiple_symbols() {
+        let mut tracker = PositionTracker::new();
+        tracker.update_position("BTCUSDT", "LONG", 0.01, 65000.0, 5.0);
+        tracker.update_position("ETHUSDT", "SHORT", -0.1, 3500.0, -2.0);
+
+        assert_eq!(tracker.all_positions().len(), 2);
+        assert_eq!(tracker.get_positions_for_symbol("BTCUSDT").len(), 1);
+        assert_eq!(tracker.get_positions_for_symbol("ETHUSDT").len(), 1);
+        assert_eq!(tracker.get_positions_for_symbol("SOLUSDT").len(), 0);
+    }
+}
+
 // ── main ─────────────────────────────────────────────────────
 
 #[tokio::main]
