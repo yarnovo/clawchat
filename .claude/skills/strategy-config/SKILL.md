@@ -6,7 +6,7 @@ user-invocable: true
 
 # 策略配置编写规范
 
-strategist 产出策略时需要写 2 个配置文件。完整格式见 [engine/SCHEMA.md](engine/SCHEMA.md)。
+strategist 产出策略时需要写 2 个配置文件。
 
 ## strategy.json
 

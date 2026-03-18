@@ -30,7 +30,7 @@ make hft     # 运行
 
 ## 规则
 
-- **配置/标准只在一处定义，其他地方引用，不重复写。** 准入标准源头：`cli/src/clawchat/criteria.py` + `engine/SCHEMA.md`
+- **配置/标准只在一处定义，其他地方引用，不重复写。** 准入标准源头：`cli/src/clawchat/criteria.py`，配置规范见 skill（`/strategy-config` `/trade-config` `/risk-config`）
 - **TODO.md 只有 team-lead 维护**，成员不能修改
 - **git commit 只有 team-lead 做**，成员完成后汇报等验收
 - **策略 status 只有 team-lead 能改为 approved**，成员产出写 `status=pending`

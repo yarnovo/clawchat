@@ -30,6 +30,9 @@ def main():
     sub.add_parser("strategy-pnl", help="按策略 P&L")
     sub.add_parser("compare", help="实盘 vs 回测对比")
 
+    # 评估
+    sub.add_parser("review", help="策略实盘评估（对比回测）")
+
     # 交易所直接操作
     sub.add_parser("exchange", help="交易所操作（开仓/平仓/止损等）")
 
@@ -85,6 +88,9 @@ def main():
         cmd()
     elif args.command == "compare":
         from clawchat.cmd_compare import main as cmd
+        cmd()
+    elif args.command == "review":
+        from clawchat.cmd_review import main as cmd
         cmd()
     elif args.command == "exchange":
         from clawchat.exchange import main as cmd

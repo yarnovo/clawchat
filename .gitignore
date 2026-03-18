@@ -10,3 +10,5 @@ venv/
 data/
 target/
 records/
+strategies/*/performance.json
+strategies/*/state.json
