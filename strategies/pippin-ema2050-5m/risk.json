@@ -3,5 +3,7 @@
   "max_loss_per_trade": 0.05,
   "max_daily_loss": 0.15,
   "max_drawdown_warning": 0.15,
-  "max_drawdown_stop": 0.25
+  "max_drawdown_stop": 0.25,
+  "max_profit_per_trade": 0.3,
+  "max_profit_total": 0.5
 }
