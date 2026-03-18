@@ -15,7 +15,63 @@ use types::{MarketEvent, OrderType as StratOrderType, Side as StratSide};
 
 use crate::ws_feed::{start_feed, FeedConfig};
 
+use std::fs::OpenOptions;
+use std::io::Write;
+
 const ENGINE_REGISTRY: &str = "/tmp/hft-engines.json";
+const TRADES_LOG: &str = "reports/trades.jsonl";
+
+/// Append a trade record to reports/trades.jsonl
+fn log_trade(
+    strategy: &str,
+    symbol: &str,
+    side: &str,
+    qty: f64,
+    order_type: &str,
+    resp: &serde_json::Value,
+) {
+    let ts = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let status = resp
+        .get("status")
+        .and_then(|v| v.as_str())
+        .unwrap_or(if resp.get("dryRun").is_some() { "dry_run" } else { "unknown" });
+    let price = resp
+        .get("avgPrice")
+        .and_then(|v| v.as_str())
+        .or_else(|| resp.get("price").and_then(|v| v.as_str()))
+        .unwrap_or("0");
+    let client_order_id = resp
+        .get("clientOrderId")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let record = serde_json::json!({
+        "ts": ts,
+        "strategy": strategy,
+        "symbol": symbol,
+        "side": side,
+        "qty": qty,
+        "price": price,
+        "order_type": order_type,
+        "status": status,
+        "client_order_id": client_order_id,
+    });
+
+    // Ensure reports/ directory exists
+    let log_path = std::path::Path::new(TRADES_LOG);
+    if let Some(parent) = log_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+
+    match OpenOptions::new().create(true).append(true).open(log_path) {
+        Ok(mut file) => {
+            if let Err(e) = writeln!(file, "{}", record) {
+                tracing::warn!("failed to write trade log: {e}");
+            }
+        }
+        Err(e) => tracing::warn!("failed to open trades.jsonl: {e}"),
+    }
+}
 
 /// Register this engine instance in shared registry file.
 /// Maps symbol → strategy so risk_guard can attribute P&L to strategies.
@@ -125,8 +181,8 @@ fn create_strategy(config: &Config) -> Box<dyn Strategy> {
     }
 }
 
-/// 将策略信号转为交易所下单
-async fn execute_signal(signal: &Signal, exchange: &Exchange) {
+/// 将策略信号转为交易所下单，成功后写交易日志
+async fn execute_signal(signal: &Signal, exchange: &Exchange, strategy_name: &str) {
     let Signal::Order(req) = signal else { return };
 
     let side = match req.side {
@@ -137,6 +193,15 @@ async fn execute_signal(signal: &Signal, exchange: &Exchange) {
     let pos_side = match req.side {
         StratSide::Buy => exchange::PositionSide::Long,
         StratSide::Sell => exchange::PositionSide::Short,
+    };
+
+    let side_str = match req.side {
+        StratSide::Buy => "buy",
+        StratSide::Sell => "sell",
+    };
+    let order_type_str = match req.order_type {
+        StratOrderType::Market => "market",
+        StratOrderType::Limit => "limit",
     };
 
     let result = match req.order_type {
@@ -150,7 +215,10 @@ async fn execute_signal(signal: &Signal, exchange: &Exchange) {
     };
 
     match result {
-        Ok(resp) => tracing::info!(?resp, "order executed"),
+        Ok(resp) => {
+            tracing::info!(?resp, "order executed");
+            log_trade(strategy_name, &exchange.symbol, side_str, req.qty, order_type_str, &resp);
+        }
         Err(e) => tracing::error!("order failed: {e}"),
     }
 }
@@ -210,7 +278,7 @@ async fn main() {
                     if let Some(signal) = strategy.on_candle(&candle) {
                         if signal != Signal::None {
                             tracing::info!(?signal, "candle signal");
-                            execute_signal(&signal, &exchange).await;
+                            execute_signal(&signal, &exchange, &strategy_name).await;
                         }
                     }
                 }
@@ -219,7 +287,7 @@ async fn main() {
                 if let Some(signal) = strategy.on_tick(tick) {
                     if signal != Signal::None {
                         tracing::info!(?signal, "tick signal");
-                        execute_signal(&signal, &exchange).await;
+                        execute_signal(&signal, &exchange, &strategy_name).await;
                     }
                 }
             }
@@ -227,7 +295,7 @@ async fn main() {
                 if let Some(signal) = strategy.on_depth(depth) {
                     if signal != Signal::None {
                         tracing::info!(?signal, "depth signal");
-                        execute_signal(&signal, &exchange).await;
+                        execute_signal(&signal, &exchange, &strategy_name).await;
                     }
                 }
             }
