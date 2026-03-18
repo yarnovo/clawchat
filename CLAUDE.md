@@ -57,7 +57,8 @@ make notify SUBJECT="xx" BODY="xx"
 ├── execute/      /execute    — 执行交易计划（交易）
 ├── report/       /report     — 统一报告（交易）
 ├── check/        /check      — 风控检查+止损（风控）
-└── audit/        /audit      — 复盘审计（风控）
+├── audit/        /audit      — 复盘审计（风控）
+└── create-team/  /create-team — 创建策略研发团队
 ```
 
 ## 核心流程
