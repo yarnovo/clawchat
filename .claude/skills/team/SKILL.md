@@ -85,6 +85,14 @@ strategies/
     └── backtest.md      ← 回测报告
 ```
 
+### 状态流转
+
+```
+strategist 产出 → status=pending → team-lead review → status=approved → watcher 启动引擎
+```
+
+**strategist 只能写 status=pending，不能直接写 approved。** team-lead review 达标后才改 approved。
+
 ### 准入标准
 
 全部满足才能 `status: "approved"`（回测必须 ≥ 14 天，3 天数据过拟合不可靠）：
@@ -157,7 +165,7 @@ TeamCreate(team_name="clawchat")
 **strategist spawn prompt 要点：**
 - 检查 strategies/ 已有策略 + `make scan` 扫描市场
 - 格式规范见 engine/SCHEMA.md
-- 达标直接 approved，watcher 自动上架
+- 产出策略写 **status=pending**（不能写 approved，由 team-lead review 后批准）
 - **risk.json 由你决定**：止盈止损阈值根据策略特性设不同值（scalping 紧、趋势宽）
 - 需要技术支持告诉 team-lead，engineer 会实现
 
@@ -165,6 +173,7 @@ TeamCreate(team_name="clawchat")
 - strategist：新币种开拓 + 投资组合分散
 - strategist2：调参优化 + 均值回归
 - 更多：按需创建（name 用纯字母数字，不能有连字符）
+- **spawn prompt 不要重复写准入标准，指向"准入标准见本 SKILL.md"即可**，避免标准更新后新旧不一致
 
 **risk spawn prompt 要点：**
 - `make check` 风控检查 + 确认 risk.json 就位
