@@ -60,8 +60,8 @@ engine/
 
 | 成员 | 产出 | 消费者 |
 |------|------|--------|
-| **strategist** | strategy.json + risk.json + backtest.md | watcher 自动启动引擎 |
-| **risk** | 审核 risk.json、定义风控规则 | risk-engine 实时执行 |
+| **strategist** | strategy.json + risk.json（含止盈止损）+ backtest.md | watcher 自动启动引擎 |
+| **risk** | 审核 risk.json、监控风控状态 | risk-engine 实时执行 |
 | **engineer** | Rust 交易/风控引擎代码 + Python 守护代码 | 引擎/守护进程 |
 
 > **技术支持**：strategist 和 risk 如需新脚本/工具/数据支持，告诉 team-lead，team-lead 派 engineer 实现。
@@ -107,10 +107,10 @@ strategies/
 
 | 功能 | 说明 |
 |------|------|
-| 止损 | 单笔 -5%、总亏损 -10% |
-| 止盈 | 单笔 +10%、总利润 +20% |
+| 止损 | 由 strategist 在 risk.json 定义（每个策略不同） |
+| 止盈 | 由 strategist 在 risk.json 定义（scalping 紧、趋势策略宽） |
 | 高水位保护 | 利润从峰值回撤超 max_drawdown_stop → 自动平仓锁利 |
-| 复利 | order_qty = base_qty × min(equity/capital, 2.0)，赚了加仓亏了缩仓 |
+| 复利 | order_qty = base_qty × (equity/capital)，赚了加仓亏了缩仓 |
 | 仓位检查 | 单币种占比 ≤ 30% |
 | 强平距离 | ≥ 10% |
 
@@ -121,14 +121,17 @@ strategies/
 盈利降到 +$14 → 自动平仓，保住 $14（70% 利润）
 ```
 
-### 复利示例
+### 百分比下单
+
+下单量根据实时权益按百分比计算（position_size），不是固定值：
 
 ```
-初始 capital=$200, base_qty=100
-权益 $250 → 100 × min(250/200, 2) = 125（加仓 25%）
-权益 $150 → 100 × min(150/200, 2) = 75（缩仓 25%）
-权益 $400+ → 100 × 2 = 200（封顶 2 倍）
+order_qty = (equity × position_size × leverage) / price
+例：权益 $215，position_size=0.3，leverage=5，price=$0.118
+→ ($215 × 0.3 × 5) / $0.118 = 2733 个 PIPPIN
 ```
+
+赚了自动加仓，亏了自动缩仓，跟权益同步。
 
 ## 执行
 
@@ -144,6 +147,7 @@ TeamCreate(team_name="clawchat")
 - 检查 strategies/ 已有策略 + `make scan` 扫描市场
 - 格式规范见 engine/SCHEMA.md
 - 达标直接 approved，watcher 自动上架
+- **risk.json 由你决定**：止盈止损阈值根据策略特性设不同值（scalping 紧、趋势宽）
 - 需要技术支持告诉 team-lead，engineer 会实现
 
 **risk spawn prompt 要点：**
