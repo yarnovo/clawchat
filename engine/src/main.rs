@@ -20,7 +20,6 @@ use std::path::{Path, PathBuf};
 use tokio::sync::mpsc as tokio_mpsc;
 use tokio_tungstenite::connect_async;
 
-const ENGINE_REGISTRY: &str = "/tmp/hft-engines.json";
 const TRADES_LOG: &str = "reports/trades.jsonl";
 const HIGH_WATER_FILE: &str = "reports/high_water.json";
 const BINANCE_FSTREAM_WS: &str = "wss://fstream.binance.com";
@@ -439,35 +438,6 @@ fn log_trade(
             }
         }
         Err(e) => tracing::warn!("failed to open trades.jsonl: {e}"),
-    }
-}
-
-/// Register this engine instance in shared registry file.
-/// Key = strategy config name (e.g. "pippin-macd-5m"), value = {symbol, strategy, pid}.
-fn register_engine(name: &str, symbol: &str, strategy: &str) {
-    let mut map: serde_json::Map<String, serde_json::Value> =
-        std::fs::read_to_string(ENGINE_REGISTRY)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default();
-
-    let pid = std::process::id();
-    map.insert(
-        name.to_string(),
-        serde_json::json!({
-            "symbol": symbol,
-            "strategy": strategy,
-            "pid": pid,
-        }),
-    );
-
-    if let Err(e) = std::fs::write(
-        ENGINE_REGISTRY,
-        serde_json::to_string_pretty(&map).unwrap_or_default(),
-    ) {
-        tracing::warn!("failed to write engine registry: {e}");
-    } else {
-        tracing::info!("registered {name} → {symbol}/{strategy} pid={pid} in {ENGINE_REGISTRY}");
     }
 }
 
@@ -1015,13 +985,7 @@ async fn main() {
 
     // 设置 clientOrderId 前缀: "{strategy}-{SYMBOL}"
     let strategy_name = strategy.name().to_lowercase();
-    let registry_name = config.strategy_name.clone().unwrap_or_else(|| {
-        format!("{}-{}", strategy_name, config.symbol.to_lowercase())
-    });
     exchange.order_id_prefix = format!("{}-{}", strategy_name, config.symbol);
-
-    // 注册引擎到 /tmp/hft-engines.json（供 risk-engine 读取策略映射）
-    register_engine(&registry_name, &config.symbol, &strategy_name);
 
     let candle_ms = config.timeframe_ms.unwrap_or(300_000); // default 5m
     let mut aggregator = CandleAggregator::new(candle_ms);

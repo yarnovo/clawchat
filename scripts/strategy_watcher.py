@@ -13,7 +13,6 @@ from pathlib import Path
 ROOT = Path(__file__).parent.parent
 STRATEGIES_DIR = ROOT / "strategies"
 ENGINE_BIN = ROOT / "engine" / "target" / "release" / "hft-engine"
-ENGINE_REGISTRY = Path("/tmp/hft-engines.json")
 LOG_DIR = Path("/tmp")
 INTERVAL = 60  # 秒
 
@@ -46,24 +45,6 @@ def scan_strategies():
     return strategies
 
 
-def read_registry():
-    """读取 /tmp/hft-engines.json"""
-    try:
-        if ENGINE_REGISTRY.exists():
-            return json.loads(ENGINE_REGISTRY.read_text())
-    except Exception:
-        pass
-    return {}
-
-
-def write_registry(registry):
-    """写入 /tmp/hft-engines.json"""
-    try:
-        ENGINE_REGISTRY.write_text(json.dumps(registry, indent=2))
-    except Exception as e:
-        print(f"  [{now()}] 写入 registry 失败: {e}")
-
-
 def start_engine(name, cfg):
     """启动一个引擎实例"""
     config_path = cfg["_path"]
@@ -82,13 +63,8 @@ def start_engine(name, cfg):
 
     running_engines[name] = proc
 
-    # 更新 registry: key=策略名, value={symbol, strategy, pid}
     symbol = cfg.get("symbol", "").replace("/", "").replace(":USDT", "")
     strategy = cfg.get("engine_strategy", cfg.get("strategy", "unknown"))
-    registry = read_registry()
-    registry[name] = {"symbol": symbol, "strategy": strategy, "pid": proc.pid}
-    write_registry(registry)
-
     print(f"  [{now()}]   PID={proc.pid} symbol={symbol} strategy={strategy}")
 
 
@@ -109,12 +85,6 @@ def stop_engine(name):
         print(f"  [{now()}]   停止失败: {e}")
 
     del running_engines[name]
-
-    # 从 registry 中移除
-    registry = read_registry()
-    if name in registry:
-        del registry[name]
-        write_registry(registry)
 
 
 def check_engine_health():
