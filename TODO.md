@@ -9,7 +9,9 @@
 ## 待做（新）
 
 - [ ] 创建 3 个 skill（strategy.json / trade.json / risk.json 编写规范）
-- [ ] CLI Python 测试用例（cli/tests/）
+- [ ] CLI pytest 测试（P0: criteria + exchange 签名 + 回测指标计算）
+- [ ] GitHub Actions CI（.github/workflows/ci.yml）
+- [ ] Makefile 加 `make test`（cargo test + uv run pytest）
 - [x] 修复 trade.json params percent + direction（QA1 验证通过）
 - [x] risk.json 热更新 start_risk_watcher（QA1 验证通过）
 - [ ] suspended 策略的 trade.json 怎么执行？（没引擎监听）
