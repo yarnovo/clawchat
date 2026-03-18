@@ -4,7 +4,7 @@ export BASH_ENV := .env
 ROOT := $(shell pwd)
 PY := cd $(ROOT)/scripts && uv run python
 
-.PHONY: install clean watch account scan backtest pnl strategy-pnl compare check watcher status build hft risk-engine transfer help
+.PHONY: install clean watch account scan backtest batch-backtest grid-search pnl strategy-pnl compare check watcher status build hft risk-engine transfer help
 
 # === Setup ===
 
@@ -30,6 +30,12 @@ scan: ## Scan high volatility coins
 
 backtest: ## Backtest (SYMBOL= STRATEGY=scalping DAYS=7 LEVERAGE=5 TIMEFRAME=5m CAPITAL=200 PARAMS=)
 	@$(PY) backtest.py --symbol $(or $(SYMBOL),BTC/USDT) --strategy $(or $(STRATEGY),scalping) --days $(or $(DAYS),7) --leverage $(or $(LEVERAGE),5) --capital $(or $(CAPITAL),200) --timeframe $(or $(TIMEFRAME),5m) $(if $(PARAMS),--params '$(PARAMS)')
+
+batch-backtest: ## Batch backtest N coins x M strategies (SYMBOLS= STRATEGIES= TOP=15 DAYS=14 TIMEFRAME=5m)
+	@$(PY) batch_backtest.py $(if $(SYMBOLS),--symbols $(SYMBOLS)) $(if $(STRATEGIES),--strategies $(STRATEGIES)) $(if $(LEVERAGES),--leverages $(LEVERAGES)) --top $(or $(TOP),15) --days $(or $(DAYS),14) --timeframe $(or $(TIMEFRAME),5m) --capital $(or $(CAPITAL),200)
+
+grid-search: ## Grid search params (SYMBOL= STRATEGY= DAYS=14 TIMEFRAME=5m LEVERAGE=3)
+	@$(PY) grid_search.py --symbol $(or $(SYMBOL),BTC/USDT) --strategy $(or $(STRATEGY),trend) --days $(or $(DAYS),14) --timeframe $(or $(TIMEFRAME),5m) --leverage $(or $(LEVERAGE),3) --capital $(or $(CAPITAL),200)
 
 # === Trading ===
 
