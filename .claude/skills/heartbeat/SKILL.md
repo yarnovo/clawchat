@@ -1,76 +1,88 @@
 ---
-name: heartbeat
-description: 核心入口 — 激活公司，启动所有定时任务 + 每分钟驱动团队
+name: 心跳
+description: 一个入口启动一切 — 创建团队、检查状态、驱动工作、输出报告
 user-invocable: true
 ---
 
 # 心跳 — 公司核心引擎
 
-`/heartbeat` 是激活公司的核心入口。启动后自动创建所有定时任务，驱动团队工作。
-
-前置条件：先执行 `/create-team` 创建团队。
-
-## 用法
-
-```
-/create-team    → 创建团队成员
-/heartbeat      → 激活公司（启动所有定时）
-```
+`/心跳` 是启动公司的唯一入口。一个命令创建团队、判断阶段、驱动工作。
 
 ## 执行
 
-### Step 1: 启动策略
+### Step 1: 创建团队
+
+```
+TeamCreate(team_name="clawchat-fund")
+```
+
+招聘 4 人：
+- **engineer** — 技术团队：系统搭建、监控、部署
+- **strategist** — 策略团队：找信号、回测、优化参数
+- **trader** — 交易团队：执行交易计划、管理资金
+- **risk** — 风控团队：止损、仓位管理、复盘审计
+
+### Step 2: 检查当前状态
 
 ```bash
-cd /Users/yarnb/agent-projects/clawchat && make start
+cd /Users/yarnb/agent-projects/clawchat
+make account    # 余额
+make pnl        # 真实 P&L
 ```
 
-### Step 2: 创建所有定时任务
+### Step 3: 判断阶段
+
+根据当前状态决定行动：
+- **无策略**：执行 `/find-alpha` 搜索盈利策略
+- **有策略未执行**：执行 `/execute` 上实盘
+- **运行中**：进入心跳循环
+
+### Step 4: 心跳循环
 
 ```
-/loop 1m KPI 心跳推进报告（按下面的心跳工作流执行，每次都发邮件给用户）
+/loop 1m 心跳循环（按下面的心跳工作流执行）
 ```
 
-同时启动以下定时报告技能：
-- `/report-risk` — 每 10 分钟风控报告
-- `/report-strategy` — 每 30 分钟策略报告
-- `/report-fund` — 每 30 分钟资金报告
-- `/report-market` — 每小时市场报告
-- `/dev-report` — 每 30 分钟迭代报告
-- `/retro` — 每小时团队复盘
-- `/ops-daily` — 每日 20:00 运营日报
-
-### Step 3: 确认启动
-
-执行 `make status` + `make pnl` 确认策略运行中，输出首份 KPI 推进报告。
-
-## 心跳工作流（每分钟）
+## 心跳工作流（每轮）
 
 ### 1. 收集数据
 ```bash
 cd /Users/yarnb/agent-projects/clawchat
-make check    # promote + 止损
-make pnl      # 实盘盈亏
-```
-promote/止损触发时 `make notify` 发邮件。
-
-### 2. 驱动团队
-- analyst 每 10 轮、trader 每 5 轮、risk 每 10 轮
-- 市场停滞时触发 `make scan` 选币
-
-### 2.5 自我更新（每 30 轮，约 1 小时）
-按 `/self-improve` 技能执行：审视架构、清理废弃、优化流程、更新提示词。
-
-### 3. 输出 KPI 推进报告
-```
-## KPI 推进报告 HH:MM
-
-### 1. KPI 目标与进度
-### 2. 本轮变化（vs 上一轮）
-### 3. 本轮做了什么
-### 4. 对上一轮的 review
-### 5. 下一步计划
+make account
+make pnl
 ```
 
-### 4. KPI 达标时
-发邮件庆祝 + 更新 kpi/YYYY-MM-DD.md
+### 2. 风控检查（每轮）
+```bash
+make check
+```
+触发止损时立即 `make notify` 通知。
+
+### 3. KPI 检查
+对比当前 P&L 与 KPI 目标。达标时发邮件庆祝。
+
+### 4. 驱动团队
+- **risk** — 每 3 轮问一次（风控状态、仓位风险）
+- **trader + strategist** — 每 5 轮问一次（策略表现、优化建议）
+- **engineer** — 每 10 轮问一次（系统状态、监控告警）
+
+### 5. 输出报告
+
+每 10 轮发运营快报：
+```
+make notify SUBJECT="运营快报" BODY="P&L / 仓位 / 风控状态"
+```
+
+每 60 轮发详细报告 + 复盘：
+```
+make notify SUBJECT="详细报告" BODY="完整运营数据 + 团队复盘 + 优化建议"
+```
+
+事件（止损/开仓/平仓）实时通知。
+
+报告同时存档到 `reports/heartbeat/`。
+
+### 6. 自我优化（每 60 轮）
+- 审视 skill 是否需要更新
+- 清理废弃文件
+- commit 所有改动

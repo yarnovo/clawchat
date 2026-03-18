@@ -4,7 +4,7 @@ export BASH_ENV := .env
 ROOT := $(shell pwd)
 PY := cd $(ROOT)/scripts && uv run python
 
-.PHONY: install clean watch account scan backtest notify report-dev help
+.PHONY: install clean watch account scan backtest pnl check build hft notify report-dev help
 
 # === Setup ===
 
@@ -30,6 +30,22 @@ scan: ## Scan high volatility coins
 
 backtest: ## Backtest (SYMBOL= STRATEGY=scalping DAYS=7 LEVERAGE=5 TIMEFRAME=5m CAPITAL=200)
 	@$(PY) backtest.py --symbol $(or $(SYMBOL),BTC/USDT) --strategy $(or $(STRATEGY),scalping) --days $(or $(DAYS),7) --leverage $(or $(LEVERAGE),5) --capital $(or $(CAPITAL),200) --timeframe $(or $(TIMEFRAME),5m)
+
+# === Trading ===
+
+pnl: ## Real P&L from exchange trades
+	@$(PY) pnl.py $(SYMBOL) $(HOURS)
+
+check: ## Risk check (stop loss / position / liquidation)
+	@$(PY) check.py $(if $(AUTO_STOP),--auto-stop)
+
+# === Engine (Rust) ===
+
+build: ## Build Rust engine (release)
+	cd engine && cargo build --release
+
+hft: ## Run Rust HFT engine
+	cd engine && cargo run --release
 
 # === Reports ===
 
