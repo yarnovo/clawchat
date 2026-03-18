@@ -28,7 +28,7 @@ cd /Users/yarnb/agent-projects/clawchat && make start
 ### Step 2: 创建所有定时任务
 
 ```
-/loop 1m KPI 心跳推进报告（按下面的心跳工作流执行）
+/loop 2m KPI 心跳推进报告（按下面的心跳工作流执行）
 ```
 
 同时启动以下定时报告技能：
@@ -57,6 +57,9 @@ promote/止损触发时 `make notify` 发邮件。
 ### 2. 驱动团队
 - analyst 每 10 轮、trader 每 5 轮、risk 每 10 轮
 - 市场停滞时触发 `make scan` 选币
+
+### 2.5 自我更新（每 30 轮，约 1 小时）
+按 `/self-improve` 技能执行：审视架构、清理废弃、优化流程、更新提示词。
 
 ### 3. 输出 KPI 推进报告
 ```
