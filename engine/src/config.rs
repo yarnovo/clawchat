@@ -90,6 +90,24 @@ fn normalize_symbol(s: &str) -> String {
     s.replace("/", "").replace(":USDT", "")
 }
 
+const VALID_STRATEGIES: &[&str] = &[
+    "mm", "market_maker", "default", "scalping", "breakout", "rsi", "bollinger", "macd",
+];
+
+/// Known params per strategy (for validation warnings)
+fn known_params(strategy: &str) -> &'static [&'static str] {
+    match strategy {
+        "mm" | "market_maker" => &["fee_rate"],
+        "default" => &["ema_fast", "ema_slow", "atr_period", "atr_sl_mult", "atr_tp_mult"],
+        "scalping" => &["ema_fast", "ema_slow", "volume_multiplier"],
+        "breakout" => &["lookback", "atr_period", "atr_filter", "trail_atr"],
+        "rsi" => &["rsi_period", "rsi_oversold", "rsi_overbought", "trend_ema"],
+        "bollinger" => &["bb_period", "num_std", "trend_ema"],
+        "macd" => &["fast_period", "slow_period", "signal_period", "trend_ema", "atr_period", "atr_sl"],
+        _ => &[],
+    }
+}
+
 impl Config {
     /// Load config from .env file (if present), then parse CLI args + env vars,
     /// then overlay strategy.json if --config is provided.
@@ -113,7 +131,60 @@ impl Config {
             }
         }
 
+        config.validate();
         config
+    }
+
+    /// Validate config values, exit on fatal errors, warn on issues.
+    fn validate(&self) {
+        let mut fatal = false;
+
+        // strategy must be valid
+        if !VALID_STRATEGIES.contains(&self.strategy.as_str()) {
+            eprintln!("FATAL: unknown strategy '{}'. Must be one of: {}",
+                self.strategy, VALID_STRATEGIES.join(", "));
+            fatal = true;
+        }
+
+        // symbol required
+        if self.symbol.is_empty() {
+            eprintln!("FATAL: symbol is required");
+            fatal = true;
+        }
+
+        // leverage 1-20
+        if self.leverage < 1 || self.leverage > 20 {
+            eprintln!("FATAL: leverage must be 1-20, got {}", self.leverage);
+            fatal = true;
+        }
+
+        // order_qty > 0 (if set)
+        if let Some(qty) = self.order_qty {
+            if qty <= 0.0 {
+                eprintln!("FATAL: order_qty must be > 0, got {qty}");
+                fatal = true;
+            }
+        }
+
+        if fatal {
+            std::process::exit(1);
+        }
+
+        // Warn on unknown params
+        let known = known_params(&self.strategy);
+        for key in self.params.keys() {
+            if !known.contains(&key.as_str()) {
+                eprintln!("WARN: unknown param '{key}' for strategy '{}' (known: {})",
+                    self.strategy, known.join(", "));
+            }
+        }
+
+        // Warn on missing params with defaults
+        for &k in known {
+            if !self.params.contains_key(k) {
+                eprintln!("WARN: param '{k}' not set for strategy '{}', using default", self.strategy);
+            }
+        }
     }
 
     fn apply_strategy_file(&mut self, sf: StrategyFile) {
