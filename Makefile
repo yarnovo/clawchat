@@ -1,26 +1,29 @@
 SHELL := /bin/bash
 export BASH_ENV := .env
 
+ENGINE := cd engine &&
+CLI := cd cli &&
+
 .PHONY: build hft status watcher install clean test help
 
 # === Engine (Rust) ===
 
 build: ## Build Rust engine (release)
-	cd engine && cargo build --release
+	$(ENGINE) cargo build --release
 
 hft: ## Run Rust HFT engine
-	cd engine && cargo run --release --bin hft-engine
+	$(ENGINE) cargo run --release --bin hft-engine
 
 # === Ops ===
 
 status: ## Global status dashboard
-	cd cli && source ../.env && uv run python -m clawchat status
+	$(CLI) source ../.env && uv run python -m clawchat status
 
 watcher: ## Strategy watcher (auto deploy/stop engines)
-	cd cli && uv run python -m clawchat watcher
+	$(CLI) uv run python -m clawchat watcher
 
 install: ## Install all deps
-	cd cli && uv sync
+	$(CLI) uv sync
 
 clean: ## Clean cache and venv
 	rm -rf cli/.venv cli/src/clawchat/__pycache__
@@ -28,8 +31,8 @@ clean: ## Clean cache and venv
 # === Test ===
 
 test: ## Run all tests (Rust + Python)
-	cd engine && cargo test
-	cd cli && uv run pytest -q --tb=short 2>/dev/null || echo "(no Python tests yet)"
+	$(ENGINE) cargo test
+	$(CLI) uv run pytest -q
 
 # === Help ===
 

@@ -1,0 +1,11 @@
+pre-commit:
+  parallel: true
+  commands:
+    rust-test:
+      root: engine/
+      glob: "*.rs"
+      run: cargo test --quiet
+    python-test:
+      root: cli/
+      glob: "*.py"
+      run: uv run pytest -q
