@@ -10,3 +10,4 @@ venv/
 data/
 target/
 # reports/ is tracked
+reports/
