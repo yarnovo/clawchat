@@ -4,25 +4,34 @@
 
 - [ ] strategist: 继续找 14 天达标新策略
 
+## 待做（架构重构 — 双 architect 评审通过）
+
+### Phase 1：统一决策管道（~250 行改动）
+- [ ] 新增 trade.json 格式（action: hold/close_all/pause/resume/stop/reduce/add + params）
+- [ ] main.rs 加 DecisionGate：strategy 信号 → trade override → risk gate → executor
+- [ ] risk.rs 新增 RiskGate（从 risk_engine.rs 提取核心检查逻辑）
+- [ ] main.rs 加 user data stream（持仓/余额实时更新）
+- [ ] 一次性指令执行后自动回 hold + 写 executed_at
+- [ ] SCHEMA.md 更新 trade.json 格式
+- [ ] 开仓时同时挂 STOP_MARKET 条件单（交易所侧安全网）
+
+### Phase 2：合并风控到主进程
+- [ ] hft-engine 内做止损/止盈/高水位保护
+- [ ] risk-engine 降级为监控报警（只看不操作）
+- [ ] 全局 portfolio 检查通过读 state.json
+
+### Phase 3：清理
+- [ ] 删除 risk_engine.rs 二进制
+- [ ] 删除 /tmp/hft-engines.json
+- [ ] Makefile 合并 target
+
 ## 待做（策略生命周期）
 
-- [ ] 实盘表现差时 team-lead 决策 suspend（risk-engine 只负责风控，不改 strategy status）
+- [ ] 实盘表现差时 team-lead 决策 suspend
 - [ ] 实盘评估机制：自动对比实盘表现 vs 回测表现
 - [ ] 自动淘汰规则：实盘连续 3 天低于回测 30% → suspend
 - [ ] 生命周期状态：discovery → backtest → approved → live → degraded → suspended → archived
 - [ ] 策略归档：suspended 超期 → 移入 strategies/archived/
-
-## 待做（交易员 — architect 评审通过）
-
-- [ ] risk.json 新增 override 字段：
-  - action: hold/close_all/close_long/close_short/pause/resume/stop/reduce/add
-  - add params: { percent, direction(long/short) }
-  - reduce params: { percent }
-- [ ] risk-engine 读取 override 执行（加仓前 7 项检查：余额/仓位/敞口/持仓数/杠杆/日亏/连亏）
-- [ ] Exchange 扩展 open_position 接口（risk-engine 执行 add 需要）
-- [ ] 优先级：override > risk rules > strategy signals
-- [ ] add 执行后自动进 hold 状态（防止 hft-engine 发矛盾信号）
-- [ ] SCHEMA.md 更新 override 字段说明
 
 ## 待做（技术）
 
@@ -30,33 +39,28 @@
 
 ## 已完成
 
-- [x] sizing_mode 支持（percent/fixed）— 78 lib 测试通过，review 通过
-- [x] risk-engine state.json 持久化 — daily_loss/consecutive_losses，94 测试通过
-- [x] 删除 Python risk_guard — Rust risk-engine 已替代
-- [x] state.json 在 make status 中展示 — 策略运行状态 + 风控状态
+- [x] sizing_mode 支持（percent/fixed）
+- [x] risk-engine state.json 持久化
+- [x] 删除 Python risk_guard
+- [x] state.json 在 make status 中展示
 - [x] risk-engine 编译错误修复
-- [x] ntrn-trend-fast-5m 上架（14 天严格达标 +38%）
-- [x] ntrn-trend-5m suspended（被 fast 版替代）
-- [x] suspend 4 个旧策略（14 天不达标）
+- [x] ntrn-trend-fast-5m 上架（14 天严格达标）
+- [x] suspend 旧策略 + BARD/LYN 验证上架
 - [x] backtest.py 支持 --params 自定义参数
-- [x] NTRN trend 5m 3x 上架
-- [x] 分页拉取（backtest.py 突破 1000 根限制）
-- [x] 均值回归策略（backtest.py + Rust 引擎）
-- [x] risk-engine 文件监听热更新（notify crate）
-- [x] hft-engine 文件监听 strategy.json 热更新
-- [x] 百分比下单（position_size），移除复利/dynamic_qty
+- [x] 分页拉取（14 天回测）
+- [x] 均值回归 + grid 策略实现
+- [x] risk-engine 文件监听热更新
+- [x] hft-engine 文件监听热更新
+- [x] 百分比下单（position_size）
 - [x] 双 Rust binary（hft-engine + risk-engine）
-- [x] strategy.json 验证（config.rs validate）
+- [x] strategy.json 验证
 - [x] pre-trade check 集成
 - [x] risk-engine WebSocket 实时风控
 - [x] 高水位利润保护
-- [x] 交易日志（trades.jsonl）
-- [x] 策略 P&L 聚合（strategy_pnl.py）
+- [x] 交易日志 + 策略 P&L 聚合
 - [x] hft-engine state.json 持久化
-- [x] 注册表 key 改策略名
-- [x] status.py 检测 Rust risk-engine
-- [x] 止盈线差异化（strategist 自定义）
-- [x] 准入标准改为 14 天回测
-- [x] engine/SCHEMA.md 格式规范
+- [x] 批量回测 + 参数网格搜索
+- [x] 实盘 vs 回测对比工具
+- [x] 准入标准统一到 criteria.py
 - [x] make status 全局面板
 - [x] make transfer 划转
