@@ -64,6 +64,7 @@ strategist risk bull bear engineer
 | **risk** | 审核 risk.json、监控风控状态 | risk-engine 实时执行 |
 | **engineer** | Rust 交易/风控引擎代码 + Python 守护代码 | 引擎/守护进程 |
 
+| **trader** | 交易员：通过 trade.json 控制引擎（加仓/减仓/暂停/平仓） | 引擎文件监听执行 |
 | **architect** | 系统架构师：技术方案设计、架构评审（只设计不实现） | team-lead 讨论后派 engineer 实现 |
 | **tester** | 测试工程师：engineer 提交后验证代码、跑测试、查 bug | team-lead review 前先过 tester |
 
@@ -251,6 +252,7 @@ strategist 提交策略后，team-lead 必须验证：
    ├─ 策略赚钱 → 保持
    ├─ 策略不够 / 有空闲资金 → 让 strategist 找新策略（别让他闲着）
    ├─ 新策略类型 → 让 engineer Rust 实现
+   ├─ 策略赚钱 → 让 trader 评估是否加仓（trade.json add）
    ├─ 风控规则需调整 → 让 strategist 更新 risk.json
    ├─ 成员需要技术支持 → 派 engineer 实现
    ├─ 守护挂了 → 重启
