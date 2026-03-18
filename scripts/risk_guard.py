@@ -2,6 +2,7 @@
 """风控守护进程 — 每 30 秒检查持仓，触发止损自动平仓 + 通知 + 记录权益曲线"""
 
 import csv
+import json
 import signal
 import sys
 import time
@@ -23,15 +24,16 @@ def handle_signal(signum, frame):
     running = False
 
 
-def append_equity(timestamp, equity, unrealized_pnl, num_positions):
-    """追加一行到 equity.csv"""
+def append_equity(timestamp, equity, unrealized_pnl, num_positions, detail):
+    """追加一行到 equity.csv，detail 为每个持仓的 JSON 明细"""
     write_header = not EQUITY_CSV.exists()
     EQUITY_CSV.parent.mkdir(parents=True, exist_ok=True)
     with open(EQUITY_CSV, "a", newline="") as f:
         writer = csv.writer(f)
         if write_header:
-            writer.writerow(["timestamp", "equity", "unrealized_pnl", "positions"])
-        writer.writerow([timestamp, f"{equity:.4f}", f"{unrealized_pnl:.4f}", num_positions])
+            writer.writerow(["timestamp", "equity", "unrealized_pnl", "positions", "detail"])
+        writer.writerow([timestamp, f"{equity:.4f}", f"{unrealized_pnl:.4f}", num_positions,
+                         json.dumps(detail, ensure_ascii=False)])
 
 
 def notify_stop_loss(alerts, exchange):
@@ -57,8 +59,18 @@ def run_check(exchange):
     unrealized = result.get("unrealized_pnl", 0)
     num_pos = result.get("positions", 0)
 
-    # 记录权益曲线
-    append_equity(now, equity, unrealized, num_pos)
+    # 获取每个持仓的独立盈亏
+    positions = get_positions(exchange)
+    detail = []
+    for p in positions:
+        detail.append({
+            "symbol": p.get("symbol", ""),
+            "side": p.get("side", ""),
+            "pnl": round(float(p.get("unrealizedPnl", 0) or 0), 4),
+        })
+
+    # 记录权益曲线（含持仓明细）
+    append_equity(now, equity, unrealized, num_pos, detail)
 
     # 输出状态
     status = result["status"]
