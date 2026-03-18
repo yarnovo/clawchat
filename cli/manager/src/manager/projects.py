@@ -49,8 +49,12 @@ def create_project(name, fund=0):
 
     if fund > 0:
         try:
-            exchange.sapi_post_sub_account_transfer({
-                'toEmail': email, 'asset': 'USDT', 'amount': fund,
+            exchange.sapi_post_sub_account_universaltransfer({
+                'fromAccountType': 'SPOT',
+                'toAccountType': 'SPOT',
+                'toEmail': email,
+                'asset': 'USDT',
+                'amount': fund,
             })
             project['fund'] = fund
             print(f"  已划转 {fund} USDT")
@@ -68,8 +72,12 @@ def fund_project(name, amount):
         return
     exchange = get_exchange()
     try:
-        exchange.sapi_post_sub_account_transfer({
-            'toEmail': project['email'], 'asset': 'USDT', 'amount': amount,
+        exchange.sapi_post_sub_account_universaltransfer({
+            'fromAccountType': 'SPOT',
+            'toAccountType': 'SPOT',
+            'toEmail': project['email'],
+            'asset': 'USDT',
+            'amount': amount,
         })
         project['fund'] += amount
         save_project(name, project)
