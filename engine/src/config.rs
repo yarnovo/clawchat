@@ -138,10 +138,10 @@ fn known_params(strategy: &str) -> &'static [&'static str] {
     match strategy {
         "mm" | "market_maker" => &["fee_rate"],
         "default" => &["ema_fast", "ema_slow", "atr_period", "atr_sl_mult", "atr_tp_mult"],
-        "scalping" => &["ema_fast", "ema_slow", "volume_multiplier"],
+        "scalping" => &["ema_fast", "ema_slow", "volume_multiplier", "atr_period", "atr_sl_mult", "atr_tp_mult", "rsi_buy_low", "rsi_buy_high", "rsi_sell_low", "rsi_sell_high"],
         "breakout" => &["lookback", "atr_period", "atr_filter", "trail_atr"],
-        "rsi" => &["rsi_period", "rsi_oversold", "rsi_overbought", "trend_ema"],
-        "bollinger" => &["bb_period", "num_std", "trend_ema"],
+        "rsi" => &["rsi_period", "rsi_oversold", "rsi_overbought", "trend_ema", "atr_period", "atr_sl_mult", "atr_tp_mult"],
+        "bollinger" => &["bb_period", "num_std", "trend_ema", "atr_period", "atr_sl_mult"],
         "macd" => &["fast_period", "slow_period", "signal_period", "trend_ema", "atr_period", "atr_sl"],
         "mean_reversion" => &["ema_period", "std_period", "entry_std", "atr_period", "atr_sl"],
         _ => &[],

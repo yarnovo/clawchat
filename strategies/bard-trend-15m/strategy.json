@@ -1,0 +1,29 @@
+{
+  "name": "bard-trend-15m",
+  "engine_strategy": "default",
+  "symbol": "BARDUSDT",
+  "timeframe": "15m",
+  "timeframe_ms": 900000,
+  "leverage": 3,
+  "order_qty": 10,
+  "position_size": 0.3,
+  "capital": 200,
+  "params": {
+    "ema_fast": 21,
+    "ema_slow": 55,
+    "atr_period": 14,
+    "atr_sl_mult": 1.5,
+    "atr_tp_mult": 2.5
+  },
+  "backtest": {
+    "days": 14,
+    "return_pct": 26.54,
+    "sharpe": 10.67,
+    "max_drawdown_pct": 6.78,
+    "trades": 9,
+    "win_rate": 0.556,
+    "profit_factor": 2.71
+  },
+  "status": "suspended",
+  "suspend_reason": "trades<20"
+}

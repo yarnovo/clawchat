@@ -1,0 +1,27 @@
+{
+  "name": "bard-scalping-15m",
+  "engine_strategy": "scalping",
+  "symbol": "BARDUSDT",
+  "timeframe": "15m",
+  "timeframe_ms": 900000,
+  "leverage": 3,
+  "order_qty": 10,
+  "position_size": 0.3,
+  "capital": 200,
+  "params": {
+    "ema_fast": 12,
+    "ema_slow": 50,
+    "volume_multiplier": 1.2
+  },
+  "backtest": {
+    "days": 14,
+    "return_pct": 38.38,
+    "sharpe": 11.18,
+    "max_drawdown_pct": 6.65,
+    "trades": 11,
+    "win_rate": 0.545,
+    "profit_factor": 3.26
+  },
+  "status": "suspended",
+  "suspend_reason": "trades<20"
+}

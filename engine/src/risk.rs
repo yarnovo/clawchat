@@ -33,6 +33,18 @@ pub struct RiskConfig {
     /// 最大杠杆，默认 20
     #[serde(default = "default_max_leverage")]
     pub max_leverage: u32,
+    /// 最大同时持仓数，默认 3
+    #[serde(default = "default_max_concurrent_positions")]
+    pub max_concurrent_positions: u32,
+    /// 持仓超时强制平仓（小时），默认 24
+    #[serde(default = "default_max_hold_time_hours")]
+    pub max_hold_time_hours: f64,
+    /// 移动止损百分比（价格新高后回撤此比例平仓），默认 0.02 = 2%
+    #[serde(default = "default_trailing_stop")]
+    pub trailing_stop: f64,
+    /// 所有策略总仓位不超过权益的百分比，默认 0.80 = 80%
+    #[serde(default = "default_max_portfolio_exposure")]
+    pub max_portfolio_exposure: f64,
 }
 
 fn default_max_loss_per_trade() -> f64 { 0.05 }
@@ -43,6 +55,10 @@ fn default_max_drawdown_stop() -> f64 { 0.30 }
 fn default_max_position_ratio() -> f64 { 0.30 }
 fn default_min_liquidation_distance() -> f64 { 0.10 }
 fn default_max_leverage() -> u32 { 20 }
+fn default_max_concurrent_positions() -> u32 { 3 }
+fn default_max_hold_time_hours() -> f64 { 24.0 }
+fn default_trailing_stop() -> f64 { 0.02 }
+fn default_max_portfolio_exposure() -> f64 { 0.80 }
 
 impl Default for RiskConfig {
     fn default() -> Self {
@@ -56,6 +72,10 @@ impl Default for RiskConfig {
             max_position_ratio: 0.30,
             min_liquidation_distance: 0.10,
             max_leverage: 20,
+            max_concurrent_positions: 3,
+            max_hold_time_hours: 24.0,
+            trailing_stop: 0.02,
+            max_portfolio_exposure: 0.80,
         }
     }
 }
@@ -409,6 +429,10 @@ mod tests {
         assert!((cfg.max_position_ratio - 0.30).abs() < f64::EPSILON);
         assert!((cfg.min_liquidation_distance - 0.10).abs() < f64::EPSILON);
         assert_eq!(cfg.max_leverage, 20);
+        assert_eq!(cfg.max_concurrent_positions, 3);
+        assert!((cfg.max_hold_time_hours - 24.0).abs() < f64::EPSILON);
+        assert!((cfg.trailing_stop - 0.02).abs() < f64::EPSILON);
+        assert!((cfg.max_portfolio_exposure - 0.80).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -425,7 +449,11 @@ mod tests {
             "max_drawdown_stop": 0.25,
             "max_position_ratio": 0.40,
             "min_liquidation_distance": 0.15,
-            "max_leverage": 10
+            "max_leverage": 10,
+            "max_concurrent_positions": 5,
+            "max_hold_time_hours": 48,
+            "trailing_stop": 0.03,
+            "max_portfolio_exposure": 0.60
         }}"#).unwrap();
 
         let cfg = RiskConfig::load(&path);
@@ -436,6 +464,10 @@ mod tests {
         assert!((cfg.max_drawdown_stop - 0.25).abs() < f64::EPSILON);
         assert!((cfg.max_position_ratio - 0.40).abs() < f64::EPSILON);
         assert_eq!(cfg.max_leverage, 10);
+        assert_eq!(cfg.max_concurrent_positions, 5);
+        assert!((cfg.max_hold_time_hours - 48.0).abs() < f64::EPSILON);
+        assert!((cfg.trailing_stop - 0.03).abs() < f64::EPSILON);
+        assert!((cfg.max_portfolio_exposure - 0.60).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -451,6 +483,11 @@ mod tests {
         assert!((cfg.max_profit_per_trade - 0.10).abs() < f64::EPSILON);
         assert!((cfg.max_daily_loss - 0.15).abs() < f64::EPSILON);
         assert_eq!(cfg.max_leverage, 20);
+        // New fields default when missing
+        assert_eq!(cfg.max_concurrent_positions, 3);
+        assert!((cfg.max_hold_time_hours - 24.0).abs() < f64::EPSILON);
+        assert!((cfg.trailing_stop - 0.02).abs() < f64::EPSILON);
+        assert!((cfg.max_portfolio_exposure - 0.80).abs() < f64::EPSILON);
     }
 
     #[test]

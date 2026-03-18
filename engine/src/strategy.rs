@@ -516,6 +516,13 @@ pub struct ScalpingStrategy {
     fast_period: usize,
     slow_period: usize,
     vol_mult: f64,
+    atr_period: usize,
+    atr_sl_mult: f64,
+    atr_tp_mult: f64,
+    rsi_buy_low: f64,
+    rsi_buy_high: f64,
+    rsi_sell_low: f64,
+    rsi_sell_high: f64,
     closes: Vec<f64>,
     highs: Vec<f64>,
     lows: Vec<f64>,
@@ -531,6 +538,13 @@ impl ScalpingStrategy {
             fast_period: 12,
             slow_period: 50,
             vol_mult: 1.2,
+            atr_period: 14,
+            atr_sl_mult: 1.5,
+            atr_tp_mult: 3.0,
+            rsi_buy_low: 45.0,
+            rsi_buy_high: 70.0,
+            rsi_sell_low: 30.0,
+            rsi_sell_high: 55.0,
             closes: Vec::new(),
             highs: Vec::new(),
             lows: Vec::new(),
@@ -546,6 +560,13 @@ impl ScalpingStrategy {
             fast_period: params.get("ema_fast").copied().unwrap_or(12.0) as usize,
             slow_period: params.get("ema_slow").copied().unwrap_or(50.0) as usize,
             vol_mult: params.get("volume_multiplier").copied().unwrap_or(1.2),
+            atr_period: params.get("atr_period").copied().unwrap_or(14.0) as usize,
+            atr_sl_mult: params.get("atr_sl_mult").copied().unwrap_or(1.5),
+            atr_tp_mult: params.get("atr_tp_mult").copied().unwrap_or(3.0),
+            rsi_buy_low: params.get("rsi_buy_low").copied().unwrap_or(45.0),
+            rsi_buy_high: params.get("rsi_buy_high").copied().unwrap_or(70.0),
+            rsi_sell_low: params.get("rsi_sell_low").copied().unwrap_or(30.0),
+            rsi_sell_high: params.get("rsi_sell_high").copied().unwrap_or(55.0),
             closes: Vec::new(),
             highs: Vec::new(),
             lows: Vec::new(),
@@ -596,8 +617,8 @@ impl Strategy for ScalpingStrategy {
         let slow_now = ema_from_slice(&self.closes, self.slow_period)?;
         let fast_prev = ema_from_slice(&self.closes[..n - 1], self.fast_period)?;
         let slow_prev = ema_from_slice(&self.closes[..n - 1], self.slow_period)?;
-        let rsi = rsi_from_slice(&self.closes, 14)?;
-        let atr = atr_from_slices(&self.highs, &self.lows, &self.closes, 14)?;
+        let rsi = rsi_from_slice(&self.closes, self.atr_period)?;
+        let atr = atr_from_slices(&self.highs, &self.lows, &self.closes, self.atr_period)?;
 
         // 持仓中：ATR 止损/止盈
         if let Some(ref pos) = self.pos {
@@ -626,12 +647,12 @@ impl Strategy for ScalpingStrategy {
             / self.slow_period as f64;
         let vol_ok = candle.volume > avg_vol * self.vol_mult;
 
-        // 做多：快线上穿慢线 + RSI 45-70 + 放量
-        if fast_prev <= slow_prev && fast_now > slow_now && vol_ok && rsi > 45.0 && rsi < 70.0 {
+        // 做多：快线上穿慢线 + RSI 范围 + 放量
+        if fast_prev <= slow_prev && fast_now > slow_now && vol_ok && rsi > self.rsi_buy_low && rsi < self.rsi_buy_high {
             self.pos = Some(ScalpingPosition {
                 side: Side::Buy,
-                sl: candle.close - atr * 1.5,
-                tp: candle.close + atr * 3.0,
+                sl: candle.close - atr * self.atr_sl_mult,
+                tp: candle.close + atr * self.atr_tp_mult,
             });
             return Some(Signal::Order(OrderRequest {
                 symbol: self.symbol.clone(),
@@ -642,12 +663,12 @@ impl Strategy for ScalpingStrategy {
             }));
         }
 
-        // 做空：快线下穿慢线 + RSI 30-55
-        if fast_prev >= slow_prev && fast_now < slow_now && rsi > 30.0 && rsi < 55.0 {
+        // 做空：快线下穿慢线 + RSI 范围
+        if fast_prev >= slow_prev && fast_now < slow_now && rsi > self.rsi_sell_low && rsi < self.rsi_sell_high {
             self.pos = Some(ScalpingPosition {
                 side: Side::Sell,
-                sl: candle.close + atr * 1.5,
-                tp: candle.close - atr * 3.0,
+                sl: candle.close + atr * self.atr_sl_mult,
+                tp: candle.close - atr * self.atr_tp_mult,
             });
             return Some(Signal::Order(OrderRequest {
                 symbol: self.symbol.clone(),
@@ -863,6 +884,9 @@ pub struct RSIStrategy {
     oversold: f64,
     overbought: f64,
     trend_ema: usize,
+    atr_period: usize,
+    atr_sl_mult: f64,
+    atr_tp_mult: f64,
     closes: Vec<f64>,
     highs: Vec<f64>,
     lows: Vec<f64>,
@@ -878,6 +902,9 @@ impl RSIStrategy {
             oversold: 25.0,
             overbought: 75.0,
             trend_ema: 50,
+            atr_period: 14,
+            atr_sl_mult: 2.0,
+            atr_tp_mult: 4.0,
             closes: Vec::new(),
             highs: Vec::new(),
             lows: Vec::new(),
@@ -893,6 +920,9 @@ impl RSIStrategy {
             oversold: params.get("rsi_oversold").copied().unwrap_or(25.0),
             overbought: params.get("rsi_overbought").copied().unwrap_or(75.0),
             trend_ema: params.get("trend_ema").copied().unwrap_or(50.0) as usize,
+            atr_period: params.get("atr_period").copied().unwrap_or(14.0) as usize,
+            atr_sl_mult: params.get("atr_sl_mult").copied().unwrap_or(2.0),
+            atr_tp_mult: params.get("atr_tp_mult").copied().unwrap_or(4.0),
             closes: Vec::new(),
             highs: Vec::new(),
             lows: Vec::new(),
@@ -936,7 +966,7 @@ impl Strategy for RSIStrategy {
 
         let rsi = rsi_from_slice(&self.closes, self.rsi_period)?;
         let trend = ema_from_slice(&self.closes, self.trend_ema)?;
-        let atr = atr_from_slices(&self.highs, &self.lows, &self.closes, 14)?;
+        let atr = atr_from_slices(&self.highs, &self.lows, &self.closes, self.atr_period)?;
 
         // 持仓中：止损止盈
         if let Some(ref pos) = self.pos {
@@ -965,8 +995,8 @@ impl Strategy for RSIStrategy {
         if rsi < self.oversold && candle.close > trend {
             self.pos = Some(RSIPosition {
                 side: Side::Buy,
-                sl: candle.close - atr * 2.0,
-                tp: candle.close + atr * 4.0,
+                sl: candle.close - atr * self.atr_sl_mult,
+                tp: candle.close + atr * self.atr_tp_mult,
             });
             return Some(Signal::Order(OrderRequest {
                 symbol: self.symbol.clone(),
@@ -981,8 +1011,8 @@ impl Strategy for RSIStrategy {
         if rsi > self.overbought && candle.close < trend {
             self.pos = Some(RSIPosition {
                 side: Side::Sell,
-                sl: candle.close + atr * 2.0,
-                tp: candle.close - atr * 4.0,
+                sl: candle.close + atr * self.atr_sl_mult,
+                tp: candle.close - atr * self.atr_tp_mult,
             });
             return Some(Signal::Order(OrderRequest {
                 symbol: self.symbol.clone(),
@@ -1016,6 +1046,8 @@ pub struct BollingerStrategy {
     bb_period: usize,
     num_std: f64,
     trend_ema: usize,
+    atr_period: usize,
+    atr_sl_mult: f64,
     closes: Vec<f64>,
     highs: Vec<f64>,
     lows: Vec<f64>,
@@ -1030,6 +1062,8 @@ impl BollingerStrategy {
             bb_period: 20,
             num_std: 2.5,
             trend_ema: 50,
+            atr_period: 14,
+            atr_sl_mult: 2.0,
             closes: Vec::new(),
             highs: Vec::new(),
             lows: Vec::new(),
@@ -1044,6 +1078,8 @@ impl BollingerStrategy {
             bb_period: params.get("bb_period").copied().unwrap_or(20.0) as usize,
             num_std: params.get("num_std").copied().unwrap_or(2.5),
             trend_ema: params.get("trend_ema").copied().unwrap_or(50.0) as usize,
+            atr_period: params.get("atr_period").copied().unwrap_or(14.0) as usize,
+            atr_sl_mult: params.get("atr_sl_mult").copied().unwrap_or(2.0),
             closes: Vec::new(),
             highs: Vec::new(),
             lows: Vec::new(),
@@ -1095,7 +1131,7 @@ impl Strategy for BollingerStrategy {
         let lower = mean - self.num_std * std;
 
         let trend = ema_from_slice(&self.closes, self.trend_ema)?;
-        let atr = atr_from_slices(&self.highs, &self.lows, &self.closes, 14)?;
+        let atr = atr_from_slices(&self.highs, &self.lows, &self.closes, self.atr_period)?;
 
         // 持仓中：止损或回到中轨平仓
         if let Some(ref pos) = self.pos {
@@ -1124,7 +1160,7 @@ impl Strategy for BollingerStrategy {
         if candle.close > upper && candle.close > trend {
             self.pos = Some(BollingerPosition {
                 side: Side::Buy,
-                sl: candle.close - atr * 2.0,
+                sl: candle.close - atr * self.atr_sl_mult,
             });
             return Some(Signal::Order(OrderRequest {
                 symbol: self.symbol.clone(),
@@ -1139,7 +1175,7 @@ impl Strategy for BollingerStrategy {
         if candle.close < lower && candle.close < trend {
             self.pos = Some(BollingerPosition {
                 side: Side::Sell,
-                sl: candle.close + atr * 2.0,
+                sl: candle.close + atr * self.atr_sl_mult,
             });
             return Some(Signal::Order(OrderRequest {
                 symbol: self.symbol.clone(),
