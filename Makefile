@@ -43,7 +43,13 @@ start: ## Start all strategies
 stop: ## Stop all strategies
 	@$(PY) runner.py stop
 
-check: ## Check auto-promote conditions
+pnl: ## Live P&L (real money profit)
+	@$(PY) runner.py pnl
+
+stoploss: ## Run stoploss check only
+	@$(PY) runner.py stoploss
+
+check: ## Check promote + stoploss
 	@$(PY) runner.py check
 
 promote: ## Promote to live (SYMBOL=)

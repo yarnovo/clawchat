@@ -93,6 +93,8 @@ KPI 体系见 [kpi/framework.md](kpi/framework.md)，涵盖 6 大维度：收益
 - **及时更新 skill 提示词**：每次用户提出新需求或变更流程，必须同步更新 `/run-company` 等相关 skill 的 SKILL.md
 - **报告存本地**：所有邮件报告同时存档到 `data/reports/YYYY-MM-DD/HH-MM-SS.md`
 - **KPI 按 framework.md 体系跟踪**，每日记录到 `kpi/YYYY-MM-DD.md`
+- **提交自己做**：不要问用户，有改动就自己 commit
+- **迭代报告 = commit + 邮件**：先提交所有改动，再发迭代报告邮件，合成一个动作
 
 ## 通知
 

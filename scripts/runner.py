@@ -175,6 +175,44 @@ def promote(symbol):
     start_all()
 
 
+def show_pnl():
+    """只显示实盘策略的盈亏"""
+    config = load_config()
+    live = [s for s in config if s.get('mode') == 'live']
+
+    if not live:
+        print("  暂无实盘策略")
+        return
+
+    total_profit = 0
+    total_trades = 0
+
+    print(f"\n  {'='*55}")
+    print(f"  实盘盈亏 (LIVE P&L)")
+    print(f"  {'='*55}")
+    print(f"  {'策略':<20} {'交易':>6} {'利润':>10} {'状态'}")
+    print(f"  {'─'*55}")
+
+    for s in live:
+        safe_sym = s['symbol'].replace('/', '-').lower()
+        sp = DATA_DIR / f"{s['type']}_{safe_sym}.json"
+        if not sp.exists():
+            print(f"  {s['symbol']:<20} {'—':>6} {'—':>10} 无数据")
+            continue
+        st = json.loads(sp.read_text())
+        profit = st.get('total_profit', 0)
+        trades = len(st.get('trades', []))
+        total_profit += profit
+        total_trades += trades
+        sign = '+' if profit >= 0 else ''
+        print(f"  {s['symbol']:<20} {trades:>4}笔 {sign}${abs(profit):>8.4f} {s['type']}")
+
+    print(f"  {'─'*55}")
+    sign = '+' if total_profit >= 0 else ''
+    print(f"  {'合计':<20} {total_trades:>4}笔 {sign}${abs(total_profit):>8.4f}")
+    print(f"  {'='*55}\n")
+
+
 def check_promote():
     """检查 dryrun 策略是否达到 promote 条件，自动切换到实盘。
 
@@ -249,6 +287,96 @@ def check_promote():
     return promoted
 
 
+def check_stoploss():
+    """三层止损检查。
+
+    策略级：单策略亏损超过 amount * 10% → 自动 demote + 通知
+    标的级：价格跌出网格下限 5% → 标记预警
+    全局级：总浮亏超过 $20（总资金 10%）→ 全部停机
+    """
+    config = load_config()
+    total_loss = 0
+    stopped = []
+    warnings = []
+    TOTAL_CAPITAL = 200  # 总资金
+
+    for s in config:
+        safe_sym = s['symbol'].replace('/', '-').lower()
+        sp = DATA_DIR / f"{s['type']}_{safe_sym}.json"
+        if not sp.exists():
+            continue
+
+        st = json.loads(sp.read_text())
+        profit = st.get('total_profit', 0)
+        trades = st.get('trades', [])
+        last_price = st.get('last_price', 0)
+        amount = s.get('amount', 5)
+        is_live = s.get('mode') == 'live'
+
+        # --- 策略级止损：亏损超过 amount * 10% ---
+        max_loss = amount * 0.10
+        if profit < -max_loss:
+            if is_live:
+                s['mode'] = 'dryrun'
+                stopped.append({
+                    'symbol': s['symbol'], 'type': s['type'],
+                    'profit': profit, 'threshold': -max_loss,
+                })
+                print(f"  STOPLOSS: {s['symbol']} {s['type']} demoted (亏损 ${profit:.4f} < -${max_loss:.4f})")
+
+        # --- 策略级止损：连续 5 笔亏损 ---
+        if len(trades) >= 5:
+            recent = trades[-5:]
+            consecutive_loss = all(
+                t.get('profit', 0) < 0 or (t.get('side') == 'buy' and t.get('filled'))
+                for t in recent
+            )
+            # 只检查有 profit 字段的交易
+            loss_trades = [t for t in recent if 'profit' in t and t['profit'] < 0]
+            if len(loss_trades) >= 5 and is_live:
+                s['mode'] = 'dryrun'
+                stopped.append({
+                    'symbol': s['symbol'], 'type': s['type'],
+                    'reason': '连续5笔亏损',
+                })
+                print(f"  STOPLOSS: {s['symbol']} {s['type']} demoted (连续5笔亏损)")
+
+        # --- 标的级：价格偏离网格区间 ---
+        if s['type'] == 'grid' and last_price > 0:
+            lower = s.get('lower', 0)
+            if lower > 0 and last_price < lower * 0.95:
+                warnings.append(f"{s['symbol']} 价格 ${last_price:.6f} 跌出下限 ${lower:.6f} 超5%")
+                print(f"  WARNING: {s['symbol']} 价格跌出网格下限 5%!")
+
+        # 累计浮亏
+        if profit < 0:
+            total_loss += abs(profit)
+
+    # --- 全局级：总浮亏超过总资金 10% ---
+    global_threshold = TOTAL_CAPITAL * 0.10
+    if total_loss > global_threshold:
+        print(f"  EMERGENCY: 总浮亏 ${total_loss:.2f} > ${global_threshold:.2f} (10%)，全部停机！")
+        for s in config:
+            if s.get('mode') == 'live':
+                s['mode'] = 'dryrun'
+                stopped.append({'symbol': s['symbol'], 'type': s['type'], 'reason': '全局止损'})
+        stop_all()
+
+    if stopped:
+        save_config(config)
+        print(f"\n  {len(stopped)} 个策略被止损 demote")
+        start_all()
+
+    # 输出状态
+    if not stopped and not warnings:
+        print(f"  风控检查通过 ✓ (总浮亏: ${total_loss:.4f} / 红线: ${global_threshold:.2f})")
+    elif warnings:
+        for w in warnings:
+            print(f"  ⚠ {w}")
+
+    return stopped, warnings
+
+
 def demote(symbol):
     config = load_config()
     found = False
@@ -277,8 +405,13 @@ def main():
         stop_all()
     elif cmd == 'status':
         show_status()
+    elif cmd == 'pnl':
+        show_pnl()
     elif cmd == 'check':
         check_promote()
+        check_stoploss()
+    elif cmd == 'stoploss':
+        check_stoploss()
     elif cmd == 'promote':
         if len(sys.argv) < 3:
             print("用法: runner.py promote SYMBOL")
