@@ -49,36 +49,8 @@ make notify SUBJECT="xx" BODY="xx"
 
 ```
 .claude/skills/
-├── heartbeat/    /heartbeat  — 一个入口启动一切（核心）
-├── build/        /build      — 编译部署引擎（技术）
-├── monitor/      /monitor    — 系统监控（技术）
-├── find-alpha/   /find-alpha — 搜索盈利策略（策略）
-├── backtest/     /backtest   — 回测验证（策略）
-├── execute/      /execute    — 执行交易计划（交易）
-├── report/       /report     — 统一报告（交易）
-├── check/        /check      — 风控检查+止损（风控）
-├── audit/        /audit      — 复盘审计（风控）
-└── create-research-team/  /create-research-team — 创建策略研发团队
+└── team/    /team  — 启动完整运营团队（策略研发+交易+风控+技术）
 ```
-
-## 核心流程
-
-```
-/heartbeat → 创建团队 → 检查状态 → 驱动4个团队 → 输出报告 → 循环
-
-首次启动: 无策略 → /find-alpha / 有策略 → /execute / 运行中 → 循环
-每轮循环: 收集数据 → 风控检查 → KPI → 驱动团队 → 报告
-```
-
-## 验证过的策略
-
-| 策略 | 最佳币种 | 周期 | 收益率 | 夏普 |
-|------|---------|------|--------|------|
-| trend | BTC | 1h | +43.6% | 6.82 |
-| breakout | ETH | 1h | +19.6% | 5.52 |
-| rsi | XRP | 1h | +20.0% | 7.51 |
-| vwap | BTC | 15m | +5.8% | 12.93 |
-| ema2050 | BTC | 1h | +4.6% | 3.10 |
 
 ## 项目结构
 
@@ -100,18 +72,8 @@ clawchat/
 │   ├── Cargo.toml
 │   └── src/
 ├── reports/                # 报告存档
-│   ├── daily/              # 日报
-│   ├── heartbeat/          # 心跳快报
-│   └── event/              # 事件报告
-├── kpi/                    # KPI + 计划 + 复盘
-└── .claude/skills/         # 技能（按团队分组）
+└── .claude/skills/         # 技能
 ```
-
-## KPI
-
-- KPI 体系：[kpi/framework.md](kpi/framework.md)
-- 报告体系：[kpi/report-framework.md](kpi/report-framework.md)
-- Day 1 复盘：[kpi/2026-03-18-retro.md](kpi/2026-03-18-retro.md)
 
 ## 通知
 
