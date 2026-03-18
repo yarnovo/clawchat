@@ -33,6 +33,16 @@ make hft     # 运行
 给人看的报告（CLI 生成，.gitignore 忽略）：
 - 日报/周报/策略报告（`clawchat report` 生成）
 
+## KPI
+
+| 指标 | 目标 | 红线 |
+|------|------|------|
+| 周增长 | +3% | — |
+| 月增长 | +15% | — |
+| 最大回撤 | — | -10%（总资产不低于起始的 90%） |
+
+起始资产：$222（2026-03-19）
+
 ## 规则
 
 - **配置/标准只在一处定义，其他地方引用，不重复写。** 准入标准源头：`cli/src/clawchat/criteria.py`，配置规范见 skill（`/strategy-config` `/trade-config` `/risk-config`）
