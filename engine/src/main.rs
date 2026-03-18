@@ -294,30 +294,42 @@ async fn start_user_data_feed(
             Ok((ws, _)) => {
                 tracing::info!("user data stream connected");
                 retry_delay = std::time::Duration::from_secs(1);
+                // listenKey 60 分钟过期，超时设 65 分钟（留余量）
+                let uds_timeout = std::time::Duration::from_secs(65 * 60);
 
                 let (mut write, mut read) = ws.split();
 
-                while let Some(msg) = read.next().await {
-                    match msg {
-                        Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
-                            for event in parse_user_data_msg(&text) {
-                                let _ = tx.try_send(event);
+                loop {
+                    match tokio::time::timeout(uds_timeout, read.next()).await {
+                        Ok(Some(msg)) => match msg {
+                            Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
+                                for event in parse_user_data_msg(&text) {
+                                    let _ = tx.try_send(event);
+                                }
                             }
-                        }
-                        Ok(tokio_tungstenite::tungstenite::Message::Ping(data)) => {
-                            let _ = write
-                                .send(tokio_tungstenite::tungstenite::Message::Pong(data))
-                                .await;
-                        }
-                        Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => {
-                            tracing::warn!("user data stream closed");
+                            Ok(tokio_tungstenite::tungstenite::Message::Ping(data)) => {
+                                let _ = write
+                                    .send(tokio_tungstenite::tungstenite::Message::Pong(data))
+                                    .await;
+                            }
+                            Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => {
+                                tracing::warn!("user data stream closed");
+                                break;
+                            }
+                            Err(e) => {
+                                tracing::error!("user data stream error: {e}");
+                                break;
+                            }
+                            _ => {}
+                        },
+                        Ok(None) => {
+                            tracing::warn!("user data stream ended");
                             break;
                         }
-                        Err(e) => {
-                            tracing::error!("user data stream error: {e}");
+                        Err(_) => {
+                            tracing::warn!("user data stream read timeout, reconnecting");
                             break;
                         }
-                        _ => {}
                     }
                 }
             }
