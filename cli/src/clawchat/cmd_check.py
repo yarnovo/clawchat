@@ -3,7 +3,7 @@
 
 import sys
 from datetime import datetime
-from futures_exchange import get_futures_exchange, get_positions, close_all
+from clawchat.exchange import get_futures_exchange, get_positions, close_all
 
 
 # ── 全局默认风控阈值（无 risk.json 时使用）──────────────────

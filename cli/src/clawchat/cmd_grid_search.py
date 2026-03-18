@@ -16,8 +16,8 @@ import json
 import sys
 import time
 
-from backtest import STRATEGIES, PARAM_ALIASES, fetch_candles, run_backtest, calc_metrics
-from criteria import CRITERIA, passes as passes_criteria
+from clawchat.cmd_backtest import STRATEGIES, PARAM_ALIASES, fetch_candles, run_backtest, calc_metrics
+from clawchat.criteria import CRITERIA, passes as passes_criteria
 
 # ── 各策略的参数搜索空间（SCHEMA 参数名）──
 PARAM_GRIDS = {

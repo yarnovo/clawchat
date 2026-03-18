@@ -7,7 +7,7 @@
   python batch_backtest.py --symbols NTRN/USDT,BAN/USDT --strategies trend,grid
   python batch_backtest.py --top 10 --days 14     # scan top 10 币种
 
-输出：reports/batch_results.csv（全部结果）+ 终端打印达标组合
+输出：records/batch_results.csv（全部结果）+ 终端打印达标组合
 """
 
 import argparse
@@ -15,9 +15,9 @@ import csv
 import os
 import sys
 
-from backtest import STRATEGIES, fetch_candles, run_backtest, calc_metrics
-from criteria import CRITERIA, passes as passes_criteria
-from futures_exchange import get_futures_exchange
+from clawchat.cmd_backtest import STRATEGIES, fetch_candles, run_backtest, calc_metrics
+from clawchat.criteria import CRITERIA, passes as passes_criteria
+from clawchat.exchange import get_futures_exchange
 
 # 要跑的策略（排除 fast 变体等固定参数子类）
 BATCH_STRATEGIES = [
@@ -29,7 +29,9 @@ LEVERAGES = [2, 3, 5]
 
 SKIP_BASES = {'USDC', 'BUSD', 'TUSD', 'FDUSD', 'DAI', 'UST', 'USDP'}
 
-OUTPUT = os.path.join(os.path.dirname(__file__), '..', 'reports', 'batch_results.csv')
+from clawchat._paths import RECORDS_DIR
+
+OUTPUT = str(RECORDS_DIR / 'batch_results.csv')
 
 
 def scan_symbols(top_n=15):

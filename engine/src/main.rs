@@ -20,8 +20,8 @@ use std::path::{Path, PathBuf};
 use tokio::sync::mpsc as tokio_mpsc;
 use tokio_tungstenite::connect_async;
 
-const TRADES_LOG: &str = "reports/trades.jsonl";
-const HIGH_WATER_FILE: &str = "reports/high_water.json";
+const TRADES_LOG: &str = "records/trades.jsonl";
+const HIGH_WATER_FILE: &str = "records/high_water.json";
 const BINANCE_FSTREAM_WS: &str = "wss://fstream.binance.com";
 /// listenKey keepalive 间隔（分钟）
 const KEEPALIVE_MINUTES: u64 = 20;
@@ -389,7 +389,7 @@ fn parse_user_data_msg(raw: &str) -> Vec<UserEvent> {
     events
 }
 
-/// Append a trade record to reports/trades.jsonl
+/// Append a trade record to records/trades.jsonl
 fn log_trade(
     strategy: &str,
     symbol: &str,
@@ -425,7 +425,7 @@ fn log_trade(
         "client_order_id": client_order_id,
     });
 
-    // Ensure reports/ directory exists
+    // Ensure records/ directory exists
     let log_path = std::path::Path::new(TRADES_LOG);
     if let Some(parent) = log_path.parent() {
         let _ = std::fs::create_dir_all(parent);

@@ -10,9 +10,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-ROOT = Path(__file__).parent.parent
-STRATEGIES_DIR = ROOT / "strategies"
-ENGINE_BIN = ROOT / "engine" / "target" / "release" / "hft-engine"
+from clawchat._paths import STRATEGIES_DIR, ENGINE_BIN
 LOG_DIR = Path("/tmp")
 INTERVAL = 60  # 秒
 

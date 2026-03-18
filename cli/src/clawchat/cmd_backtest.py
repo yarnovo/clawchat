@@ -21,7 +21,7 @@ import math
 import sys
 import time
 from datetime import datetime
-from futures_exchange import get_futures_exchange
+from clawchat.exchange import get_futures_exchange
 
 
 # ─── 费用常量 ───

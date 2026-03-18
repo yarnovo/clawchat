@@ -13,9 +13,9 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-ROOT = Path(__file__).parent.parent
-TRADES_FILE = ROOT / "reports" / "trades.jsonl"
-STRATEGIES_DIR = ROOT / "strategies"
+from clawchat._paths import STRATEGIES_DIR, RECORDS_DIR
+
+TRADES_FILE = RECORDS_DIR / "trades.jsonl"
 
 # ANSI 颜色
 RED = "\033[91m"
@@ -206,7 +206,7 @@ def main():
     # 加载实盘数据
     trades = load_trades(strategy_name)
     if not trades:
-        print(f"\n  {YELLOW}警告: 无实盘交易记录 (reports/trades.jsonl 中无 strategy={strategy_name}){RESET}")
+        print(f"\n  {YELLOW}警告: 无实盘交易记录 (records/trades.jsonl 中无 strategy={strategy_name}){RESET}")
         print(f"\n  回测指标（仅供参考）:")
         print(f"    收益率:     {fmt_pct(backtest.get('return_pct', 0))}")
         print(f"    胜率:       {fmt_pct(backtest.get('win_rate', 0) * 100)}")

@@ -9,10 +9,10 @@ from pathlib import Path
 
 from collections import defaultdict
 
-ROOT = Path(__file__).parent.parent
-STRATEGIES_DIR = ROOT / "strategies"
-EQUITY_CSV = ROOT / "reports" / "equity.csv"
-TRADES_FILE = ROOT / "reports" / "trades.jsonl"
+from clawchat._paths import PROJECT_ROOT, STRATEGIES_DIR, RECORDS_DIR
+
+EQUITY_CSV = RECORDS_DIR / "equity.csv"
+TRADES_FILE = RECORDS_DIR / "trades.jsonl"
 
 
 def now():
@@ -46,7 +46,7 @@ def show_engines():
 def show_account():
     section("账户")
     try:
-        from futures_exchange import get_futures_exchange
+        from clawchat.exchange import get_futures_exchange
         ex = get_futures_exchange()
         balance = ex.fetch_balance()
         usdt = balance.get("USDT", {})
@@ -83,7 +83,7 @@ def _strategy_symbol_map():
 def show_positions():
     section("持仓")
     try:
-        from futures_exchange import get_futures_exchange, get_positions
+        from clawchat.exchange import get_futures_exchange, get_positions
         ex = get_futures_exchange()
         positions = get_positions(ex)
         if not positions:

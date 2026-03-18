@@ -3,7 +3,7 @@
 
 import sys
 from datetime import datetime, timedelta
-from futures_exchange import get_futures_exchange, get_positions
+from clawchat.exchange import get_futures_exchange, get_positions
 
 
 def fetch_recent_trades(exchange, symbol=None, since_hours=24):

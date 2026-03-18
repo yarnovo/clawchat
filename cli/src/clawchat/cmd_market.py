@@ -3,7 +3,7 @@
 
 import sys
 from datetime import datetime
-from futures_exchange import get_futures_exchange as get_exchange
+from clawchat.exchange import get_futures_exchange as get_exchange
 
 WATCHLIST = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT']
 

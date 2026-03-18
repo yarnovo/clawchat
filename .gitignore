@@ -9,5 +9,4 @@ venv/
 .venv/
 data/
 target/
-# reports/ is tracked
-reports/
+records/

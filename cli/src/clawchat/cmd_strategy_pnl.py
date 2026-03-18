@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
-"""按策略聚合 P&L — 从 reports/trades.jsonl 计算已实现盈亏、胜率、盈亏比"""
+"""按策略聚合 P&L — 从 records/trades.jsonl 计算已实现盈亏、胜率、盈亏比"""
 
 import json
 import sys
 from collections import defaultdict
 from pathlib import Path
 
-TRADES_FILE = Path(__file__).parent.parent / "reports" / "trades.jsonl"
+from clawchat._paths import RECORDS_DIR
+
+TRADES_FILE = RECORDS_DIR / "trades.jsonl"
 
 
 def load_trades():
@@ -122,7 +124,7 @@ def compute_pnl(trades):
 def main():
     trades = load_trades()
     if not trades:
-        print("\n  (无交易记录，reports/trades.jsonl 为空或不存在)")
+        print("\n  (无交易记录，records/trades.jsonl 为空或不存在)")
         return
 
     results = compute_pnl(trades)

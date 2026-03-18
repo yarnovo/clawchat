@@ -2,7 +2,7 @@ SHELL := /bin/bash
 export BASH_ENV := .env
 
 ROOT := $(shell pwd)
-PY := cd $(ROOT)/scripts && uv run python
+PY := uv run python -m clawchat
 
 .PHONY: install clean watch account scan backtest batch-backtest grid-search pnl strategy-pnl compare check watcher status build hft transfer help
 
@@ -13,52 +13,52 @@ install: ## Install all deps
 	@[ -f package.json ] && npm install --silent 2>/dev/null || true
 
 clean: ## Clean cache and venv
-	rm -rf .venv node_modules __pycache__ scripts/__pycache__
+	rm -rf .venv node_modules __pycache__ cli/src/clawchat/__pycache__
 
 # === Market ===
 
 watch: ## Market prices
-	@$(PY) market.py watch
+	@$(PY) watch
 
 account: ## Account balance
-	@$(PY) market.py account
+	@$(PY) account
 
 scan: ## Scan high volatility coins
-	@$(PY) market.py scan
+	@$(PY) scan
 
 # === Backtest ===
 
 backtest: ## Backtest (SYMBOL= STRATEGY=scalping DAYS=7 LEVERAGE=5 TIMEFRAME=5m CAPITAL=200 PARAMS=)
-	@$(PY) backtest.py --symbol $(or $(SYMBOL),BTC/USDT) --strategy $(or $(STRATEGY),scalping) --days $(or $(DAYS),7) --leverage $(or $(LEVERAGE),5) --capital $(or $(CAPITAL),200) --timeframe $(or $(TIMEFRAME),5m) $(if $(PARAMS),--params '$(PARAMS)')
+	@$(PY) backtest --symbol $(or $(SYMBOL),BTC/USDT) --strategy $(or $(STRATEGY),scalping) --days $(or $(DAYS),7) --leverage $(or $(LEVERAGE),5) --capital $(or $(CAPITAL),200) --timeframe $(or $(TIMEFRAME),5m) $(if $(PARAMS),--params '$(PARAMS)')
 
 batch-backtest: ## Batch backtest N coins x M strategies (SYMBOLS= STRATEGIES= TOP=15 DAYS=14 TIMEFRAME=5m)
-	@$(PY) batch_backtest.py $(if $(SYMBOLS),--symbols $(SYMBOLS)) $(if $(STRATEGIES),--strategies $(STRATEGIES)) $(if $(LEVERAGES),--leverages $(LEVERAGES)) --top $(or $(TOP),15) --days $(or $(DAYS),14) --timeframe $(or $(TIMEFRAME),5m) --capital $(or $(CAPITAL),200)
+	@$(PY) batch-backtest $(if $(SYMBOLS),--symbols $(SYMBOLS)) $(if $(STRATEGIES),--strategies $(STRATEGIES)) $(if $(LEVERAGES),--leverages $(LEVERAGES)) --top $(or $(TOP),15) --days $(or $(DAYS),14) --timeframe $(or $(TIMEFRAME),5m) --capital $(or $(CAPITAL),200)
 
 grid-search: ## Grid search params (SYMBOL= STRATEGY= DAYS=14 TIMEFRAME=5m LEVERAGE=3)
-	@$(PY) grid_search.py --symbol $(or $(SYMBOL),BTC/USDT) --strategy $(or $(STRATEGY),trend) --days $(or $(DAYS),14) --timeframe $(or $(TIMEFRAME),5m) --leverage $(or $(LEVERAGE),3) --capital $(or $(CAPITAL),200)
+	@$(PY) grid-search --symbol $(or $(SYMBOL),BTC/USDT) --strategy $(or $(STRATEGY),trend) --days $(or $(DAYS),14) --timeframe $(or $(TIMEFRAME),5m) --leverage $(or $(LEVERAGE),3) --capital $(or $(CAPITAL),200)
 
 # === Trading ===
 
 transfer: ## Transfer USDT spot→futures (AMOUNT=197)
-	@$(PY) futures_exchange.py transfer $(or $(AMOUNT),197)
+	@$(PY) transfer $(or $(AMOUNT),197)
 
 pnl: ## Real P&L from exchange trades
-	@$(PY) pnl.py $(SYMBOL) $(HOURS)
+	@$(PY) pnl $(SYMBOL) $(HOURS)
 
 check: ## Risk check (stop loss / position / liquidation)
-	@$(PY) check.py $(if $(AUTO_STOP),--auto-stop)
+	@$(PY) check $(if $(AUTO_STOP),--auto-stop)
 
 watcher: ## Strategy watcher (auto deploy/stop engines from strategies/)
-	@$(PY) strategy_watcher.py
+	@$(PY) watcher
 
 status: ## Global status dashboard (engines/account/positions/risk/strategies)
-	@$(PY) status.py
+	@$(PY) status
 
 strategy-pnl: ## P&L by strategy (from trades.jsonl)
-	@$(PY) strategy_pnl.py
+	@$(PY) strategy-pnl
 
 compare: ## Live vs backtest compare (STRATEGY=)
-	@$(PY) live_vs_backtest.py $(STRATEGY)
+	@$(PY) compare $(STRATEGY)
 
 # === Engine (Rust) ===
 

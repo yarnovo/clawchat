@@ -2,7 +2,15 @@
 
 ## 进行中
 
+- [ ] engineer: CLI 重构（scripts→cli，进行中）
+- [x] trader: ETH 减仓 50%（手动执行成功 orderId=8389766132631757231）
 - [ ] strategist: 继续找 14 天达标新策略 + grid-search 调参
+
+## 待做（新）
+
+- [ ] 创建 3 个 skill（strategy.json / trade.json / risk.json 编写规范），让团队成员知道格式
+- [ ] 创建 qa 角色，测试 3 个 JSON 配置的功能是否有效
+- [ ] suspended 策略的 trade.json 怎么执行？（当前没引擎监听）
 
 ## 待做（策略生命周期）
 

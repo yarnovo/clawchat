@@ -65,7 +65,7 @@
 
 ### 策略准入标准
 
-全部满足才能 `status: "approved"`（代码定义见 `scripts/criteria.py`）：
+全部满足才能 `status: "approved"`（代码定义见 `cli/src/clawchat/criteria.py`）：
 
 | 指标 | 要求 |
 |------|------|
