@@ -7,10 +7,13 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
+from collections import defaultdict
+
 ROOT = Path(__file__).parent.parent
 STRATEGIES_DIR = ROOT / "strategies"
 ENGINE_REGISTRY = Path("/tmp/hft-engines.json")
 EQUITY_CSV = ROOT / "reports" / "equity.csv"
+TRADES_FILE = ROOT / "reports" / "trades.jsonl"
 
 
 def now():
@@ -180,6 +183,85 @@ def show_strategies():
             print(f"    {s.get('name', '?'):<28} status={s.get('status', '?')}")
 
 
+def show_performance():
+    section("策略表现")
+    if not TRADES_FILE.exists():
+        print("  (无交易记录)")
+        return
+
+    trades = []
+    for line in TRADES_FILE.read_text().strip().split("\n"):
+        if not line:
+            continue
+        try:
+            trades.append(json.loads(line))
+        except Exception:
+            pass
+
+    if not trades:
+        print("  (无交易记录)")
+        return
+
+    # 按策略+symbol配对计算 P&L
+    by_strategy = defaultdict(list)
+    for t in trades:
+        by_strategy[t.get("strategy", "unknown")].append(t)
+
+    for strategy, strades in sorted(by_strategy.items()):
+        by_symbol = defaultdict(list)
+        for t in strades:
+            by_symbol[t.get("symbol", "?")].append(t)
+
+        total_pnl = 0.0
+        wins = 0
+        losses = 0
+
+        for symbol, sym_trades in by_symbol.items():
+            pos = None
+            for t in sym_trades:
+                side = t.get("side", "").lower()
+                price = float(t.get("price", 0) or 0)
+                qty = float(t.get("qty", 0) or 0)
+                if price == 0:
+                    continue
+                if pos is None:
+                    pos = {"side": side, "price": price, "qty": qty}
+                    continue
+                if pos["side"] == side:
+                    total_qty = pos["qty"] + qty
+                    if total_qty > 0:
+                        pos["price"] = (pos["price"] * pos["qty"] + price * qty) / total_qty
+                        pos["qty"] = total_qty
+                    continue
+                close_qty = min(pos["qty"], qty)
+                if pos["side"] == "buy":
+                    pnl = (price - pos["price"]) * close_qty
+                else:
+                    pnl = (pos["price"] - price) * close_qty
+                total_pnl += pnl
+                if pnl >= 0:
+                    wins += 1
+                else:
+                    losses += 1
+                remaining = pos["qty"] - close_qty
+                if remaining > 0:
+                    pos["qty"] = remaining
+                elif qty > close_qty:
+                    pos = {"side": side, "price": price, "qty": qty - close_qty}
+                else:
+                    pos = None
+
+        rounds = wins + losses
+        wr = f"{wins / rounds:.0%}" if rounds > 0 else "N/A"
+        sign = "+" if total_pnl >= 0 else ""
+        print(f"  {strategy:<16} {sign}${total_pnl:<10.4f} {rounds}轮 {wr} ({wins}W/{losses}L)  [{len(strades)}笔]")
+
+    total = sum(
+        float(t.get("price", 0) or 0) for t in trades
+    )  # just count
+    print(f"  {'':>16} 共 {len(trades)} 笔交易记录")
+
+
 def main():
     print(f"\n  ClawChat 全局状态  {now()}")
     print(f"  {'='*50}")
@@ -187,6 +269,7 @@ def main():
     show_engines()
     show_account()
     show_positions()
+    show_performance()
     show_risk()
     show_watcher()
     show_strategies()
