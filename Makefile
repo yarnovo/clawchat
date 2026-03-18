@@ -4,7 +4,7 @@ export BASH_ENV := .env
 ROOT := $(shell pwd)
 PY := cd $(ROOT)/scripts && uv run python
 
-.PHONY: install clean watch account scan backtest pnl check guard watcher build hft transfer notify report-dev help
+.PHONY: install clean watch account scan backtest pnl check guard watcher status build hft transfer notify report-dev help
 
 # === Setup ===
 
@@ -47,6 +47,9 @@ guard: ## Risk guard daemon (30s interval, auto stop-loss + equity log)
 
 watcher: ## Strategy watcher (auto deploy/stop engines from strategies/)
 	@$(PY) strategy_watcher.py
+
+status: ## Global status dashboard (engines/account/positions/risk/strategies)
+	@$(PY) status.py
 
 # === Engine (Rust) ===
 
