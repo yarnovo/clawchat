@@ -82,11 +82,11 @@ def start_engine(name, cfg):
 
     running_engines[name] = proc
 
-    # 更新 registry
+    # 更新 registry: key=策略名, value={symbol, strategy, pid}
     symbol = cfg.get("symbol", "").replace("/", "").replace(":USDT", "")
-    strategy = cfg.get("strategy", "unknown")
+    strategy = cfg.get("engine_strategy", cfg.get("strategy", "unknown"))
     registry = read_registry()
-    registry[symbol] = strategy
+    registry[name] = {"symbol": symbol, "strategy": strategy, "pid": proc.pid}
     write_registry(registry)
 
     print(f"  [{now()}]   PID={proc.pid} symbol={symbol} strategy={strategy}")
@@ -109,6 +109,12 @@ def stop_engine(name):
         print(f"  [{now()}]   停止失败: {e}")
 
     del running_engines[name]
+
+    # 从 registry 中移除
+    registry = read_registry()
+    if name in registry:
+        del registry[name]
+        write_registry(registry)
 
 
 def check_engine_health():

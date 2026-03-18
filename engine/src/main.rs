@@ -74,17 +74,22 @@ fn log_trade(
 }
 
 /// Register this engine instance in shared registry file.
-/// Maps symbol → strategy so risk_guard can attribute P&L to strategies.
-fn register_engine(symbol: &str, strategy: &str) {
+/// Key = strategy config name (e.g. "pippin-macd-5m"), value = {symbol, strategy, pid}.
+fn register_engine(name: &str, symbol: &str, strategy: &str) {
     let mut map: serde_json::Map<String, serde_json::Value> =
         std::fs::read_to_string(ENGINE_REGISTRY)
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default();
 
+    let pid = std::process::id();
     map.insert(
-        symbol.to_string(),
-        serde_json::Value::String(strategy.to_string()),
+        name.to_string(),
+        serde_json::json!({
+            "symbol": symbol,
+            "strategy": strategy,
+            "pid": pid,
+        }),
     );
 
     if let Err(e) = std::fs::write(
@@ -93,7 +98,7 @@ fn register_engine(symbol: &str, strategy: &str) {
     ) {
         tracing::warn!("failed to write engine registry: {e}");
     } else {
-        tracing::info!("registered {symbol} → {strategy} in {ENGINE_REGISTRY}");
+        tracing::info!("registered {name} → {symbol}/{strategy} pid={pid} in {ENGINE_REGISTRY}");
     }
 }
 
@@ -247,10 +252,13 @@ async fn main() {
 
     // 设置 clientOrderId 前缀: "{strategy}-{SYMBOL}"
     let strategy_name = strategy.name().to_lowercase();
+    let registry_name = config.strategy_name.clone().unwrap_or_else(|| {
+        format!("{}-{}", strategy_name, config.symbol.to_lowercase())
+    });
     exchange.order_id_prefix = format!("{}-{}", strategy_name, config.symbol);
 
     // 注册引擎到 /tmp/hft-engines.json（供 risk_guard 读取策略映射）
-    register_engine(&config.symbol, &strategy_name);
+    register_engine(&registry_name, &config.symbol, &strategy_name);
 
     let candle_ms = config.timeframe_ms.unwrap_or(300_000); // default 5m
     let mut aggregator = CandleAggregator::new(candle_ms);

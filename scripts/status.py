@@ -46,6 +46,20 @@ def is_process_alive(name):
         return False
 
 
+def _registry_symbol_map(registry):
+    """从 registry 构建 {norm_symbol: strategy} 映射，兼容新旧格式。"""
+    m = {}
+    for key, val in registry.items():
+        if isinstance(val, dict):
+            sym = val.get("symbol", "")
+            strat = val.get("strategy", "?")
+            if sym:
+                m[sym] = strat
+        else:
+            m[key] = val
+    return m
+
+
 def show_engines():
     section("引擎")
     registry = read_registry()
@@ -53,10 +67,23 @@ def show_engines():
         print("  (无注册引擎)")
         return
 
-    hft_alive = is_process_alive("hft-engine")
-    for symbol, strategy in registry.items():
-        status = "RUNNING" if hft_alive else "DEAD"
-        print(f"  {symbol:<16} {strategy:<20} [{status}]")
+    for name, val in registry.items():
+        if isinstance(val, dict):
+            symbol = val.get("symbol", "?")
+            strategy = val.get("strategy", "?")
+            pid = val.get("pid", 0)
+            try:
+                alive = subprocess.run(
+                    ["kill", "-0", str(pid)], capture_output=True, timeout=2
+                ).returncode == 0 if pid else False
+            except Exception:
+                alive = False
+            status = "RUNNING" if alive else "DEAD"
+            print(f"  {name:<28} {symbol:<14} {strategy:<12} PID={pid} [{status}]")
+        else:
+            hft_alive = is_process_alive("hft-engine")
+            status = "RUNNING" if hft_alive else "DEAD"
+            print(f"  {name:<28} {val:<14} [{status}]")
 
 
 def show_account():
@@ -84,12 +111,12 @@ def show_positions():
             print("  (无持仓)")
             return
 
-        registry = read_registry()
+        sym_map = _registry_symbol_map(read_registry())
         total_pnl = 0.0
         for p in positions:
             sym = p.get("symbol", "")
             raw = sym.replace("/", "").replace(":USDT", "")
-            strategy = registry.get(raw, "?")
+            strategy = sym_map.get(raw, "?")
             side = p.get("side", "")
             contracts = float(p.get("contracts", 0) or 0)
             pnl = float(p.get("unrealizedPnl", 0) or 0)

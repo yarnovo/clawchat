@@ -155,35 +155,50 @@ def _load_risk_from_dir(strategy_dir, strategy_name):
     return risk_cfg
 
 
+def _read_engine_registry():
+    """读取 engine registry，兼容新旧格式。
+    新格式: {name: {symbol, strategy, pid}}
+    旧格式: {symbol: strategy_name}
+    返回: [(registry_name, norm_symbol, strategy_type)]
+    """
+    try:
+        if ENGINE_REGISTRY.exists():
+            raw = json.loads(ENGINE_REGISTRY.read_text())
+            entries = []
+            for key, val in raw.items():
+                if isinstance(val, dict):
+                    # 新格式
+                    entries.append((key, val.get("symbol", ""), val.get("strategy", "")))
+                else:
+                    # 旧格式: key=symbol, val=strategy
+                    entries.append((val, key, val))
+            return entries
+    except Exception:
+        pass
+    return []
+
+
 def load_risk_configs():
     """加载每个持仓对应的策略风控配置。
     返回 {normalized_symbol: risk_config}，如 {'PIPPINUSDT': {...}}。
 
     匹配路径（优先 engine registry）：
-    1. /tmp/hft-engines.json: {symbol: strategy_name} → strategies/{name}/risk.json
+    1. /tmp/hft-engines.json → strategies/{name}/risk.json
     2. 补充：遍历 strategies/*/strategy.json 按 symbol 字段匹配
     """
     by_name, by_symbol = _build_strategy_index()
     risk_by_symbol = {}
 
-    # 路径 1：通过 engine registry (symbol→strategy name→risk.json)
-    engine_map = {}
-    try:
-        if ENGINE_REGISTRY.exists():
-            engine_map = json.loads(ENGINE_REGISTRY.read_text())
-    except Exception:
-        pass
-
-    for norm_symbol, strategy_name in engine_map.items():
+    # 路径 1：通过 engine registry
+    for reg_name, norm_symbol, _strategy_type in _read_engine_registry():
         if norm_symbol in risk_by_symbol:
             continue
-        # strategy_name 可能是策略类型如 "scalping"，也可能是完整名如 "pippin-scalping-5m"
-        # 先按完整名匹配
-        strategy_dir = by_name.get(strategy_name)
+        # reg_name 是策略配置名如 "pippin-macd-5m"，直接匹配策略目录
+        strategy_dir = by_name.get(reg_name)
         if strategy_dir:
-            risk_by_symbol[norm_symbol] = _load_risk_from_dir(strategy_dir, strategy_name)
+            risk_by_symbol[norm_symbol] = _load_risk_from_dir(strategy_dir, reg_name)
             continue
-        # 再按 symbol 匹配
+        # fallback: 按 symbol 匹配
         strategy_dir = by_symbol.get(norm_symbol)
         if strategy_dir:
             dir_name = strategy_dir.name
@@ -221,13 +236,10 @@ def run_check(exchange):
     unrealized = result.get("unrealized_pnl", 0)
     num_pos = result.get("positions", 0)
 
-    # 读取引擎注册表: symbol → strategy
-    strategy_map = {}
-    try:
-        if ENGINE_REGISTRY.exists():
-            strategy_map = json.loads(ENGINE_REGISTRY.read_text())
-    except Exception:
-        pass
+    # 读取引擎注册表: symbol → strategy（兼容新旧格式）
+    symbol_to_strategy = {}
+    for _reg_name, norm_sym, strat_type in _read_engine_registry():
+        symbol_to_strategy[norm_sym] = strat_type
 
     # 获取每个持仓的独立盈亏（按策略标注）
     positions = get_positions(exchange)
@@ -236,7 +248,7 @@ def run_check(exchange):
         sym = p.get("symbol", "")
         # ccxt symbol 格式如 "PIPPIN/USDT:USDT"，registry 用 "PIPPINUSDT"
         raw_sym = sym.replace("/", "").replace(":USDT", "")
-        strategy = strategy_map.get(raw_sym, "unknown")
+        strategy = symbol_to_strategy.get(raw_sym, "unknown")
         detail.append({
             "symbol": sym,
             "side": p.get("side", ""),
