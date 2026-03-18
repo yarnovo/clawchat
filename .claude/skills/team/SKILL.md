@@ -48,10 +48,10 @@ engine/
          │ 心跳策略管理  │
          └──────┬──────┘
                 │
-  ┌─────────┬───┼───┬──────────┐
-  ▼         ▼   ▼   ▼          ▼
-strategist risk analyst engineer
- 策略研发  风控  分析   代码实现
+  ┌─────────┬───┼───┬────┬─────────┐
+  ▼         ▼   ▼   ▼    ▼         ▼
+strategist risk bull bear engineer
+ 策略研发  风控 积极派 谨慎派 代码实现
 ```
 
 > **team-lead = 交易总监 + 交易员**：启停引擎、划转资金、`make status` 监控、心跳策略管理、协调团队。
@@ -64,10 +64,11 @@ strategist risk analyst engineer
 | **risk** | 审核 risk.json、监控风控状态 | risk-engine 实时执行 |
 | **engineer** | Rust 交易/风控引擎代码 + Python 守护代码 | 引擎/守护进程 |
 
-| **analyst** | 分析数据、评估策略、给 team-lead 决策建议 | team-lead 决策参考 |
+| **bull** | 积极派分析师：找机会，论证该行动的理由 | team-lead 决策参考 |
+| **bear** | 谨慎派分析师：找风险，论证要谨慎的理由 | team-lead 决策参考 |
 
 > **技术支持**：strategist 和 risk 如需新脚本/工具/数据支持，告诉 team-lead，team-lead 派 engineer 实现。
-> **决策讨论**：team-lead 重要决策前先跟 analyst 讨论，获取第二意见。
+> **决策讨论**：team-lead 重要决策前同时问 bull 和 bear，听两边分析后决策。
 
 ## 策略配置
 
