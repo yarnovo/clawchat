@@ -49,25 +49,21 @@ make notify SUBJECT="xx" BODY="xx"
 
 ```
 .claude/skills/
-├── heartbeat/          /心跳    — 一个入口启动一切
-├── tech/
-│   ├── build/          /build   — 编译部署引擎
-│   └── monitor/        /monitor — 系统监控
-├── strategy/
-│   ├── find-alpha/     /find-alpha — 搜索盈利策略
-│   └── backtest/       /backtest   — 回测验证
-├── trading/
-│   ├── execute/        /execute — 执行交易计划
-│   └── report/         /report  — 统一报告
-└── risk/
-    ├── check/          /check   — 风控检查+止损
-    └── audit/          /audit   — 复盘审计
+├── heartbeat/    /heartbeat  — 一个入口启动一切（核心）
+├── build/        /build      — 编译部署引擎（技术）
+├── monitor/      /monitor    — 系统监控（技术）
+├── find-alpha/   /find-alpha — 搜索盈利策略（策略）
+├── backtest/     /backtest   — 回测验证（策略）
+├── execute/      /execute    — 执行交易计划（交易）
+├── report/       /report     — 统一报告（交易）
+├── check/        /check      — 风控检查+止损（风控）
+└── audit/        /audit      — 复盘审计（风控）
 ```
 
 ## 核心流程
 
 ```
-/心跳 → 创建团队 → 检查状态 → 驱动4个团队 → 输出报告 → 循环
+/heartbeat → 创建团队 → 检查状态 → 驱动4个团队 → 输出报告 → 循环
 
 首次启动: 无策略 → /find-alpha / 有策略 → /execute / 运行中 → 循环
 每轮循环: 收集数据 → 风控检查 → KPI → 驱动团队 → 报告

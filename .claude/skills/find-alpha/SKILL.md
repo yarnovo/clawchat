@@ -73,4 +73,4 @@ cd /Users/yarnb/agent-projects/clawchat/scripts && uv run python hft_engine.py -
 
 ### Phase 6: 启动心跳
 
-回到 `/心跳` 循环监控。
+回到 `/heartbeat` 循环监控。
