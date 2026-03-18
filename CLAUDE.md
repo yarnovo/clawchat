@@ -59,7 +59,8 @@ make notify SUBJECT="xx" BODY="xx"     # 发邮件
 
 ## 技能
 
-- `/run-company` — 启动量化基金（创建 Team + 策略 + 定时报告）
+- `/create-team` — 创建量化基金团队
+- `/heartbeat` — 激活公司（核心入口，启动所有定时任务）
 - `/start-trading` — 启动后台策略 + 定时监控
 - `/monitor` — 查行情/持仓/策略
 - `/scan` — 扫描高波动币种
