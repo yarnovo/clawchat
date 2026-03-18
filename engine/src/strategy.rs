@@ -1607,6 +1607,145 @@ impl Strategy for MeanReversionStrategy {
     }
 }
 
+// ══════════════════════════════════════════════════════════════
+// Grid 网格策略 — 在价格区间内等距划分网格，触及网格线低买高卖
+// ══════════════════════════════════════════════════════════════
+
+pub struct GridStrategy {
+    pub symbol: String,
+    pub order_qty: f64,
+    grids: usize,
+    lookback: usize,
+    closes: Vec<f64>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
+    lines: Option<Vec<f64>>,
+}
+
+impl GridStrategy {
+    pub fn new(symbol: &str, order_qty: f64) -> Self {
+        Self {
+            symbol: symbol.to_string(),
+            order_qty,
+            grids: 5,
+            lookback: 50,
+            closes: Vec::new(),
+            highs: Vec::new(),
+            lows: Vec::new(),
+            lines: None,
+        }
+    }
+
+    pub fn from_params(symbol: &str, order_qty: f64, params: &HashMap<String, f64>) -> Self {
+        Self {
+            symbol: symbol.to_string(),
+            order_qty,
+            grids: params.get("grids").copied().unwrap_or(5.0) as usize,
+            lookback: params.get("lookback").copied().unwrap_or(50.0) as usize,
+            closes: Vec::new(),
+            highs: Vec::new(),
+            lows: Vec::new(),
+            lines: None,
+        }
+    }
+
+    fn update_grid(&mut self) {
+        let n = self.closes.len();
+        let window_size = n.min(self.lookback);
+        let window = &self.closes[n - window_size..];
+        let lo = window.iter().cloned().fold(f64::INFINITY, f64::min);
+        let hi = window.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let margin = (hi - lo) * 0.1;
+        let lo = lo - margin;
+        let hi = hi + margin;
+        let step = (hi - lo) / self.grids as f64;
+        self.lines = Some((0..=self.grids).map(|i| lo + i as f64 * step).collect());
+    }
+}
+
+impl Strategy for GridStrategy {
+    fn export_state(&self) -> serde_json::Value {
+        serde_json::json!({
+            "closes": self.closes,
+            "highs": self.highs,
+            "lows": self.lows,
+            "lines": self.lines,
+        })
+    }
+
+    fn restore_state(&mut self, state: &serde_json::Value) {
+        if let Some(arr) = state.get("closes").and_then(|v| v.as_array()) {
+            self.closes = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        if let Some(arr) = state.get("highs").and_then(|v| v.as_array()) {
+            self.highs = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        if let Some(arr) = state.get("lows").and_then(|v| v.as_array()) {
+            self.lows = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        if let Some(arr) = state.get("lines").and_then(|v| v.as_array()) {
+            self.lines = Some(arr.iter().filter_map(|v| v.as_f64()).collect());
+        }
+        tracing::info!(candles = self.closes.len(), "Grid state restored");
+    }
+
+    fn on_candle(&mut self, candle: &Candle) -> Option<Signal> {
+        self.closes.push(candle.close);
+        self.highs.push(candle.high);
+        self.lows.push(candle.low);
+
+        let n = self.closes.len();
+        if n < 2 {
+            return Some(Signal::None);
+        }
+
+        // 初始化网格：需要至少 min(lookback, 50) 根 K 线
+        if self.lines.is_none() && n >= self.lookback.min(50) {
+            self.update_grid();
+        }
+
+        let lines = match &self.lines {
+            Some(l) => l,
+            None => return Some(Signal::None),
+        };
+
+        let prev = self.closes[n - 2];
+        let close = candle.close;
+
+        // 价格向下穿过网格线 → 买入（低买）
+        for &line in lines {
+            if prev >= line && close < line {
+                return Some(Signal::Order(OrderRequest {
+                    symbol: self.symbol.clone(),
+                    side: Side::Buy,
+                    order_type: OrderType::Market,
+                    qty: self.order_qty,
+                    price: None,
+                }));
+            }
+        }
+
+        // 价格向上穿过网格线 → 卖出（高卖）
+        for &line in lines {
+            if prev <= line && close > line {
+                return Some(Signal::Order(OrderRequest {
+                    symbol: self.symbol.clone(),
+                    side: Side::Sell,
+                    order_type: OrderType::Market,
+                    qty: self.order_qty,
+                    price: None,
+                }));
+            }
+        }
+
+        Some(Signal::None)
+    }
+
+    fn name(&self) -> &str {
+        "Grid"
+    }
+}
+
 /// 计算止损/止盈价格
 pub fn calc_sl_tp(entry: f64, atr: f64, is_long: bool, sl_mult: f64, tp_mult: f64) -> (f64, f64) {
     if is_long {
@@ -1763,5 +1902,76 @@ mod tests {
         let exported = mm.export_state();
         assert!(exported.get("pending_bid").unwrap().is_null());
         assert!(exported.get("pending_ask").unwrap().is_null());
+    }
+
+    #[test]
+    fn grid_warmup_returns_none() {
+        let mut grid = GridStrategy::new("BTCUSDT", 1.0);
+        // 默认 lookback=50, min(50,50)=50，前 49 根不建网格
+        for i in 0..49 {
+            let sig = grid.on_candle(&sample_candle(100.0, i));
+            assert_eq!(sig, Some(Signal::None));
+        }
+    }
+
+    #[test]
+    fn grid_buy_on_price_drop_through_line() {
+        let mut grid = GridStrategy::from_params(
+            "BTCUSDT", 1.0,
+            &[("grids".to_string(), 5.0), ("lookback".to_string(), 10.0)]
+                .into_iter().collect(),
+        );
+        // 喂入 10 根稳定 K 线建立网格（价格 95-105 区间）
+        for i in 0..10 {
+            let price = 95.0 + (i as f64);
+            grid.on_candle(&sample_candle(price, i));
+        }
+        // 网格已建立，下一根价格大跌穿过网格线 → 应该买入
+        let sig = grid.on_candle(&sample_candle(93.0, 10));
+        match sig {
+            Some(Signal::Order(req)) => assert_eq!(req.side, Side::Buy),
+            _ => panic!("expected Buy signal on price drop through grid line"),
+        }
+    }
+
+    #[test]
+    fn grid_sell_on_price_rise_through_line() {
+        let mut grid = GridStrategy::from_params(
+            "BTCUSDT", 1.0,
+            &[("grids".to_string(), 5.0), ("lookback".to_string(), 10.0)]
+                .into_iter().collect(),
+        );
+        // 喂入 10 根稳定 K 线
+        for i in 0..10 {
+            let price = 95.0 + (i as f64);
+            grid.on_candle(&sample_candle(price, i));
+        }
+        // 价格大涨穿过网格线 → 应该卖出
+        let sig = grid.on_candle(&sample_candle(107.0, 10));
+        match sig {
+            Some(Signal::Order(req)) => assert_eq!(req.side, Side::Sell),
+            _ => panic!("expected Sell signal on price rise through grid line"),
+        }
+    }
+
+    #[test]
+    fn grid_state_roundtrip() {
+        let mut grid = GridStrategy::from_params(
+            "BTCUSDT", 1.0,
+            &[("grids".to_string(), 5.0), ("lookback".to_string(), 10.0)]
+                .into_iter().collect(),
+        );
+        for i in 0..15 {
+            grid.on_candle(&sample_candle(100.0 + (i as f64) * 0.1, i));
+        }
+
+        let exported = grid.export_state();
+        assert!(exported.get("closes").and_then(|v| v.as_array()).is_some());
+        assert!(exported.get("lines").and_then(|v| v.as_array()).is_some());
+
+        let mut grid2 = GridStrategy::new("BTCUSDT", 1.0);
+        grid2.restore_state(&exported);
+        assert_eq!(grid2.closes.len(), 15);
+        assert!(grid2.lines.is_some());
     }
 }

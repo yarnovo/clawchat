@@ -2,8 +2,9 @@ use hft_engine::config::{Config, SizingMode, StrategyFile};
 use hft_engine::exchange::{self, Exchange};
 use hft_engine::state::{EngineState, TradeStats};
 use hft_engine::strategy::{
-    BollingerStrategy, BreakoutStrategy, CandleAggregator, MACDStrategy, MarketMaker,
-    MeanReversionStrategy, RSIStrategy, ScalpingStrategy, Signal, Strategy, TrendFollower,
+    BollingerStrategy, BreakoutStrategy, CandleAggregator, GridStrategy, MACDStrategy,
+    MarketMaker, MeanReversionStrategy, RSIStrategy, ScalpingStrategy, Signal, Strategy,
+    TrendFollower,
 };
 use hft_engine::types::{MarketEvent, OrderType as StratOrderType, Side as StratSide};
 use hft_engine::ws_feed::{start_feed, FeedConfig};
@@ -177,6 +178,14 @@ fn create_strategy(config: &Config) -> Box<dyn Strategy> {
                 Box::new(MeanReversionStrategy::from_params(sym, qty, p))
             } else {
                 Box::new(MeanReversionStrategy::new(sym, qty))
+            }
+        }
+        "grid" => {
+            tracing::info!("using Grid strategy");
+            if has_params {
+                Box::new(GridStrategy::from_params(sym, qty, p))
+            } else {
+                Box::new(GridStrategy::new(sym, qty))
             }
         }
         _ => {

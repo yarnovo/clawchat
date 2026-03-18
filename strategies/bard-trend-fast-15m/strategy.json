@@ -24,6 +24,6 @@
     "win_rate": 0.529,
     "profit_factor": 3.68
   },
-  "status": "approved",
-  "approved_date": "2026-03-18"
+  "status": "suspended",
+  "suspend_reason": "trades<20"
 }

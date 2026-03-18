@@ -130,7 +130,7 @@ pub fn normalize_symbol(s: &str) -> String {
 
 const VALID_STRATEGIES: &[&str] = &[
     "mm", "market_maker", "default", "scalping", "breakout", "rsi", "bollinger", "macd",
-    "mean_reversion",
+    "mean_reversion", "grid",
 ];
 
 /// Known params per strategy (for validation warnings)
@@ -144,6 +144,7 @@ fn known_params(strategy: &str) -> &'static [&'static str] {
         "bollinger" => &["bb_period", "num_std", "trend_ema", "atr_period", "atr_sl_mult"],
         "macd" => &["fast_period", "slow_period", "signal_period", "trend_ema", "atr_period", "atr_sl"],
         "mean_reversion" => &["ema_period", "std_period", "entry_std", "atr_period", "atr_sl"],
+        "grid" => &["grids", "lookback"],
         _ => &[],
     }
 }
