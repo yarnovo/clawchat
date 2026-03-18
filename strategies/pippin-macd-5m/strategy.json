@@ -1,0 +1,29 @@
+{
+  "name": "pippin-macd-5m",
+  "engine_strategy": "macd",
+  "symbol": "PIPPINUSDT",
+  "timeframe_ms": 300000,
+  "leverage": 3,
+  "order_qty": 100,
+  "position_size": 0.5,
+  "capital": 200,
+  "params": {
+    "fast": 12,
+    "slow": 26,
+    "signal": 9,
+    "trend_ema": 200,
+    "atr_period": 14,
+    "atr_sl": 2.0
+  },
+  "backtest": {
+    "days": 14,
+    "return_pct": 104.33,
+    "sharpe": 23.70,
+    "max_drawdown_pct": 13.32,
+    "trades": 27,
+    "win_rate": 0.519,
+    "profit_factor": 4.49
+  },
+  "status": "approved",
+  "approved_date": "2026-03-18"
+}
