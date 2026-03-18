@@ -28,7 +28,7 @@ cd /Users/yarnb/agent-projects/clawchat && make start
 ### Step 2: 创建所有定时任务
 
 ```
-/loop 2m KPI 心跳推进报告（按下面的心跳工作流执行）
+/loop 1m KPI 心跳推进报告（按下面的心跳工作流执行，每次都发邮件给用户）
 ```
 
 同时启动以下定时报告技能：
