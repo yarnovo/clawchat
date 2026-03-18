@@ -114,8 +114,8 @@ def open_short(exchange, symbol, amount, price=None, leverage=None):
 # ── 平仓 ───────────────────────────────────────────────────
 
 def close_long(exchange, symbol, amount, price=None):
-    """平多仓。用 reduceOnly=True 确保只平仓不反向开仓。"""
-    params = {'reduceOnly': True}
+    """平多仓。hedge mode 需要 positionSide=LONG。"""
+    params = {'reduceOnly': True, 'positionSide': 'LONG'}
     if price:
         order = exchange.create_limit_sell_order(symbol, amount, price, params)
         print(f"  CLOSE LONG {symbol} x{amount} @ ${price} (限价)")
@@ -126,8 +126,8 @@ def close_long(exchange, symbol, amount, price=None):
 
 
 def close_short(exchange, symbol, amount, price=None):
-    """平空仓。用 reduceOnly=True 确保只平仓不反向开仓。"""
-    params = {'reduceOnly': True}
+    """平空仓。hedge mode 需要 positionSide=SHORT。"""
+    params = {'reduceOnly': True, 'positionSide': 'SHORT'}
     if price:
         order = exchange.create_limit_buy_order(symbol, amount, price, params)
         print(f"  CLOSE SHORT {symbol} x{amount} @ ${price} (限价)")
