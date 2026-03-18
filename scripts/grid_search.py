@@ -12,21 +12,10 @@
 
 import argparse
 import itertools
-import json
 import sys
-import time
 
 from backtest import STRATEGIES, PARAM_ALIASES, fetch_candles, run_backtest, calc_metrics
-
-# ── 准入标准（SCHEMA.md）──
-CRITERIA = {
-    'min_roi': 20,
-    'min_sharpe': 5,
-    'max_drawdown': 15,
-    'min_trades': 8,
-    'min_win_rate': 50,
-    'min_profit_factor': 2,
-}
+from criteria import CRITERIA, passes as passes_criteria
 
 # ── 各策略的参数搜索空间（SCHEMA 参数名）──
 PARAM_GRIDS = {
@@ -76,19 +65,6 @@ PARAM_GRIDS = {
         'trail_atr': [2.0, 2.5, 3.5],
     },
 }
-
-
-def passes_criteria(m, days):
-    """检查回测结果是否达标"""
-    return (
-        days >= 14
-        and m['roi'] > CRITERIA['min_roi']
-        and m['sharpe'] > CRITERIA['min_sharpe']
-        and m['max_drawdown_pct'] < CRITERIA['max_drawdown']
-        and m['total_trades'] >= CRITERIA['min_trades']
-        and m['win_rate'] >= CRITERIA['min_win_rate']
-        and m['profit_factor'] >= CRITERIA['min_profit_factor']
-    )
 
 
 def main():

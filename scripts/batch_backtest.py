@@ -16,17 +16,8 @@ import os
 import sys
 
 from backtest import STRATEGIES, fetch_candles, run_backtest, calc_metrics
+from criteria import CRITERIA, passes as passes_criteria
 from futures_exchange import get_futures_exchange
-
-# ── 准入标准（SKILL.md）──
-CRITERIA = {
-    'min_roi': 15,
-    'min_sharpe': 5,
-    'max_drawdown': 20,
-    'min_trades': 20,
-    'min_win_rate': 45,
-    'min_profit_factor': 1.8,
-}
 
 # 要跑的策略（排除 fast 变体等固定参数子类）
 BATCH_STRATEGIES = [
@@ -74,19 +65,6 @@ def scan_symbols(top_n=15):
     return symbols
 
 
-def passes_criteria(m, days):
-    """检查回测结果是否达标"""
-    return (
-        days >= 14
-        and m['roi'] > CRITERIA['min_roi']
-        and m['sharpe'] > CRITERIA['min_sharpe']
-        and m['max_drawdown_pct'] < CRITERIA['max_drawdown']
-        and m['total_trades'] >= CRITERIA['min_trades']
-        and m['win_rate'] >= CRITERIA['min_win_rate']
-        and m['profit_factor'] >= CRITERIA['min_profit_factor']
-    )
-
-
 def main():
     parser = argparse.ArgumentParser(description='批量回测')
     parser.add_argument('--symbols', type=str, default=None,
@@ -128,8 +106,8 @@ def main():
     total = len(symbols) * len(strategies) * len(leverages)
     print(f"\n  批量回测: {len(symbols)} 币种 x {len(strategies)} 策略 x {len(leverages)} 杠杆 = {total} 组合")
     print(f"  天数: {args.days}  周期: {args.timeframe}  资金: ${args.capital}  仓位: {args.position*100:.0f}%")
-    print(f"  准入: ROI>{CRITERIA['min_roi']}% 夏普>{CRITERIA['min_sharpe']} "
-          f"回撤<{CRITERIA['max_drawdown']}% 交易>={CRITERIA['min_trades']} "
+    print(f"  准入: ROI>{CRITERIA['min_return_pct']}% 夏普>{CRITERIA['min_sharpe']} "
+          f"回撤<{CRITERIA['max_drawdown_pct']}% 交易>={CRITERIA['min_trades']} "
           f"胜率>={CRITERIA['min_win_rate']}% PF>={CRITERIA['min_profit_factor']}")
     print()
 
