@@ -3,6 +3,14 @@ name = "hft-engine"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "hft-engine"
+path = "src/main.rs"
+
+[[bin]]
+name = "risk-engine"
+path = "src/bin/risk_engine.rs"
+
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 tokio-tungstenite = { version = "0.26", features = ["native-tls"] }

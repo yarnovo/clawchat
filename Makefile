@@ -4,7 +4,7 @@ export BASH_ENV := .env
 ROOT := $(shell pwd)
 PY := cd $(ROOT)/scripts && uv run python
 
-.PHONY: install clean watch account scan backtest pnl strategy-pnl check guard watcher status build hft transfer help
+.PHONY: install clean watch account scan backtest pnl strategy-pnl check guard watcher status build hft risk-engine transfer help
 
 # === Setup ===
 
@@ -60,7 +60,10 @@ build: ## Build Rust engine (release)
 	cd engine && cargo build --release
 
 hft: ## Run Rust HFT engine
-	cd engine && cargo run --release
+	cd engine && cargo run --release --bin hft-engine
+
+risk-engine: ## Run Rust risk engine (independent process, 10s interval)
+	cd engine && cargo run --release --bin risk-engine
 
 # === Help ===
 

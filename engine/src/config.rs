@@ -55,13 +55,9 @@ pub struct Config {
     #[arg(skip)]
     pub params: HashMap<String, f64>,
 
-    /// Capital amount (from config file, for risk calculations)
+    /// Capital amount (from config file)
     #[arg(skip)]
     pub capital: Option<f64>,
-
-    /// Path to risk.json (derived from strategy.json directory)
-    #[arg(skip)]
-    pub risk_json_path: Option<PathBuf>,
 }
 
 /// Deserialized strategy.json
@@ -124,8 +120,8 @@ impl Config {
         let _ = dotenvy::dotenv();
         let mut config = Self::parse();
 
-        if let Some(path) = config.config.clone() {
-            match std::fs::read_to_string(&path) {
+        if let Some(ref path) = config.config {
+            match std::fs::read_to_string(path) {
                 Ok(contents) => match serde_json::from_str::<StrategyFile>(&contents) {
                     Ok(sf) => config.apply_strategy_file(sf),
                     Err(e) => {
@@ -137,11 +133,6 @@ impl Config {
                     eprintln!("Failed to read {}: {e}", path.display());
                     std::process::exit(1);
                 }
-            }
-            // Derive risk.json path from strategy.json's parent directory
-            if let Some(parent) = path.parent() {
-                let risk_path = parent.join("risk.json");
-                config.risk_json_path = Some(risk_path);
             }
         }
 

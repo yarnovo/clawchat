@@ -1,20 +1,11 @@
-pub mod config;
-pub mod exchange;
-pub mod risk;
-pub mod strategy;
-pub mod types;
-pub mod ws_feed;
-
-use config::Config;
-use exchange::Exchange;
-use risk::{EngineRiskGuard, RiskConfig};
-use strategy::{
+use hft_engine::config::Config;
+use hft_engine::exchange::{self, Exchange};
+use hft_engine::strategy::{
     BollingerStrategy, BreakoutStrategy, CandleAggregator, MACDStrategy, MarketMaker,
     RSIStrategy, ScalpingStrategy, Signal, Strategy, TrendFollower,
 };
-use types::{MarketEvent, OrderType as StratOrderType, Side as StratSide};
-
-use crate::ws_feed::{start_feed, FeedConfig};
+use hft_engine::types::{MarketEvent, OrderType as StratOrderType, Side as StratSide};
+use hft_engine::ws_feed::{start_feed, FeedConfig};
 
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -187,21 +178,9 @@ fn create_strategy(config: &Config) -> Box<dyn Strategy> {
     }
 }
 
-/// 将策略信号转为交易所下单，先做风控检查，成功后写交易日志
-async fn execute_signal(
-    signal: &Signal,
-    exchange: &Exchange,
-    strategy_name: &str,
-    risk_guard: &mut EngineRiskGuard,
-    leverage: u32,
-) {
+/// 将策略信号转为交易所下单，成功后写交易日志
+async fn execute_signal(signal: &Signal, exchange: &Exchange, strategy_name: &str) {
     let Signal::Order(req) = signal else { return };
-
-    // ── 风控前置检查 ──
-    if let Err(reason) = risk_guard.pre_trade_check(req.qty, leverage) {
-        tracing::warn!(reason, qty = req.qty, "RISK BLOCKED: order rejected");
-        return;
-    }
 
     let side = match req.side {
         StratSide::Buy => exchange::Side::Buy,
@@ -273,18 +252,6 @@ async fn main() {
     // 注册引擎到 /tmp/hft-engines.json（供 risk_guard 读取策略映射）
     register_engine(&registry_name, &config.symbol, &strategy_name);
 
-    // ── 初始化引擎风控守卫 ──
-    let risk_config = match config.risk_json_path {
-        Some(ref path) => RiskConfig::load(path),
-        None => {
-            tracing::info!("no risk.json path, using default risk config");
-            RiskConfig::default()
-        }
-    };
-    let capital = config.capital.unwrap_or(200.0);
-    let mut risk_guard = EngineRiskGuard::new(risk_config, capital);
-    let leverage = config.leverage;
-
     let candle_ms = config.timeframe_ms.unwrap_or(300_000); // default 5m
     let mut aggregator = CandleAggregator::new(candle_ms);
 
@@ -311,7 +278,7 @@ async fn main() {
                     if let Some(signal) = strategy.on_candle(&candle) {
                         if signal != Signal::None {
                             tracing::info!(?signal, "candle signal");
-                            execute_signal(&signal, &exchange, &strategy_name, &mut risk_guard, leverage).await;
+                            execute_signal(&signal, &exchange, &strategy_name).await;
                         }
                     }
                 }
@@ -320,7 +287,7 @@ async fn main() {
                 if let Some(signal) = strategy.on_tick(tick) {
                     if signal != Signal::None {
                         tracing::info!(?signal, "tick signal");
-                        execute_signal(&signal, &exchange, &strategy_name, &mut risk_guard, leverage).await;
+                        execute_signal(&signal, &exchange, &strategy_name).await;
                     }
                 }
             }
@@ -328,7 +295,7 @@ async fn main() {
                 if let Some(signal) = strategy.on_depth(depth) {
                     if signal != Signal::None {
                         tracing::info!(?signal, "depth signal");
-                        execute_signal(&signal, &exchange, &strategy_name, &mut risk_guard, leverage).await;
+                        execute_signal(&signal, &exchange, &strategy_name).await;
                     }
                 }
             }
