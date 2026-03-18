@@ -5,20 +5,46 @@
 ```
 clawchat/
 ├── .env                    # 密钥（BINANCE / BINANCE_TESTNET / AGENTMAIL）
+├── Makefile                # 统一命令入口（所有语言通过 make 调用）
 ├── pyproject.toml          # uv 管理 Python 依赖
-├── Makefile                # 统一命令入口
-├── scripts/                # 核心脚本
+├── package.json            # npm 管理 Node.js 依赖（以后加）
+├── scripts/                # Python 层（回测 + 策略搜索 + 工具）
+│   ├── backtest.py         # 回测框架（扣手续费+滑点，9 个策略）
+│   ├── hft_engine.py       # Python 实时交易引擎
 │   ├── ws_feed.py          # WebSocket 实时行情
-│   ├── futures_exchange.py # 合约交易接口（杠杆+做空+止损）
-│   ├── backtest.py         # 回测框架（扣手续费+滑点）
-│   ├── hft_engine.py       # 实时交易引擎
+│   ├── futures_exchange.py # 合约交易接口
 │   ├── market.py           # 行情查询 + 选币扫描
 │   └── notify.py           # 邮件通知
+├── engine/                 # Rust 层（高频交易引擎）
+│   ├── Cargo.toml          # cargo 管理 Rust 依赖
+│   └── src/
+│       ├── main.rs         # 入口
+│       ├── ws_feed.rs      # 异步 WebSocket（tokio）
+│       ├── exchange.rs     # 合约 API + HMAC 签名
+│       ├── strategy.rs     # Strategy trait + 做市/趋势策略
+│       ├── risk.rs         # 风控（仓位/亏损/爆仓）
+│       ├── types.rs        # 数据类型（零拷贝 serde）
+│       └── config.rs       # 配置（clap + env）
 ├── data/                   # 运行数据（gitignore）
 ├── kpi/                    # KPI + 计划 + 复盘
 ├── notes/                  # 团队经验笔记
-└── .claude/skills/         # 技能
+└── .claude/skills/         # 技能（只调 make，不关心底层语言）
 ```
+
+## 多语言架构
+
+```
+Skill → make xxx → 底层实现
+
+Python (uv):   make backtest / make scan / make notify
+Rust (cargo):  make build / make hft
+Node.js (npm): make stream（以后加）
+```
+
+- 三种语言各管各的依赖管理
+- Makefile 是唯一的命令入口
+- Skill 和团队成员只用 `make xxx`，不关心底层语言
+- `engine/` 不绑定语言名，当前用 Rust，未来可换
 
 ## 核心规则
 
