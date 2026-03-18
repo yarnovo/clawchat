@@ -121,17 +121,10 @@ def load_risk_configs():
 
 
 def notify_stop_loss(alerts, exchange):
-    """触发止损时发邮件通知。任何失败只打日志，绝不退出进程。"""
-    try:
-        from notify import send
-        body_lines = ["风控守护进程触发自动止损：", ""]
-        for a in alerts:
-            body_lines.append(f"- {a}")
-        body_lines.append("")
-        body_lines.append(f"时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        send("[STOP LOSS] 自动止损触发", "\n".join(body_lines))
-    except BaseException as e:
-        print(f"  通知发送失败（不影响风控）: {e}")
+    """触发止损时打印到控制台。"""
+    print(f"\n  ⚠ 自动止损触发 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    for a in alerts:
+        print(f"  - {a}")
 
 
 def run_check(exchange):

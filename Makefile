@@ -4,7 +4,7 @@ export BASH_ENV := .env
 ROOT := $(shell pwd)
 PY := cd $(ROOT)/scripts && uv run python
 
-.PHONY: install clean watch account scan backtest pnl check guard watcher status build hft transfer notify report-dev help
+.PHONY: install clean watch account scan backtest pnl check guard watcher status build hft transfer help
 
 # === Setup ===
 
@@ -58,20 +58,6 @@ build: ## Build Rust engine (release)
 
 hft: ## Run Rust HFT engine
 	cd engine && cargo run --release
-
-# === Reports ===
-
-report-dev: ## Iteration report (on commit)
-	@cd $(ROOT)/scripts && \
-	MSG=$$(git -C .. log -1 --format="%H%n%s%n%n%b" 2>&1) && \
-	LOG=$$(git -C .. log --oneline -5 2>&1) && \
-	DIFF=$$(git -C .. diff --stat HEAD~1 2>&1) && \
-	SKILLS=$$(ls -1 ../.claude/skills/ 2>&1) && \
-	SCRIPTS=$$(ls -1 . 2>&1) && \
-	uv run python notify.py "迭代报告" "== 最新提交 ==" "$$MSG" "== 最近5条 ==" "$$LOG" "== 文件变更 ==" "$$DIFF" "== Skills ==" "$$SKILLS" "== Scripts ==" "$$SCRIPTS"
-
-notify: ## Send email (SUBJECT= BODY=)
-	@$(PY) notify.py "$(SUBJECT)" "$(BODY)"
 
 # === Help ===
 
