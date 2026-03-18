@@ -1,1 +1,1 @@
-{"action":"reduce","params":{"percent":50},"note":"锁利50%，仓位占比108%过高","updated_at":"2026-03-18T15:33:00Z","executed_at":null}
+{"action":"reduce","params":{"percent":50},"note":"二次锁利50%，遗留仓无止盈保护","updated_at":"2026-03-19T01:24:00Z","executed_at":null}

@@ -250,10 +250,13 @@ quant 提交策略后，team-lead 必须验证：
    ├─ quant 空闲 → 派分析/评审/报告
    ├─ architect 空闲 → 派设计待做方案
    └─ qa 空闲 → 派验证最新改动
-4. 决策 & 行动：
+4. 定时任务（检查 make status 输出的时间）：
+   ├─ 每日 9:00 → 跑 clawchat review + clawchat report daily
+   └─ 每周一 9:00 → 跑 clawchat report weekly
+5. 决策 & 行动：
    ├─ 策略亏钱 → suspend
    ├─ 策略赚钱 → trader 评估加仓
-   ├─ 空闲资金 → quant 找新策略
+   ├─ 空闲资金 → strategist 找新策略
    └─ 引擎异常 → devops 排查修复
 ```
 
