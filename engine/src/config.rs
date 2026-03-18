@@ -78,7 +78,7 @@ pub struct StrategyFile {
     pub params: HashMap<String, serde_json::Value>,
 }
 
-fn timeframe_to_ms(tf: &str) -> Option<u64> {
+pub fn timeframe_to_ms(tf: &str) -> Option<u64> {
     let (num_str, unit) = tf.split_at(tf.len().saturating_sub(1));
     let num: u64 = num_str.parse().ok()?;
     match unit {
@@ -91,7 +91,7 @@ fn timeframe_to_ms(tf: &str) -> Option<u64> {
 }
 
 /// Normalize symbol: "PIPPIN/USDT" → "PIPPINUSDT", "BTC/USDT" → "BTCUSDT"
-fn normalize_symbol(s: &str) -> String {
+pub fn normalize_symbol(s: &str) -> String {
     s.replace("/", "").replace(":USDT", "")
 }
 
@@ -136,43 +136,48 @@ impl Config {
             }
         }
 
-        config.validate();
+        if let Err(errors) = config.validate() {
+            for e in &errors {
+                eprintln!("FATAL: {e}");
+            }
+            std::process::exit(1);
+        }
         config
     }
 
-    /// Validate config values, exit on fatal errors, warn on issues.
-    fn validate(&self) {
-        let mut fatal = false;
+    /// Validate config values. Returns Err with list of fatal errors.
+    /// Also prints warnings for unknown/missing params.
+    pub fn validate(&self) -> Result<(), Vec<String>> {
+        let mut errors = Vec::new();
 
         // strategy must be valid
         if !VALID_STRATEGIES.contains(&self.strategy.as_str()) {
-            eprintln!("FATAL: unknown strategy '{}'. Must be one of: {}",
-                self.strategy, VALID_STRATEGIES.join(", "));
-            fatal = true;
+            errors.push(format!(
+                "unknown strategy '{}'. Must be one of: {}",
+                self.strategy,
+                VALID_STRATEGIES.join(", ")
+            ));
         }
 
         // symbol required
         if self.symbol.is_empty() {
-            eprintln!("FATAL: symbol is required");
-            fatal = true;
+            errors.push("symbol is required".to_string());
         }
 
         // leverage 1-20
         if self.leverage < 1 || self.leverage > 20 {
-            eprintln!("FATAL: leverage must be 1-20, got {}", self.leverage);
-            fatal = true;
+            errors.push(format!("leverage must be 1-20, got {}", self.leverage));
         }
 
         // order_qty > 0 (if set)
         if let Some(qty) = self.order_qty {
             if qty <= 0.0 {
-                eprintln!("FATAL: order_qty must be > 0, got {qty}");
-                fatal = true;
+                errors.push(format!("order_qty must be > 0, got {qty}"));
             }
         }
 
-        if fatal {
-            std::process::exit(1);
+        if !errors.is_empty() {
+            return Err(errors);
         }
 
         // Warn on unknown params
@@ -190,9 +195,11 @@ impl Config {
                 eprintln!("WARN: param '{k}' not set for strategy '{}', using default", self.strategy);
             }
         }
+
+        Ok(())
     }
 
-    fn apply_strategy_file(&mut self, sf: StrategyFile) {
+    pub fn apply_strategy_file(&mut self, sf: StrategyFile) {
         if let Some(name) = sf.name {
             self.strategy_name = Some(name);
         }
@@ -223,5 +230,205 @@ impl Config {
                 self.params.insert(k, n);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper: create a minimal valid Config for testing
+    fn test_config(strategy: &str, symbol: &str, leverage: u32) -> Config {
+        Config {
+            config: None,
+            symbol: symbol.to_string(),
+            leverage,
+            strategy: strategy.to_string(),
+            dry_run: true,
+            api_key: "test".to_string(),
+            api_secret: "test".to_string(),
+            base_url: "https://test".to_string(),
+            strategy_name: None,
+            order_qty: None,
+            timeframe_ms: None,
+            params: HashMap::new(),
+            capital: None,
+        }
+    }
+
+    // ── timeframe_to_ms ──
+
+    #[test]
+    fn timeframe_minutes() {
+        assert_eq!(timeframe_to_ms("5m"), Some(300_000));
+        assert_eq!(timeframe_to_ms("1m"), Some(60_000));
+        assert_eq!(timeframe_to_ms("15m"), Some(900_000));
+    }
+
+    #[test]
+    fn timeframe_hours_days_seconds() {
+        assert_eq!(timeframe_to_ms("1h"), Some(3_600_000));
+        assert_eq!(timeframe_to_ms("4h"), Some(14_400_000));
+        assert_eq!(timeframe_to_ms("1d"), Some(86_400_000));
+        assert_eq!(timeframe_to_ms("30s"), Some(30_000));
+    }
+
+    #[test]
+    fn timeframe_invalid() {
+        assert_eq!(timeframe_to_ms("x"), None);
+        assert_eq!(timeframe_to_ms(""), None);
+    }
+
+    // ── normalize_symbol ──
+
+    #[test]
+    fn normalize_symbol_slash() {
+        assert_eq!(normalize_symbol("PIPPIN/USDT"), "PIPPINUSDT");
+        assert_eq!(normalize_symbol("BTC/USDT"), "BTCUSDT");
+    }
+
+    #[test]
+    fn normalize_symbol_colon() {
+        assert_eq!(normalize_symbol("PIPPIN/USDT:USDT"), "PIPPINUSDT");
+    }
+
+    #[test]
+    fn normalize_symbol_already_clean() {
+        assert_eq!(normalize_symbol("BTCUSDT"), "BTCUSDT");
+    }
+
+    // ── validate: valid cases ──
+
+    #[test]
+    fn validate_valid_strategies() {
+        for &s in VALID_STRATEGIES {
+            let cfg = test_config(s, "BTCUSDT", 10);
+            assert!(cfg.validate().is_ok(), "strategy '{s}' should be valid");
+        }
+    }
+
+    #[test]
+    fn validate_valid_leverage_range() {
+        for lev in [1, 5, 10, 20] {
+            let cfg = test_config("macd", "BTCUSDT", lev);
+            assert!(cfg.validate().is_ok(), "leverage {lev} should be valid");
+        }
+    }
+
+    #[test]
+    fn validate_valid_order_qty() {
+        let mut cfg = test_config("macd", "BTCUSDT", 5);
+        cfg.order_qty = Some(100.0);
+        assert!(cfg.validate().is_ok());
+    }
+
+    // ── validate: invalid cases ──
+
+    #[test]
+    fn validate_invalid_strategy() {
+        let cfg = test_config("invalid_strat", "BTCUSDT", 10);
+        let err = cfg.validate().unwrap_err();
+        assert!(err.iter().any(|e| e.contains("unknown strategy")));
+    }
+
+    #[test]
+    fn validate_empty_symbol() {
+        let cfg = test_config("macd", "", 10);
+        let err = cfg.validate().unwrap_err();
+        assert!(err.iter().any(|e| e.contains("symbol is required")));
+    }
+
+    #[test]
+    fn validate_leverage_zero() {
+        let cfg = test_config("macd", "BTCUSDT", 0);
+        let err = cfg.validate().unwrap_err();
+        assert!(err.iter().any(|e| e.contains("leverage must be 1-20")));
+    }
+
+    #[test]
+    fn validate_leverage_too_high() {
+        let cfg = test_config("macd", "BTCUSDT", 21);
+        let err = cfg.validate().unwrap_err();
+        assert!(err.iter().any(|e| e.contains("leverage must be 1-20")));
+    }
+
+    #[test]
+    fn validate_negative_order_qty() {
+        let mut cfg = test_config("macd", "BTCUSDT", 5);
+        cfg.order_qty = Some(-1.0);
+        let err = cfg.validate().unwrap_err();
+        assert!(err.iter().any(|e| e.contains("order_qty must be > 0")));
+    }
+
+    #[test]
+    fn validate_zero_order_qty() {
+        let mut cfg = test_config("macd", "BTCUSDT", 5);
+        cfg.order_qty = Some(0.0);
+        let err = cfg.validate().unwrap_err();
+        assert!(err.iter().any(|e| e.contains("order_qty must be > 0")));
+    }
+
+    #[test]
+    fn validate_multiple_errors() {
+        let cfg = test_config("bad", "", 0);
+        let err = cfg.validate().unwrap_err();
+        assert!(err.len() >= 3); // bad strategy + empty symbol + leverage 0
+    }
+
+    // ── apply_strategy_file ──
+
+    #[test]
+    fn apply_strategy_file_full() {
+        let mut cfg = test_config("default", "BTCUSDT", 10);
+        let sf: StrategyFile = serde_json::from_str(r#"{
+            "name": "pippin-macd-5m",
+            "engine_strategy": "macd",
+            "symbol": "PIPPIN/USDT",
+            "leverage": 5,
+            "order_qty": 100,
+            "capital": 200,
+            "timeframe": "5m",
+            "params": {"fast_period": 12, "slow_period": 26}
+        }"#).unwrap();
+
+        cfg.apply_strategy_file(sf);
+
+        assert_eq!(cfg.strategy_name.as_deref(), Some("pippin-macd-5m"));
+        assert_eq!(cfg.strategy, "macd");
+        assert_eq!(cfg.symbol, "PIPPINUSDT");
+        assert_eq!(cfg.leverage, 5);
+        assert_eq!(cfg.order_qty, Some(100.0));
+        assert_eq!(cfg.capital, Some(200.0));
+        assert_eq!(cfg.timeframe_ms, Some(300_000));
+        assert_eq!(cfg.params.get("fast_period"), Some(&12.0));
+        assert_eq!(cfg.params.get("slow_period"), Some(&26.0));
+    }
+
+    #[test]
+    fn apply_strategy_file_partial() {
+        let mut cfg = test_config("default", "BTCUSDT", 10);
+        let sf: StrategyFile = serde_json::from_str(r#"{
+            "symbol": "ETHUSDT"
+        }"#).unwrap();
+
+        cfg.apply_strategy_file(sf);
+
+        assert_eq!(cfg.symbol, "ETHUSDT");
+        assert_eq!(cfg.strategy, "default"); // unchanged
+        assert_eq!(cfg.leverage, 10); // unchanged
+    }
+
+    #[test]
+    fn apply_strategy_file_timeframe_ms_priority() {
+        let mut cfg = test_config("default", "BTCUSDT", 10);
+        let sf: StrategyFile = serde_json::from_str(r#"{
+            "timeframe_ms": 60000,
+            "timeframe": "5m"
+        }"#).unwrap();
+
+        cfg.apply_strategy_file(sf);
+
+        // timeframe_ms should take priority over timeframe string
+        assert_eq!(cfg.timeframe_ms, Some(60_000));
     }
 }

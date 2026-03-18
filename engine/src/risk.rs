@@ -263,11 +263,13 @@ impl EngineRiskGuard {
         self.daily_trades
     }
 
-    /// 手动重置（人工审核后）
+    /// 手动重置（人工审核后）— 清除所有日内计数器
     pub fn reset(&mut self) {
         self.stopped = false;
         self.stop_reason = None;
         self.consecutive_losses = 0;
+        self.daily_realized_pnl = 0.0;
+        self.daily_trades = 0;
         tracing::info!("engine risk guard manually reset");
     }
 }
@@ -390,6 +392,356 @@ impl RiskManager {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
+
+    // ══════════════════════════════════════════════════════════════
+    // RiskConfig 解析测试
+    // ══════════════════════════════════════════════════════════════
+
+    #[test]
+    fn risk_config_default_values() {
+        let cfg = RiskConfig::default();
+        assert!((cfg.max_loss_per_trade - 0.05).abs() < f64::EPSILON);
+        assert!((cfg.max_profit_per_trade - 0.10).abs() < f64::EPSILON);
+        assert!((cfg.max_daily_loss - 0.15).abs() < f64::EPSILON);
+        assert!((cfg.max_drawdown_warning - 0.20).abs() < f64::EPSILON);
+        assert!((cfg.max_drawdown_stop - 0.30).abs() < f64::EPSILON);
+        assert!((cfg.max_position_ratio - 0.30).abs() < f64::EPSILON);
+        assert!((cfg.min_liquidation_distance - 0.10).abs() < f64::EPSILON);
+        assert_eq!(cfg.max_leverage, 20);
+    }
+
+    #[test]
+    fn risk_config_load_full_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("risk.json");
+        let mut f = std::fs::File::create(&path).unwrap();
+        write!(f, r#"{{
+            "name": "test-strategy",
+            "max_loss_per_trade": 0.03,
+            "max_profit_per_trade": 0.08,
+            "max_daily_loss": 0.10,
+            "max_drawdown_warning": 0.15,
+            "max_drawdown_stop": 0.25,
+            "max_position_ratio": 0.40,
+            "min_liquidation_distance": 0.15,
+            "max_leverage": 10
+        }}"#).unwrap();
+
+        let cfg = RiskConfig::load(&path);
+        assert_eq!(cfg.name, "test-strategy");
+        assert!((cfg.max_loss_per_trade - 0.03).abs() < f64::EPSILON);
+        assert!((cfg.max_profit_per_trade - 0.08).abs() < f64::EPSILON);
+        assert!((cfg.max_daily_loss - 0.10).abs() < f64::EPSILON);
+        assert!((cfg.max_drawdown_stop - 0.25).abs() < f64::EPSILON);
+        assert!((cfg.max_position_ratio - 0.40).abs() < f64::EPSILON);
+        assert_eq!(cfg.max_leverage, 10);
+    }
+
+    #[test]
+    fn risk_config_load_partial_uses_defaults() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("risk.json");
+        let mut f = std::fs::File::create(&path).unwrap();
+        write!(f, r#"{{"max_loss_per_trade": 0.02}}"#).unwrap();
+
+        let cfg = RiskConfig::load(&path);
+        assert!((cfg.max_loss_per_trade - 0.02).abs() < f64::EPSILON);
+        // All other fields should be defaults
+        assert!((cfg.max_profit_per_trade - 0.10).abs() < f64::EPSILON);
+        assert!((cfg.max_daily_loss - 0.15).abs() < f64::EPSILON);
+        assert_eq!(cfg.max_leverage, 20);
+    }
+
+    #[test]
+    fn risk_config_load_missing_file_uses_defaults() {
+        let path = std::path::Path::new("/nonexistent/risk.json");
+        let cfg = RiskConfig::load(path);
+        assert!((cfg.max_loss_per_trade - 0.05).abs() < f64::EPSILON);
+        assert_eq!(cfg.max_leverage, 20);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // EngineRiskGuard pre-trade check 测试
+    // ══════════════════════════════════════════════════════════════
+
+    fn guard_with_defaults(capital: f64) -> EngineRiskGuard {
+        EngineRiskGuard::new(RiskConfig::default(), capital)
+    }
+
+    #[test]
+    fn pre_trade_check_normal_pass() {
+        let mut guard = guard_with_defaults(200.0);
+        assert!(guard.pre_trade_check(100.0, 5).is_ok());
+    }
+
+    #[test]
+    fn pre_trade_check_zero_qty_rejected() {
+        let mut guard = guard_with_defaults(200.0);
+        let err = guard.pre_trade_check(0.0, 5).unwrap_err();
+        assert!(err.contains("qty must be > 0"));
+    }
+
+    #[test]
+    fn pre_trade_check_leverage_exceeded() {
+        let mut guard = guard_with_defaults(200.0);
+        let err = guard.pre_trade_check(100.0, 25).unwrap_err();
+        assert!(err.contains("leverage 25 exceeds max 20"));
+    }
+
+    #[test]
+    fn pre_trade_check_custom_leverage_limit() {
+        let mut cfg = RiskConfig::default();
+        cfg.max_leverage = 5;
+        let mut guard = EngineRiskGuard::new(cfg, 200.0);
+        assert!(guard.pre_trade_check(100.0, 5).is_ok());
+        let err = guard.pre_trade_check(100.0, 6).unwrap_err();
+        assert!(err.contains("leverage 6 exceeds max 5"));
+    }
+
+    #[test]
+    fn pre_trade_check_daily_loss_limit() {
+        let mut guard = guard_with_defaults(200.0);
+        // max_daily_loss default = 0.15 = $30 on $200 capital
+        guard.record_trade(-30.0); // exactly at limit
+        let err = guard.pre_trade_check(100.0, 5).unwrap_err();
+        assert!(err.contains("daily loss"));
+    }
+
+    #[test]
+    fn pre_trade_check_daily_loss_under_limit() {
+        let mut guard = guard_with_defaults(200.0);
+        guard.record_trade(-29.0); // just under 15%
+        assert!(guard.pre_trade_check(100.0, 5).is_ok());
+    }
+
+    #[test]
+    fn pre_trade_check_consecutive_losses_circuit_breaker() {
+        let mut guard = guard_with_defaults(10_000.0); // large capital so daily loss doesn't trigger
+        for _ in 0..5 {
+            guard.record_trade(-1.0);
+        }
+        let err = guard.pre_trade_check(100.0, 5).unwrap_err();
+        assert!(err.contains("consecutive losses"));
+    }
+
+    #[test]
+    fn pre_trade_check_win_resets_consecutive() {
+        let mut guard = guard_with_defaults(10_000.0);
+        guard.record_trade(-1.0);
+        guard.record_trade(-1.0);
+        guard.record_trade(-1.0);
+        guard.record_trade(-1.0);
+        guard.record_trade(10.0); // win resets counter
+        guard.record_trade(-1.0);
+        assert!(guard.pre_trade_check(100.0, 5).is_ok());
+    }
+
+    #[test]
+    fn pre_trade_check_stopped_rejects() {
+        let mut guard = guard_with_defaults(200.0);
+        guard.record_trade(-31.0); // triggers daily stop
+        assert!(guard.is_stopped());
+        let err = guard.pre_trade_check(100.0, 5).unwrap_err();
+        assert!(err.contains("trading stopped"));
+    }
+
+    #[test]
+    fn engine_risk_guard_reset() {
+        let mut guard = guard_with_defaults(200.0);
+        guard.record_trade(-31.0);
+        assert!(guard.is_stopped());
+        guard.reset();
+        assert!(!guard.is_stopped());
+        assert!(guard.pre_trade_check(100.0, 5).is_ok());
+    }
+
+    #[test]
+    fn engine_risk_guard_daily_pnl_tracking() {
+        let mut guard = guard_with_defaults(1000.0);
+        guard.record_trade(10.0);
+        guard.record_trade(-3.0);
+        guard.record_trade(5.0);
+        assert!((guard.daily_pnl() - 12.0).abs() < f64::EPSILON);
+        assert_eq!(guard.daily_trades(), 3);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // 复利计算测试
+    // ══════════════════════════════════════════════════════════════
+
+    /// Helper: compute compound qty using the same formula as risk-engine
+    fn compound_qty(base_qty: f64, equity: f64, capital: f64) -> f64 {
+        let multiplier = (equity / capital).min(2.0);
+        base_qty * multiplier
+    }
+
+    #[test]
+    fn compound_equity_equals_capital() {
+        // equity == capital → 1x
+        let qty = compound_qty(100.0, 200.0, 200.0);
+        assert!((qty - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn compound_equity_above_capital() {
+        // equity $300, capital $200 → 1.5x
+        let qty = compound_qty(100.0, 300.0, 200.0);
+        assert!((qty - 150.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn compound_equity_capped_at_2x() {
+        // equity $500, capital $200 → capped at 2x
+        let qty = compound_qty(100.0, 500.0, 200.0);
+        assert!((qty - 200.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn compound_equity_below_capital() {
+        // equity $150, capital $200 → 0.75x (auto scale down)
+        let qty = compound_qty(100.0, 150.0, 200.0);
+        assert!((qty - 75.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn compound_equity_exactly_2x() {
+        // equity $400, capital $200 → exactly 2x
+        let qty = compound_qty(100.0, 400.0, 200.0);
+        assert!((qty - 200.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn compound_small_equity() {
+        // equity $50, capital $200 → 0.25x
+        let qty = compound_qty(100.0, 50.0, 200.0);
+        assert!((qty - 25.0).abs() < f64::EPSILON);
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // 风控规则测试（止损/止盈/高水位保护）
+    // ══════════════════════════════════════════════════════════════
+
+    /// Simulate risk check logic (same as risk_engine.rs)
+    struct RiskCheckResult {
+        should_close: bool,
+        reason: &'static str,
+    }
+
+    fn check_risk_rules(
+        pnl: f64,
+        capital: f64,
+        risk: &RiskConfig,
+        hwm: f64,
+        _balance: f64,
+        _notional: f64,
+    ) -> RiskCheckResult {
+        // Stop loss
+        if capital > 0.0 && pnl < 0.0 {
+            let loss_ratio = -pnl / capital;
+            if loss_ratio >= risk.max_loss_per_trade {
+                return RiskCheckResult {
+                    should_close: true,
+                    reason: "stop_loss",
+                };
+            }
+        }
+        // Take profit
+        if capital > 0.0 && pnl > 0.0 {
+            let profit_ratio = pnl / capital;
+            if profit_ratio >= risk.max_profit_per_trade {
+                return RiskCheckResult {
+                    should_close: true,
+                    reason: "take_profit",
+                };
+            }
+        }
+        // High water mark profit protection
+        if pnl > 0.0 && hwm > 0.0 {
+            let protection_line = hwm * (1.0 - risk.max_drawdown_stop);
+            if pnl <= protection_line {
+                return RiskCheckResult {
+                    should_close: true,
+                    reason: "profit_protection",
+                };
+            }
+        }
+        RiskCheckResult {
+            should_close: false,
+            reason: "ok",
+        }
+    }
+
+    #[test]
+    fn risk_stop_loss_triggers() {
+        let risk = RiskConfig::default(); // max_loss_per_trade = 0.05
+        let result = check_risk_rules(-10.0, 200.0, &risk, 0.0, 200.0, 0.0);
+        assert!(result.should_close);
+        assert_eq!(result.reason, "stop_loss");
+    }
+
+    #[test]
+    fn risk_stop_loss_below_threshold() {
+        let risk = RiskConfig::default();
+        let result = check_risk_rules(-9.9, 200.0, &risk, 0.0, 200.0, 0.0);
+        assert!(!result.should_close);
+    }
+
+    #[test]
+    fn risk_take_profit_triggers() {
+        let risk = RiskConfig::default(); // max_profit_per_trade = 0.10
+        let result = check_risk_rules(20.0, 200.0, &risk, 0.0, 200.0, 0.0);
+        assert!(result.should_close);
+        assert_eq!(result.reason, "take_profit");
+    }
+
+    #[test]
+    fn risk_take_profit_below_threshold() {
+        let risk = RiskConfig::default();
+        let result = check_risk_rules(19.9, 200.0, &risk, 0.0, 200.0, 0.0);
+        assert!(!result.should_close);
+    }
+
+    #[test]
+    fn risk_hwm_protection_triggers() {
+        let risk = RiskConfig::default(); // max_drawdown_stop = 0.30
+        // hwm = $20, protection_line = $20 * 0.70 = $14
+        // pnl = $14 → should trigger (pnl <= protection_line)
+        let result = check_risk_rules(14.0, 200.0, &risk, 20.0, 200.0, 0.0);
+        assert!(result.should_close);
+        assert_eq!(result.reason, "profit_protection");
+    }
+
+    #[test]
+    fn risk_hwm_protection_does_not_trigger() {
+        let risk = RiskConfig::default();
+        // hwm = $20, protection_line = $14
+        // pnl = $15 → should NOT trigger
+        let result = check_risk_rules(15.0, 200.0, &risk, 20.0, 200.0, 0.0);
+        assert!(!result.should_close);
+    }
+
+    #[test]
+    fn risk_hwm_protection_exact_boundary() {
+        let risk = RiskConfig::default();
+        // hwm = $20, protection_line = $14
+        // pnl = $14.01 → should NOT trigger (just above)
+        let result = check_risk_rules(14.01, 200.0, &risk, 20.0, 200.0, 0.0);
+        assert!(!result.should_close);
+    }
+
+    #[test]
+    fn risk_hwm_protection_deep_drawdown() {
+        let risk = RiskConfig::default();
+        // hwm = $20, pnl = $5 → deep drawdown, should trigger
+        let result = check_risk_rules(5.0, 200.0, &risk, 20.0, 200.0, 0.0);
+        assert!(result.should_close);
+        assert_eq!(result.reason, "profit_protection");
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    // 原有 RiskManager 测试
+    // ══════════════════════════════════════════════════════════════
 
     #[test]
     fn position_limit() {
