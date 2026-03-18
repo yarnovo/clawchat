@@ -66,6 +66,7 @@ strategist risk bull bear engineer
 
 | **bull** | 积极派分析师：找机会，论证该行动的理由 | team-lead 决策参考 |
 | **bear** | 谨慎派分析师：找风险，论证要谨慎的理由 | team-lead 决策参考 |
+| **architect** | 系统架构师：技术方案设计、架构评审（只设计不实现） | team-lead 讨论后派 engineer 实现 |
 
 > **技术支持**：strategist 和 risk 如需新脚本/工具/数据支持，告诉 team-lead，team-lead 派 engineer 实现。
 > **决策讨论**：team-lead 重要决策前同时问 bull 和 bear，听两边分析后决策。
