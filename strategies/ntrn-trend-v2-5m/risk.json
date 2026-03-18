@@ -1,0 +1,15 @@
+{
+  "name": "ntrn-trend-v2-5m",
+  "max_loss_per_trade": 0.05,
+  "max_profit_per_trade": 0.35,
+  "max_daily_loss": 0.15,
+  "max_drawdown_warning": 0.10,
+  "max_drawdown_stop": 0.20,
+  "max_position_ratio": 0.30,
+  "min_liquidation_distance": 0.10,
+  "max_leverage": 5,
+  "max_concurrent_positions": 3,
+  "max_hold_time_hours": 24,
+  "trailing_stop": 0.02,
+  "max_portfolio_exposure": 0.80
+}

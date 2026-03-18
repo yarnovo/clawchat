@@ -1,0 +1,32 @@
+{
+  "name": "ntrn-trend-v2-5m",
+  "engine_strategy": "default",
+  "symbol": "NTRNUSDT",
+  "timeframe": "5m",
+  "timeframe_ms": 300000,
+  "leverage": 3,
+  "order_qty": 10,
+  "position_size": 0.3,
+  "sizing_mode": "percent",
+  "capital": 200,
+  "params": {
+    "ema_fast": 10,
+    "ema_slow": 50,
+    "atr_period": 14,
+    "atr_sl_mult": 1.5,
+    "atr_tp_mult": 3.0
+  },
+  "backtest": {
+    "days": 14,
+    "return_pct": 42.35,
+    "sharpe": 10.90,
+    "max_drawdown_pct": 5.61,
+    "trades": 46,
+    "win_rate": 0.543,
+    "profit_factor": 1.93
+  },
+  "status": "pending",
+  "lifecycle": {
+    "created": "2026-03-19"
+  }
+}

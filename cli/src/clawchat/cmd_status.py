@@ -4,7 +4,7 @@
 import csv
 import json
 import subprocess
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from collections import defaultdict
@@ -13,6 +13,13 @@ from clawchat._paths import PROJECT_ROOT, STRATEGIES_DIR, RECORDS_DIR
 
 EQUITY_CSV = RECORDS_DIR / "equity.csv"
 TRADES_FILE = RECORDS_DIR / "trades.jsonl"
+SIGNALS_FILE = RECORDS_DIR / "signals.jsonl"
+
+# ANSI 颜色
+_RED = "\033[31m"
+_GREEN = "\033[32m"
+_RESET = "\033[0m"
+_STALE_MINUTES = 10
 
 
 def now():
@@ -162,6 +169,10 @@ def show_strategies():
         print("  (无策略)")
         return
 
+    # 预加载信号和交易数据（一次性读取，避免重复 IO）
+    signal_counts = _load_signals_by_strategy()
+    last_trades = _load_last_trade_by_strategy()
+
     approved = [s for s in strategies if s.get("status") in ("approved", "active")]
     suspended = [s for s in strategies if s.get("status") == "suspended"]
     other = [s for s in strategies if s.get("status") not in ("approved", "active", "suspended")]
@@ -172,7 +183,7 @@ def show_strategies():
             name = s.get("name", "?")
             sym = s.get("symbol", "?")
             strat = s.get("engine_strategy", "?")
-            state_info = _read_state_summary(s.get("_dir"))
+            state_info = _read_state_summary(s.get("_dir"), signal_counts, last_trades)
             print(f"    {name:<28} {sym:<14} {strat}")
             if state_info:
                 print(f"      {state_info}")
@@ -191,7 +202,65 @@ def show_strategies():
             print(f"    {s.get('name', '?'):<28} status={s.get('status', '?')}")
 
 
-def _read_state_summary(strategy_dir):
+def _load_signals_by_strategy():
+    """从 records/signals.jsonl 统计每个策略的信号数"""
+    counts = defaultdict(int)
+    if not SIGNALS_FILE.exists():
+        return counts
+    try:
+        for line in SIGNALS_FILE.read_text().strip().split("\n"):
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+                counts[rec.get("strategy", "")] += 1
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return counts
+
+
+def _load_last_trade_by_strategy():
+    """从 records/trades.jsonl 取每个策略最后一笔交易时间"""
+    last = {}
+    if not TRADES_FILE.exists():
+        return last
+    try:
+        for line in TRADES_FILE.read_text().strip().split("\n"):
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+                strat = rec.get("strategy", "")
+                ts = rec.get("ts", "")
+                if strat and ts:
+                    last[strat] = ts
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return last
+
+
+def _format_updated(updated_str):
+    """格式化 last_updated，超 10 分钟标红"""
+    if not updated_str or updated_str == "?":
+        return f"{_RED}?{_RESET}"
+    try:
+        # 解析 ISO 格式（如 2026-03-18T16:54:59Z）
+        dt = datetime.fromisoformat(updated_str.replace("Z", "+00:00"))
+        age = datetime.now(timezone.utc) - dt
+        age_min = int(age.total_seconds() / 60)
+        short_ts = dt.strftime("%m-%d %H:%M")
+        if age_min >= _STALE_MINUTES:
+            return f"{_RED}{short_ts} ({age_min}m ago){_RESET}"
+        return f"{_GREEN}{short_ts} ({age_min}m ago){_RESET}"
+    except Exception:
+        return updated_str
+
+
+def _read_state_summary(strategy_dir, signal_counts=None, last_trades=None):
     """Read state.json and return a one-line summary, or None."""
     if strategy_dir is None:
         return None
@@ -203,22 +272,47 @@ def _read_state_summary(strategy_dir):
     except Exception:
         return None
 
-    updated = state.get("last_updated", "?")
-    ts = state.get("trade_stats", {})
-    total = ts.get("total", 0)
-    wins = ts.get("wins", 0)
-    losses = ts.get("losses", 0)
-    pnl = ts.get("realized_pnl", 0.0)
+    strategy_name = strategy_dir.name
 
+    # 最后更新时间（超 10 分钟标红）
+    updated = state.get("last_updated", "?")
+    updated_fmt = _format_updated(updated)
+
+    # K 线累计数
     indicators = state.get("indicators", {})
     if isinstance(indicators, dict):
         candle_count = indicators.get("candle_count", "?")
     else:
         candle_count = "?"
 
+    # 交易统计
+    ts = state.get("trade_stats", {})
+    total = ts.get("total", 0)
+    wins = ts.get("wins", 0)
+    losses = ts.get("losses", 0)
+    pnl = ts.get("realized_pnl", 0.0)
     sign = "+" if pnl >= 0 else ""
     wr = f"{wins / total:.0%}" if total > 0 else "N/A"
-    return f"updated={updated}  trades={total} ({wins}W/{losses}L {wr})  pnl={sign}${pnl:.4f}  candles={candle_count}"
+
+    # 信号数
+    sig_count = 0
+    if signal_counts:
+        sig_count = signal_counts.get(strategy_name, 0)
+
+    # 最后交易时间
+    last_trade = "-"
+    if last_trades and strategy_name in last_trades:
+        try:
+            lt = last_trades[strategy_name]
+            lt_dt = datetime.fromisoformat(lt.replace("Z", "+00:00"))
+            last_trade = lt_dt.strftime("%m-%d %H:%M")
+        except Exception:
+            last_trade = last_trades[strategy_name][:16]
+
+    return (
+        f"tick={updated_fmt}  candles={candle_count}  signals={sig_count}  "
+        f"trades={total}({wins}W/{losses}L {wr})  pnl={sign}${pnl:.4f}  last_trade={last_trade}"
+    )
 
 
 def show_performance():

@@ -15,29 +15,18 @@ quant 回测发现策略 → strategies/{name}/ (strategy.json + risk.json)
                                 ↓ status=approved 自动
 strategy_watcher → 启动 hft-engine --config strategy.json
                                 ↓ 自动
-hft-engine 接收行情 → 计算信号 → pre-trade check → 下单
-                                ↓ 实时
-risk-engine 订阅 WebSocket → 实时风控 → 止损/止盈/高水位保护/复利
+hft-engine 统一管道：策略信号 → trade override → risk gate → 执行下单
 ```
 
-## 双 Rust 引擎架构
+## 引擎架构
+
+单进程统一管道（每策略一个 hft-engine 实例）：
 
 ```
-engine/
-├── src/
-│   ├── main.rs              ← hft-engine（交易引擎）
-│   └── bin/
-│       └── risk_engine.rs   ← risk-engine（风控引擎）
-├── Cargo.toml               ← [[bin]] 两个独立 binary
-└── SCHEMA.md                ← 策略配置格式规范
+strategy.json 信号 → SignalFilter → DecisionGate(trade.json) → RiskGate(risk.json) → Executor → 币安 API
 ```
 
-**两个独立进程，共享代码**：交易引擎崩了，风控引擎还在，能平仓保命。
-
-| 引擎 | 职责 | 特点 |
-|------|------|------|
-| **hft-engine** | 接收行情、计算信号、下单 | 读 strategy.json |
-| **risk-engine** | 实时风控、止损止盈、高水位保护、复利 | 读 risk.json、WebSocket 实时 |
+WebSocket 实时接收行情（aggTrade + depth + markPrice），30 秒超时自动重连。
 
 ## 团队架构
 
@@ -81,7 +70,7 @@ engine/
 strategies/
 └── {name}/
     ├── strategy.json    ← hft-engine 读（含 sizing_mode/params）
-    ├── risk.json        ← risk-engine 读（止盈止损由 quant 定义）
+    ├── risk.json        ← hft-engine RiskGate 读（止盈止损由 quant 定义）
     ├── state.json       ← 引擎写（运行时状态，重启恢复指标/K线/统计）
     └── backtest.md      ← 回测报告
 ```
@@ -103,12 +92,13 @@ quant 产出 → status=pending → team-lead review → status=approved → wat
 ### 三层防护
 
 ```
-第 1 层：hft-engine pre-trade check（下单前拦截）
-第 2 层：risk-engine（独立进程，WebSocket 实时监控持仓）
-第 3 层：交易所强平（最后防线）
+第 1 层：hft-engine SignalFilter（信号过滤）
+第 2 层：hft-engine RiskGate（风控检查 + 高水位保护）
+第 3 层：交易所 STOP_MARKET 条件单（安全网）
+第 4 层：交易所强平（最后防线）
 ```
 
-### risk-engine 功能
+### 风控功能（hft-engine 内置）
 
 | 功能 | 说明 |
 |------|------|
@@ -141,7 +131,7 @@ percent 模式计算：`order_qty = (equity × position_size × leverage) / pric
 
 两个引擎都用 notify crate 监听配置文件变化：
 - hft-engine 监听 strategy.json → 参数改了立即热更新策略
-- risk-engine 监听 risk.json → 阈值改了立即生效
+- hft-engine 监听 risk.json → 阈值改了立即生效
 
 ## 执行
 
@@ -189,7 +179,7 @@ TeamCreate(team_name="clawchat")
 nohup make watcher > /tmp/strategy-watcher.log 2>&1 &
 
 # Rust 风控引擎（WebSocket 实时）
-nohup make risk-engine > /tmp/risk-engine.log 2>&1 &
+# 引擎由 watcher 自动启动（每策略一个 hft-engine）
 
 # 引擎由 watcher 自动启动
 ```
@@ -227,7 +217,7 @@ make status   # 一屏看全局
 ## Code Review
 
 engineer 提交代码后的验收流程：
-1. **qa 先测**：跑 `cargo test --lib && cargo test --bin risk-engine`、手动验证功能、检查边界情况
+1. **qa 先测**：跑 `cargo test --lib && cargo test --bin hft-engine`、手动验证功能、检查边界情况
 2. **team-lead review**：`git diff` 看实际改动、确认逻辑正确
 3. **team-lead 提交**：统一 git commit
 - 不能只听汇报，qa 和 team-lead 都要验证
@@ -256,9 +246,7 @@ quant 提交策略后，team-lead 必须验证：
    ├─ 策略亏钱 → suspend
    ├─ 策略赚钱 → trader 评估加仓
    ├─ 空闲资金 → quant 找新策略
-   ├─ 引擎异常 → engineer 修
-   └─ 守护挂了 → 重启
-5. 每 10 轮 → 输出运营摘要给 CEO
+   └─ 引擎异常 → engineer 修 / watcher 重启
 ```
 
 ### 策略表现评估
