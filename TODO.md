@@ -6,7 +6,9 @@
 - [ ] quant: 每日 `clawchat review` 评估策略健康
 - [ ] quant: 每周生成周报（`clawchat report weekly`）
 - [ ] trader: 监控持仓，判断加仓/减仓/锁利
+- [ ] trader: 清理现货账户小币（A2Z/IDEX/POLYX/ZEC），换成 USDT
 - [ ] team-lead: 心跳策略管理（make status + 决策）
+- [ ] team-lead: 运维健康检查（引擎是否活着、行情数据是否在流、信号是否产生）
 
 ## 进行中
 
@@ -18,10 +20,9 @@
 - [ ] funding_rate_history.csv — 资金费率
 
 ### CLI 工具
+- [ ] `make status` 加运维健康栏（最后 tick 时间/K 线数/信号数，超时标红）
 - [ ] `clawchat risk-log` — 风控事件查询
-- [ ] `clawchat correlation` — 策略相关性分析
 - [ ] `clawchat funding` — 资金费率查看
-- [ ] `clawchat emergency-close` — 紧急全平
 
 ### 配置扩展
 - [ ] strategy.json: trade_direction / min_volume_filter / cooldown_bars / liquidity_guard
