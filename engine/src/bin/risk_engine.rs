@@ -22,11 +22,14 @@ use std::path::{Path, PathBuf};
 
 const ENGINE_REGISTRY: &str = "/tmp/hft-engines.json";
 const HIGH_WATER_FILE: &str = "reports/high_water_rust.json";
+const DYNAMIC_QTY_FILE: &str = "/tmp/dynamic_qty.json";
 const BINANCE_FSTREAM_WS: &str = "wss://fstream.binance.com";
 /// 风控配置热更新间隔（秒）
 const CONFIG_RELOAD_SECS: u64 = 60;
 /// listenKey keepalive 间隔（分钟）
 const KEEPALIVE_MINUTES: u64 = 20;
+/// 复利倍数上限
+const COMPOUND_MAX_MULTIPLIER: f64 = 2.0;
 
 // ── 风控事件 ─────────────────────────────────────────────────
 
@@ -58,10 +61,20 @@ struct StrategyJson {
     name: Option<String>,
     symbol: Option<String>,
     capital: Option<f64>,
+    order_qty: Option<f64>,
 }
 
-/// {normalized_symbol: (strategy_name, risk_config, capital)}
-type RiskMap = HashMap<String, (String, RiskConfig, f64)>;
+/// 每个 symbol 的风控+复利配置
+#[derive(Debug, Clone)]
+struct SymbolRiskConfig {
+    strategy_name: String,
+    risk: RiskConfig,
+    capital: f64,
+    base_qty: f64,
+}
+
+/// {normalized_symbol: SymbolRiskConfig}
+type RiskMap = HashMap<String, SymbolRiskConfig>;
 
 fn load_risk_configs(strategies_dir: &Path) -> RiskMap {
     let mut map = RiskMap::new();
@@ -92,6 +105,7 @@ fn load_risk_configs(strategies_dir: &Path) -> RiskMap {
                 .map(|s| normalize_symbol(&s))
                 .unwrap_or_default();
             let capital = cfg.capital.unwrap_or(200.0);
+            let base_qty = cfg.order_qty.unwrap_or(1.0);
 
             if symbol.is_empty() {
                 continue;
@@ -99,7 +113,15 @@ fn load_risk_configs(strategies_dir: &Path) -> RiskMap {
 
             let risk_file = dir.join("risk.json");
             let risk_config = RiskConfig::load(&risk_file);
-            map.insert(symbol.clone(), (name, risk_config, capital));
+            map.insert(
+                symbol.clone(),
+                SymbolRiskConfig {
+                    strategy_name: name,
+                    risk: risk_config,
+                    capital,
+                    base_qty,
+                },
+            );
         }
     }
 
@@ -107,7 +129,12 @@ fn load_risk_configs(strategies_dir: &Path) -> RiskMap {
         if !map.contains_key(norm_symbol) && !norm_symbol.is_empty() {
             map.insert(
                 norm_symbol.clone(),
-                (reg_name.clone(), RiskConfig::default(), 200.0),
+                SymbolRiskConfig {
+                    strategy_name: reg_name.clone(),
+                    risk: RiskConfig::default(),
+                    capital: 200.0,
+                    base_qty: 1.0,
+                },
             );
         }
     }
@@ -175,6 +202,49 @@ fn save_high_water(hwm: &HighWaterMarks) {
     }
     if let Ok(json) = serde_json::to_string_pretty(hwm) {
         let _ = std::fs::write(path, json);
+    }
+}
+
+// ── 复利动态 order_qty ───────────────────────────────────────
+
+/// 计算动态 order_qty 并写入 /tmp/dynamic_qty.json
+/// hft-engine 读取此文件获取实时调整后的下单量
+///
+/// order_qty = base_qty × min(equity / initial_capital, 2.0)
+fn update_dynamic_qty(risk_map: &RiskMap, equity: f64) {
+    let mut qty_map: serde_json::Map<String, serde_json::Value> = serde_json::Map::new();
+
+    for (symbol, cfg) in risk_map {
+        if cfg.capital <= 0.0 || cfg.base_qty <= 0.0 {
+            continue;
+        }
+        let multiplier = (equity / cfg.capital).min(COMPOUND_MAX_MULTIPLIER);
+        let dynamic_qty = cfg.base_qty * multiplier;
+
+        qty_map.insert(
+            symbol.clone(),
+            serde_json::json!({
+                "base_qty": cfg.base_qty,
+                "dynamic_qty": dynamic_qty,
+                "multiplier": multiplier,
+                "equity": equity,
+                "capital": cfg.capital,
+            }),
+        );
+
+        tracing::debug!(
+            "{symbol}: base={:.4} × {:.3} = {:.4}",
+            cfg.base_qty,
+            multiplier,
+            dynamic_qty
+        );
+    }
+
+    let json = serde_json::Value::Object(qty_map);
+    if let Ok(contents) = serde_json::to_string_pretty(&json) {
+        if let Err(e) = std::fs::write(DYNAMIC_QTY_FILE, contents) {
+            tracing::warn!("failed to write dynamic_qty.json: {e}");
+        }
     }
 }
 
@@ -537,10 +607,13 @@ async fn check_position_risk(
     let norm_sym = &pos.symbol;
     let key = pos.key();
 
-    let (strategy_name, risk_cfg, capital) = match risk_map.get(norm_sym) {
-        Some(r) => (&r.0, &r.1, r.2),
+    let cfg = match risk_map.get(norm_sym) {
+        Some(r) => r,
         None => return None,
     };
+    let strategy_name = &cfg.strategy_name;
+    let risk_cfg = &cfg.risk;
+    let capital = cfg.capital;
 
     let pnl = pos.unrealized_pnl;
 
@@ -724,6 +797,8 @@ async fn main() {
                 tracker.all_positions().len(),
                 total_balance
             );
+            // 初始复利计算
+            update_dynamic_qty(&risk_map, total_balance);
         }
         Err(e) => {
             tracing::error!("failed to load initial account: {e}");
@@ -826,6 +901,8 @@ async fn main() {
                     RiskEvent::BalanceUpdate { wallet_balance } => {
                         tracing::info!("balance update: ${wallet_balance:.2}");
                         total_balance = wallet_balance;
+                        // 复利：余额变化时更新动态 order_qty
+                        update_dynamic_qty(&risk_map, total_balance);
                     }
                 }
 
@@ -846,6 +923,10 @@ async fn main() {
                     tracing::info!("risk config reloaded: {} strategies", new_map.len());
                 }
                 risk_map = new_map;
+                // 复利重算（配置可能变了 base_qty / capital）
+                if total_balance > 0.0 {
+                    update_dynamic_qty(&risk_map, total_balance);
+                }
             }
         }
     }

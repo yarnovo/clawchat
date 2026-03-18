@@ -12,6 +12,17 @@ use std::io::Write;
 
 const ENGINE_REGISTRY: &str = "/tmp/hft-engines.json";
 const TRADES_LOG: &str = "reports/trades.jsonl";
+const DYNAMIC_QTY_FILE: &str = "/tmp/dynamic_qty.json";
+
+/// 从 /tmp/dynamic_qty.json 读取动态 order_qty（复利）
+/// 如果文件不存在或解析失败，返回 None
+fn read_dynamic_qty(symbol: &str) -> Option<f64> {
+    let contents = std::fs::read_to_string(DYNAMIC_QTY_FILE).ok()?;
+    let map: serde_json::Value = serde_json::from_str(&contents).ok()?;
+    map.get(symbol)?
+        .get("dynamic_qty")?
+        .as_f64()
+}
 
 /// Append a trade record to reports/trades.jsonl
 fn log_trade(
@@ -182,6 +193,12 @@ fn create_strategy(config: &Config) -> Box<dyn Strategy> {
 async fn execute_signal(signal: &Signal, exchange: &Exchange, strategy_name: &str) {
     let Signal::Order(req) = signal else { return };
 
+    // 复利：优先使用 risk-engine 计算的动态 order_qty
+    let qty = read_dynamic_qty(&exchange.symbol).unwrap_or(req.qty);
+    if (qty - req.qty).abs() > f64::EPSILON {
+        tracing::info!(base_qty = req.qty, dynamic_qty = qty, "using compound qty");
+    }
+
     let side = match req.side {
         StratSide::Buy => exchange::Side::Buy,
         StratSide::Sell => exchange::Side::Sell,
@@ -203,18 +220,18 @@ async fn execute_signal(signal: &Signal, exchange: &Exchange, strategy_name: &st
 
     let result = match req.order_type {
         StratOrderType::Market => {
-            exchange.market_order(side, pos_side, req.qty).await
+            exchange.market_order(side, pos_side, qty).await
         }
         StratOrderType::Limit => {
             let price = req.price.unwrap_or(0.0);
-            exchange.limit_order(side, pos_side, req.qty, price).await
+            exchange.limit_order(side, pos_side, qty, price).await
         }
     };
 
     match result {
         Ok(resp) => {
             tracing::info!(?resp, "order executed");
-            log_trade(strategy_name, &exchange.symbol, side_str, req.qty, order_type_str, &resp);
+            log_trade(strategy_name, &exchange.symbol, side_str, qty, order_type_str, &resp);
         }
         Err(e) => tracing::error!("order failed: {e}"),
     }
