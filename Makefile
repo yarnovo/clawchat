@@ -4,7 +4,7 @@ export BASH_ENV := .env
 ENGINE := cd engine &&
 CLI := cd cli &&
 
-.PHONY: build hft status watcher install clean test help
+.PHONY: build hft status watcher report-engine report-daily report-weekly install clean test help
 
 # === Engine (Rust) ===
 
@@ -21,6 +21,17 @@ status: ## Global status dashboard
 
 watcher: ## Strategy watcher (auto deploy/stop engines)
 	$(CLI) uv run python -m clawchat watcher
+
+# === Reports ===
+
+report-engine: ## Run report engine (daily/weekly scheduler)
+	$(CLI) uv run python -m clawchat.report_engine
+
+report-daily: ## Generate daily report (once)
+	$(CLI) uv run python -m clawchat.report_engine --once daily
+
+report-weekly: ## Generate weekly report (once)
+	$(CLI) uv run python -m clawchat.report_engine --once weekly
 
 install: ## Install all deps
 	$(CLI) uv sync

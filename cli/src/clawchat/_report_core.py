@@ -1,8 +1,7 @@
-"""报告生成工具 — 日报/周报 markdown 输出到 reports/"""
+"""报告核心逻辑 — 数据加载、指标计算、报告生成（纯函数）"""
 
 import csv
 import json
-import sys
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -346,55 +345,3 @@ def generate_weekly_report(end_date: datetime) -> str:
     lines.append(f"---\n*生成时间: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}*")
     lines.append("")
     return "\n".join(lines)
-
-
-# ── CLI 入口 ──────────────────────────────────────────────────
-
-
-def main():
-    import argparse
-
-    parser = argparse.ArgumentParser(prog="clawchat report", description="报告生成")
-    sub = parser.add_subparsers(dest="type", help="报告类型")
-
-    daily_p = sub.add_parser("daily", help="日报")
-    daily_p.add_argument("--date", default=None, help="日期 YYYY-MM-DD（默认今天）")
-
-    weekly_p = sub.add_parser("weekly", help="周报")
-    weekly_p.add_argument("--date", default=None, help="截止日期 YYYY-MM-DD（默认今天）")
-
-    args = parser.parse_args()
-
-    if args.type is None:
-        parser.print_help()
-        return
-
-    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
-
-    if args.type == "daily":
-        if args.date:
-            date = datetime.strptime(args.date, "%Y-%m-%d")
-        else:
-            date = datetime.now(timezone.utc)
-        report = generate_daily_report(date)
-        filename = f"daily-{date.strftime('%Y-%m-%d')}.md"
-        out_path = REPORTS_DIR / filename
-        out_path.write_text(report)
-        print(f"\n  日报已生成: {out_path}")
-        print(report)
-
-    elif args.type == "weekly":
-        if args.date:
-            date = datetime.strptime(args.date, "%Y-%m-%d")
-        else:
-            date = datetime.now(timezone.utc)
-        report = generate_weekly_report(date)
-        filename = f"weekly-{date.strftime('%Y-%m-%d')}.md"
-        out_path = REPORTS_DIR / filename
-        out_path.write_text(report)
-        print(f"\n  周报已生成: {out_path}")
-        print(report)
-
-
-if __name__ == "__main__":
-    main()

@@ -1,9 +1,9 @@
-"""Tests for cmd_report — daily/weekly report generation."""
+"""Tests for _report_core — daily/weekly report generation."""
 
 import json
 from datetime import datetime, timezone, timedelta
 
-from clawchat.cmd_report import (
+from clawchat._report_core import (
     filter_trades_by_date,
     compute_pnl_by_strategy,
     compute_equity_stats,
@@ -185,9 +185,9 @@ def test_equity_stats_out_of_range():
 
 def test_daily_report_structure(monkeypatch):
     """Daily report should contain expected markdown sections."""
-    monkeypatch.setattr("clawchat.cmd_report.load_trades", lambda: [])
-    monkeypatch.setattr("clawchat.cmd_report.load_equity", lambda: [])
-    monkeypatch.setattr("clawchat.cmd_report.load_strategy_configs", lambda: {
+    monkeypatch.setattr("clawchat._report_core.load_trades", lambda: [])
+    monkeypatch.setattr("clawchat._report_core.load_equity", lambda: [])
+    monkeypatch.setattr("clawchat._report_core.load_strategy_configs", lambda: {
         "test-strat": {"status": "approved", "symbol": "BTCUSDT", "timeframe": "5m"},
     })
 
@@ -206,9 +206,9 @@ def test_daily_report_with_trades(monkeypatch):
         _trade("s1", "BTC", "buy", 100, 1, ts="2026-03-19T10:00:00Z"),
         _trade("s1", "BTC", "sell", 110, 1, ts="2026-03-19T14:00:00Z"),
     ]
-    monkeypatch.setattr("clawchat.cmd_report.load_trades", lambda: trades)
-    monkeypatch.setattr("clawchat.cmd_report.load_equity", lambda: [])
-    monkeypatch.setattr("clawchat.cmd_report.load_strategy_configs", lambda: {})
+    monkeypatch.setattr("clawchat._report_core.load_trades", lambda: trades)
+    monkeypatch.setattr("clawchat._report_core.load_equity", lambda: [])
+    monkeypatch.setattr("clawchat._report_core.load_strategy_configs", lambda: {})
 
     report = generate_daily_report(datetime(2026, 3, 19))
 
@@ -220,10 +220,10 @@ def test_daily_report_with_trades(monkeypatch):
 
 
 def test_weekly_report_structure(monkeypatch):
-    monkeypatch.setattr("clawchat.cmd_report.load_trades", lambda: [])
-    monkeypatch.setattr("clawchat.cmd_report.load_equity", lambda: [])
-    monkeypatch.setattr("clawchat.cmd_report.load_strategy_configs", lambda: {})
-    monkeypatch.setattr("clawchat.cmd_report.load_performance", lambda name: None)
+    monkeypatch.setattr("clawchat._report_core.load_trades", lambda: [])
+    monkeypatch.setattr("clawchat._report_core.load_equity", lambda: [])
+    monkeypatch.setattr("clawchat._report_core.load_strategy_configs", lambda: {})
+    monkeypatch.setattr("clawchat._report_core.load_performance", lambda name: None)
 
     report = generate_weekly_report(datetime(2026, 3, 19))
 
@@ -240,10 +240,10 @@ def test_weekly_report_with_equity(monkeypatch):
         {"timestamp": "2026-03-17 08:00:00", "equity": "220"},
         {"timestamp": "2026-03-19 08:00:00", "equity": "210"},
     ]
-    monkeypatch.setattr("clawchat.cmd_report.load_trades", lambda: [])
-    monkeypatch.setattr("clawchat.cmd_report.load_equity", lambda: equity)
-    monkeypatch.setattr("clawchat.cmd_report.load_strategy_configs", lambda: {})
-    monkeypatch.setattr("clawchat.cmd_report.load_performance", lambda name: None)
+    monkeypatch.setattr("clawchat._report_core.load_trades", lambda: [])
+    monkeypatch.setattr("clawchat._report_core.load_equity", lambda: equity)
+    monkeypatch.setattr("clawchat._report_core.load_strategy_configs", lambda: {})
+    monkeypatch.setattr("clawchat._report_core.load_performance", lambda name: None)
 
     report = generate_weekly_report(datetime(2026, 3, 19))
 
@@ -252,12 +252,12 @@ def test_weekly_report_with_equity(monkeypatch):
 
 
 def test_weekly_report_with_performance(monkeypatch):
-    monkeypatch.setattr("clawchat.cmd_report.load_trades", lambda: [])
-    monkeypatch.setattr("clawchat.cmd_report.load_equity", lambda: [])
-    monkeypatch.setattr("clawchat.cmd_report.load_strategy_configs", lambda: {
+    monkeypatch.setattr("clawchat._report_core.load_trades", lambda: [])
+    monkeypatch.setattr("clawchat._report_core.load_equity", lambda: [])
+    monkeypatch.setattr("clawchat._report_core.load_strategy_configs", lambda: {
         "s1": {"status": "approved"},
     })
-    monkeypatch.setattr("clawchat.cmd_report.load_performance", lambda name: {
+    monkeypatch.setattr("clawchat._report_core.load_performance", lambda name: {
         "health": "healthy",
         "live": {"max_drawdown_pct": 5.5},
     })

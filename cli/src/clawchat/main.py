@@ -37,9 +37,6 @@ def main():
     sub.add_parser("correlation", help="策略相关性分析")
     sub.add_parser("funding", help="资金费率查看")
 
-    # 报告
-    sub.add_parser("report", help="报告生成（daily/weekly）")
-
     # 风控
     sub.add_parser("risk-log", help="风控事件查询")
 
@@ -110,9 +107,6 @@ def main():
         cmd()
     elif args.command == "funding":
         from clawchat.cmd_funding import main as cmd
-        cmd()
-    elif args.command == "report":
-        from clawchat.cmd_report import main as cmd
         cmd()
     elif args.command == "risk-log":
         from clawchat.cmd_risklog import main as cmd
