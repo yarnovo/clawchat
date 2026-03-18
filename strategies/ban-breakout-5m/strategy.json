@@ -12,6 +12,7 @@
     "maker": 0.0002
   },
   "slippage": 0.0005,
-  "status": "approved",
+  "status": "suspended",
+  "suspend_reason": "trades=7 (need >=10)",
   "approved_date": "2026-03-18"
 }

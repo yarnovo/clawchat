@@ -19,6 +19,7 @@
     "atr_filter": 0.3,
     "trail_atr": 3.0
   },
-  "status": "approved",
+  "status": "suspended",
+  "suspend_reason": "profit_factor=1.44 (need >2)",
   "approved_date": "2026-03-18"
 }

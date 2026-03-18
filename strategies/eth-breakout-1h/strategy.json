@@ -19,6 +19,7 @@
     "atr_filter": 0.3,
     "trail_atr": 3.0
   },
-  "status": "approved",
+  "status": "suspended",
+  "suspend_reason": "trades=3 (need >=10)",
   "approved_date": "2026-03-18"
 }

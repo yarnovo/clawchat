@@ -20,6 +20,7 @@
     "atr_sl_mult": 1.5,
     "atr_tp_mult": 2.5
   },
-  "status": "approved",
+  "status": "suspended",
+  "suspend_reason": "return=5.9% (need >20%), sharpe=3.34 (need >5), trades=2 (need >=10), win_rate=50% (need >50%)",
   "approved_date": "2026-03-18"
 }

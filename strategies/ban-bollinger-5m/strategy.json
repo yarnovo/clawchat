@@ -18,6 +18,7 @@
     "num_std": 2.5,
     "trend_ema": 50
   },
-  "status": "approved",
+  "status": "suspended",
+  "suspend_reason": "win_rate=50% (need >50%), drawdown=15.45% (need <15%)",
   "approved_date": "2026-03-18"
 }
