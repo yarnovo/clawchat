@@ -1,10 +1,10 @@
-"""策略实盘评估 — 对比实盘表现 vs 回测预期，生成 performance.json"""
+"""策略实盘评估 — 对比实盘表现 vs 回测预期，生成 performance.json，自动状态转换"""
 
 import json
 import math
 import sys
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from clawchat._paths import STRATEGIES_DIR, RECORDS_DIR
@@ -17,6 +17,21 @@ GREEN = "\033[92m"
 YELLOW = "\033[93m"
 BOLD = "\033[1m"
 RESET = "\033[0m"
+
+# 生命周期常量
+PROBATION_DAYS = 7
+DEGRADED_GRACE_DAYS = 7
+
+# probation → active 升级条件
+PROBATION_MIN_TRADES = 10
+PROBATION_MIN_ROI = 0.0           # 实盘收益 > 0%
+PROBATION_MIN_WR_RATIO = 0.8     # 胜率 >= 回测 80%
+PROBATION_MAX_DD_RATIO = 1.5     # 回撤 < 回测 1.5 倍
+
+
+def is_active_status(status: str | None) -> bool:
+    """status 是否表示策略应该在运行"""
+    return status in ("approved", "active")
 
 
 def load_all_trades() -> list[dict]:
@@ -42,8 +57,14 @@ def load_strategy_config(name: str) -> dict | None:
     return json.loads(path.read_text())
 
 
-def get_approved_strategies() -> list[str]:
-    """扫描 strategies/ 找所有 status=approved 的策略"""
+def save_strategy_config(name: str, cfg: dict):
+    """写回 strategy.json"""
+    path = STRATEGIES_DIR / name / "strategy.json"
+    path.write_text(json.dumps(cfg, indent=2, ensure_ascii=False) + "\n")
+
+
+def get_reviewable_strategies() -> list[str]:
+    """扫描 strategies/ 找所有 approved/active 的策略"""
     results = []
     if not STRATEGIES_DIR.exists():
         return results
@@ -53,11 +74,32 @@ def get_approved_strategies() -> list[str]:
             continue
         try:
             cfg = json.loads(sj.read_text())
-            if cfg.get("status") == "approved":
+            if is_active_status(cfg.get("status")):
                 results.append(d.name)
         except (json.JSONDecodeError, OSError):
             pass
     return results
+
+
+# keep old name as alias for backward compatibility
+get_approved_strategies = get_reviewable_strategies
+
+
+def filter_trades_by_window(trades: list[dict], days: int = 7) -> list[dict]:
+    """过滤最近 N 天的交易"""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    result = []
+    for t in trades:
+        ts_str = t.get("ts", "")
+        if not ts_str:
+            continue
+        try:
+            ts = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+            if ts >= cutoff:
+                result.append(t)
+        except (ValueError, TypeError):
+            pass
+    return result
 
 
 def compute_live_metrics(trades: list[dict], capital: float) -> dict:
@@ -145,7 +187,6 @@ def compute_live_metrics(trades: list[dict], capital: float) -> dict:
         mean_r = sum(returns) / len(returns)
         std_r = math.sqrt(sum((r - mean_r) ** 2 for r in returns) / len(returns))
         if std_r > 0:
-            # 年化：假设每天 ~10 笔交易，一年 365 天
             sharpe = (mean_r / std_r) * math.sqrt(len(pnl_series))
 
     return {
@@ -189,6 +230,116 @@ def assess_health(live: dict, backtest: dict | None) -> str:
     return "healthy"
 
 
+def _parse_date(s: str | None) -> datetime | None:
+    """解析日期字符串（支持 YYYY-MM-DD 和 ISO 格式）"""
+    if not s:
+        return None
+    try:
+        # YYYY-MM-DD
+        if len(s) == 10:
+            return datetime.strptime(s, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+        # ISO format
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+
+
+def _today() -> str:
+    """返回今天日期字符串"""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def check_probation_upgrade(
+    cfg: dict, live_7d: dict, backtest: dict | None, now: datetime | None = None,
+) -> str | None:
+    """检查是否应该从 approved → active（试运行期满升级）
+
+    条件：
+    - status=approved + lifecycle.approved 存在
+    - approved 已过 PROBATION_DAYS 天
+    - 7 天窗口实盘达标：
+      - ROI > 0%
+      - 胜率 >= 回测 80%
+      - 回撤 < 回测 1.5 倍
+      - 交易 >= 10 笔完整交易
+
+    返回 "active" 表示应该升级，None 表示不升级。
+    """
+    if cfg.get("status") != "approved":
+        return None
+
+    lifecycle = cfg.get("lifecycle", {})
+    approved_date = _parse_date(lifecycle.get("approved") or cfg.get("approved_date"))
+    if not approved_date:
+        return None
+
+    if now is None:
+        now = datetime.now(timezone.utc)
+    if (now - approved_date).days < PROBATION_DAYS:
+        return None
+
+    # 检查实盘指标
+    if live_7d["round_trips"] < PROBATION_MIN_TRADES:
+        return None
+    if live_7d["roi"] <= PROBATION_MIN_ROI:
+        return None
+
+    # 胜率对比回测
+    if backtest:
+        bt_wr = backtest.get("win_rate", 0) * 100
+        if bt_wr > 0 and live_7d["win_rate"] < bt_wr * PROBATION_MIN_WR_RATIO:
+            return None
+        bt_dd = backtest.get("max_drawdown_pct", 0)
+        if bt_dd > 0 and live_7d["max_drawdown_pct"] > bt_dd * PROBATION_MAX_DD_RATIO:
+            return None
+
+    return "active"
+
+
+def check_degraded_suspension(
+    cfg: dict, health: str, now: datetime | None = None,
+) -> str | None:
+    """检查是否应该从 degraded → suspended（持续退化自动降级）
+
+    条件：
+    - 当前 health=degraded
+    - lifecycle.degraded_since 存在且已过 DEGRADED_GRACE_DAYS 天
+
+    返回 "suspended" 表示应该降级，None 表示不降级。
+    """
+    if health != "degraded":
+        return None
+
+    lifecycle = cfg.get("lifecycle", {})
+    degraded_since = _parse_date(lifecycle.get("degraded_since"))
+
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    if degraded_since and (now - degraded_since).days >= DEGRADED_GRACE_DAYS:
+        return "suspended"
+
+    return None
+
+
+def _update_lifecycle(cfg: dict, health: str, now: datetime | None = None):
+    """更新 lifecycle 时间戳"""
+    if now is None:
+        now = datetime.now(timezone.utc)
+    today = now.strftime("%Y-%m-%d")
+
+    lifecycle = cfg.setdefault("lifecycle", {})
+    lifecycle["last_review"] = today
+
+    # 记录 degraded_since（首次进入 degraded 时设置）
+    if health == "degraded":
+        if not lifecycle.get("degraded_since"):
+            lifecycle["degraded_since"] = today
+    else:
+        # 不再 degraded → 清除
+        lifecycle.pop("degraded_since", None)
+
+
 def generate_performance(name: str, live: dict, backtest: dict | None, health: str) -> dict:
     """生成 performance.json 内容"""
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -203,8 +354,18 @@ def generate_performance(name: str, live: dict, backtest: dict | None, health: s
     return perf
 
 
-def review_strategy(name: str, all_trades: list[dict], verbose: bool = True) -> dict | None:
-    """评估单个策略，返回 performance dict"""
+def review_strategy(
+    name: str,
+    all_trades: list[dict],
+    verbose: bool = True,
+    now: datetime | None = None,
+) -> dict | None:
+    """评估单个策略，返回 performance dict
+
+    自动执行状态转换：
+    - probation → active（试运行期满升级）
+    - degraded → suspended（持续退化降级）
+    """
     cfg = load_strategy_config(name)
     if not cfg:
         if verbose:
@@ -223,8 +384,42 @@ def review_strategy(name: str, all_trades: list[dict], verbose: bool = True) -> 
         live = compute_live_metrics([], capital)
         health = "no_data"
     else:
+        # 全量指标
         live = compute_live_metrics(strades, capital)
         health = assess_health(live, backtest)
+
+    # 更新 lifecycle 时间戳
+    cfg_changed = False
+    _update_lifecycle(cfg, health, now=now)
+    cfg_changed = True
+
+    # 滚动 7 天窗口指标（用于 probation 升级判断）
+    strades_7d = filter_trades_by_window(strades, days=PROBATION_DAYS)
+    live_7d = compute_live_metrics(strades_7d, capital)
+
+    # 自动状态转换
+    transition = None
+
+    # 1. probation → active
+    new_status = check_probation_upgrade(cfg, live_7d, backtest, now=now)
+    if new_status:
+        transition = ("approved", "active", "试运行期满，实盘达标")
+        cfg["status"] = "active"
+        cfg.setdefault("lifecycle", {})["probation_end"] = _today() if now is None else now.strftime("%Y-%m-%d")
+        cfg_changed = True
+
+    # 2. degraded → suspended
+    if not transition:
+        new_status = check_degraded_suspension(cfg, health, now=now)
+        if new_status:
+            transition = (cfg.get("status", "?"), "suspended", f"degraded 超过 {DEGRADED_GRACE_DAYS} 天未恢复")
+            cfg["status"] = "suspended"
+            cfg["suspend_reason"] = f"auto: degraded {DEGRADED_GRACE_DAYS}+ days"
+            cfg_changed = True
+
+    # 写回 strategy.json（如果有变更）
+    if cfg_changed:
+        save_strategy_config(name, cfg)
 
     perf = generate_performance(name, live, backtest, health)
 
@@ -233,12 +428,22 @@ def review_strategy(name: str, all_trades: list[dict], verbose: bool = True) -> 
     perf_path.write_text(json.dumps(perf, indent=2, ensure_ascii=False) + "\n")
 
     if verbose:
-        _print_review(name, live, backtest, health)
+        _print_review(name, live, backtest, health, transition)
+
+    if transition:
+        perf["transition"] = {
+            "from": transition[0],
+            "to": transition[1],
+            "reason": transition[2],
+        }
 
     return perf
 
 
-def _print_review(name: str, live: dict, backtest: dict | None, health: str):
+def _print_review(
+    name: str, live: dict, backtest: dict | None, health: str,
+    transition: tuple | None = None,
+):
     """打印单个策略的评估报告"""
     health_colors = {
         "healthy": GREEN,
@@ -253,6 +458,8 @@ def _print_review(name: str, live: dict, backtest: dict | None, health: str):
 
     if live["trades"] == 0:
         print(f"    (无实盘数据)")
+        if transition:
+            _print_transition(transition)
         return
 
     pf_str = str(live["profit_factor"]) if live["profit_factor"] == "inf" else f"{live['profit_factor']:.2f}"
@@ -266,12 +473,27 @@ def _print_review(name: str, live: dict, backtest: dict | None, health: str):
         bt_pf = backtest.get("profit_factor", 0)
         print(f"    回测: ROI={backtest.get('return_pct', 0):.1f}%  WR={bt_wr:.0f}%  PF={bt_pf:.2f}  DD={backtest.get('max_drawdown_pct', 0):.1f}%")
 
+    if transition:
+        _print_transition(transition)
+
+
+def _print_transition(transition: tuple):
+    """打印状态转换信息"""
+    from_s, to_s, reason = transition
+    if to_s == "active":
+        color = GREEN
+    elif to_s == "suspended":
+        color = RED
+    else:
+        color = YELLOW
+    print(f"    {color}{BOLD}>>> {from_s} -> {to_s}: {reason}{RESET}")
+
 
 def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="策略实盘评估")
-    parser.add_argument("strategy", nargs="?", help="策略名（不指定则评估所有 approved 策略）")
+    parser.add_argument("strategy", nargs="?", help="策略名（不指定则评估所有 approved/active 策略）")
     args = parser.parse_args()
 
     all_trades = load_all_trades()
@@ -279,9 +501,9 @@ def main():
     if args.strategy:
         names = [args.strategy]
     else:
-        names = get_approved_strategies()
+        names = get_reviewable_strategies()
         if not names:
-            print("\n  无 approved 策略")
+            print("\n  无 approved/active 策略")
             return
 
     print(f"\n  {'='*62}")
@@ -289,10 +511,13 @@ def main():
     print(f"  {'='*62}")
 
     healths = {}
+    transitions = []
     for name in names:
         perf = review_strategy(name, all_trades)
         if perf:
             healths[name] = perf["health"]
+            if "transition" in perf:
+                transitions.append((name, perf["transition"]))
 
     # 汇总
     print(f"\n  {'─'*62}")
@@ -301,6 +526,12 @@ def main():
     degraded = sum(1 for h in healths.values() if h == "degraded")
     no_data = sum(1 for h in healths.values() if h in ("no_data", "no_backtest"))
     print(f"  合计: {len(healths)} 策略  {GREEN}healthy={healthy}{RESET}  {YELLOW}warning={warning}{RESET}  {RED}degraded={degraded}{RESET}  no_data={no_data}")
+
+    if transitions:
+        print(f"\n  {BOLD}状态变更:{RESET}")
+        for name, t in transitions:
+            print(f"    {name}: {t['from']} -> {t['to']} ({t['reason']})")
+
     print()
 
 

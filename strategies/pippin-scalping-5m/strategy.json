@@ -21,6 +21,7 @@
     "win_rate": 0.462,
     "profit_factor": 2.07
   },
-  "status": "approved",
+  "status": "suspended",
+  "suspend_reason": "30天回测不达标：回撤33.11%(>20%), 夏普4.90(<5), 胜率42.3%(<45%)",
   "approved_date": "2026-03-18"
 }

@@ -69,7 +69,7 @@ def _strategy_symbol_map():
             continue
         try:
             cfg = json.loads(sf.read_text())
-            if cfg.get("status") != "approved":
+            if cfg.get("status") not in ("approved", "active"):
                 continue
             sym = cfg.get("symbol", "").replace("/", "").replace(":USDT", "")
             strat = cfg.get("engine_strategy", cfg.get("strategy", "?"))
@@ -162,12 +162,12 @@ def show_strategies():
         print("  (无策略)")
         return
 
-    approved = [s for s in strategies if s.get("status") == "approved"]
+    approved = [s for s in strategies if s.get("status") in ("approved", "active")]
     suspended = [s for s in strategies if s.get("status") == "suspended"]
-    other = [s for s in strategies if s.get("status") not in ("approved", "suspended")]
+    other = [s for s in strategies if s.get("status") not in ("approved", "active", "suspended")]
 
     if approved:
-        print(f"  approved ({len(approved)}):")
+        print(f"  running ({len(approved)}):")
         for s in approved:
             name = s.get("name", "?")
             sym = s.get("symbol", "?")

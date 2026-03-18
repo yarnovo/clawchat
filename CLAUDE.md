@@ -22,11 +22,16 @@ make hft     # 运行
 
 ## records/
 
-引擎运行时记录目录（.gitignore 忽略）：
-- `equity.csv` — 权益曲线（时间戳/权益/盈亏/持仓数）
+引擎运行时记录（程序写入，.gitignore 忽略）：
+- `equity.csv` — 权益曲线
 - `high_water.json` — 高水位持久化
-- `trades.jsonl` — 交易日志（每笔成交）
+- `trades.jsonl` — 交易日志
 - `batch_results.csv` — 批量回测结果
+
+## reports/
+
+给人看的报告（CLI 生成，.gitignore 忽略）：
+- 日报/周报/策略报告（`clawchat report` 生成）
 
 ## 规则
 

@@ -104,7 +104,7 @@ def reconcile():
     # 应该运行的策略
     should_run = {
         name: cfg for name, cfg in strategies.items()
-        if cfg.get("status") == "approved"
+        if cfg.get("status") in ("approved", "active")
     }
 
     # 检查引擎健康，清理死掉的

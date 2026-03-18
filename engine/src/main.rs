@@ -590,6 +590,7 @@ async fn execute_signal(
     position_size: Option<f64>,
     leverage: u32,
     current_price: f64,
+    max_loss_per_trade: f64,
 ) {
     let Signal::Order(req) = signal else { return };
 
@@ -629,6 +630,34 @@ async fn execute_signal(
         Ok(resp) => {
             tracing::info!(?resp, "order executed");
             log_trade(strategy_name, &exchange.symbol, side_str, qty, order_type_str, &resp);
+
+            // 挂 STOP_MARKET 条件单作为交易所侧安全网
+            if max_loss_per_trade > 0.0 {
+                let (sl_side, sl_price) = match req.side {
+                    // 开多 → 止损卖出，价格下跌触发
+                    StratSide::Buy => (
+                        exchange::Side::Sell,
+                        current_price * (1.0 - max_loss_per_trade),
+                    ),
+                    // 开空 → 止损买入，价格上涨触发
+                    StratSide::Sell => (
+                        exchange::Side::Buy,
+                        current_price * (1.0 + max_loss_per_trade),
+                    ),
+                };
+                match exchange.stop_loss(sl_side, pos_side, sl_price).await {
+                    Ok(sl_resp) => {
+                        tracing::info!(
+                            stop_price = sl_price,
+                            ?sl_resp,
+                            "STOP_MARKET safety order placed"
+                        );
+                    }
+                    Err(e) => {
+                        tracing::warn!("STOP_MARKET order failed (non-blocking): {e}");
+                    }
+                }
+            }
         }
         Err(e) => tracing::error!("order failed: {e}"),
     }
@@ -823,6 +852,7 @@ async fn try_execute_signal(
     position_size: Option<f64>,
     leverage: u32,
     current_price: f64,
+    max_loss_per_trade: f64,
 ) {
     if *signal == Signal::None {
         return;
@@ -839,6 +869,7 @@ async fn try_execute_signal(
     execute_signal(
         signal, exchange, strategy_name,
         sizing_mode, position_size, leverage, current_price,
+        max_loss_per_trade,
     ).await;
 }
 
@@ -1167,6 +1198,7 @@ async fn main() {
                                 try_execute_signal(
                                     &signal, &trade_override, &exchange, &strategy_name,
                                     config.sizing_mode, config.position_size, config.leverage, last_price,
+                                    risk_config.max_loss_per_trade,
                                 ).await;
                                 // 成交后保存状态
                                 if signal != Signal::None && decision_gate_allows_signal(&trade_override) {
@@ -1186,6 +1218,7 @@ async fn main() {
                             try_execute_signal(
                                 &signal, &trade_override, &exchange, &strategy_name,
                                 config.sizing_mode, config.position_size, config.leverage, last_price,
+                                risk_config.max_loss_per_trade,
                             ).await;
                             if signal != Signal::None && decision_gate_allows_signal(&trade_override) {
                                 if let Some(ref sp) = state_path {
@@ -1199,6 +1232,7 @@ async fn main() {
                             try_execute_signal(
                                 &signal, &trade_override, &exchange, &strategy_name,
                                 config.sizing_mode, config.position_size, config.leverage, last_price,
+                                risk_config.max_loss_per_trade,
                             ).await;
                             if signal != Signal::None && decision_gate_allows_signal(&trade_override) {
                                 if let Some(ref sp) = state_path {
