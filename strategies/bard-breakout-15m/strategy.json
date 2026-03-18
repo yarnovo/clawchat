@@ -23,5 +23,8 @@
     "win_rate": 0.478,
     "profit_factor": 5.09
   },
-  "status": "approved"
+  "status": "approved",
+  "lifecycle": {
+    "last_review": "2026-03-18"
+  }
 }

@@ -25,5 +25,8 @@
     "profit_factor": 2.04
   },
   "status": "approved",
-  "approved_date": "2026-03-18"
+  "approved_date": "2026-03-18",
+  "lifecycle": {
+    "last_review": "2026-03-18"
+  }
 }

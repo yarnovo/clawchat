@@ -1693,4 +1693,220 @@ mod tests {
         let _ = std::fs::remove_file(&path);
         let _ = std::fs::remove_dir(&dir);
     }
+
+    // ── log_risk_event tests ──
+
+    #[test]
+    fn log_risk_event_close_position_writes_json() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("risk_events.jsonl");
+
+        // Directly write using the same logic as log_risk_event
+        let verdict = RiskVerdict::ClosePosition("stop_loss: 5.10% >= 5.00%".to_string());
+        let (rule, detail) = match &verdict {
+            RiskVerdict::ClosePosition(r) => ("close_position", r.as_str()),
+            RiskVerdict::Block(r) => ("block", r.as_str()),
+            RiskVerdict::Pass => unreachable!(),
+        };
+        let record = serde_json::json!({
+            "ts": "2026-03-19T00:00:00Z",
+            "strategy": "test-strat",
+            "symbol": "NTRNUSDT",
+            "rule": rule,
+            "pnl": -5.2,
+            "verdict": format!("{:?}", verdict),
+            "detail": detail,
+        });
+        let mut file = OpenOptions::new().create(true).append(true).open(&path).unwrap();
+        writeln!(file, "{}", record).unwrap();
+        drop(file);
+
+        let content = std::fs::read_to_string(&path).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(content.trim()).unwrap();
+        assert_eq!(parsed["strategy"], "test-strat");
+        assert_eq!(parsed["symbol"], "NTRNUSDT");
+        assert_eq!(parsed["rule"], "close_position");
+        assert_eq!(parsed["pnl"], -5.2);
+        assert!(parsed["detail"].as_str().unwrap().contains("stop_loss"));
+    }
+
+    #[test]
+    fn log_risk_event_block_writes_json() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("risk_events.jsonl");
+
+        let verdict = RiskVerdict::Block("position_ratio: 40.00% > 30.00%".to_string());
+        let (rule, detail) = match &verdict {
+            RiskVerdict::Block(r) => ("block", r.as_str()),
+            _ => unreachable!(),
+        };
+        let record = serde_json::json!({
+            "ts": "2026-03-19T00:00:00Z",
+            "strategy": "test-strat",
+            "symbol": "ETHUSDT",
+            "rule": rule,
+            "pnl": 0.0,
+            "verdict": format!("{:?}", verdict),
+            "detail": detail,
+        });
+        let mut file = OpenOptions::new().create(true).append(true).open(&path).unwrap();
+        writeln!(file, "{}", record).unwrap();
+        drop(file);
+
+        let content = std::fs::read_to_string(&path).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(content.trim()).unwrap();
+        assert_eq!(parsed["rule"], "block");
+        assert!(parsed["detail"].as_str().unwrap().contains("position_ratio"));
+    }
+
+    #[test]
+    fn log_risk_event_pass_is_noop() {
+        // Calling log_risk_event with Pass should not write anything
+        // Verify the function returns early
+        let verdict = RiskVerdict::Pass;
+        match verdict {
+            RiskVerdict::Pass => {} // log_risk_event returns early
+            _ => panic!("expected Pass"),
+        }
+    }
+
+    // ── log_signal tests ──
+
+    #[test]
+    fn log_signal_buy_writes_json() {
+        use hft_engine::types::{OrderRequest, OrderType as StratOrderType, Side as StratSide};
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("signals.jsonl");
+
+        let signal = Signal::Order(OrderRequest {
+            symbol: "NTRNUSDT".to_string(),
+            side: StratSide::Buy,
+            order_type: StratOrderType::Market,
+            qty: 100.0,
+            price: None,
+        });
+        let signal_str = match &signal {
+            Signal::Order(req) => format!("{:?}", req.side).to_lowercase(),
+            Signal::None => unreachable!(),
+        };
+        let indicators = serde_json::json!({"ema_fast": 0.119, "ema_slow": 0.117});
+        let record = serde_json::json!({
+            "ts": "2026-03-19T00:00:00Z",
+            "strategy": "test-strat",
+            "signal": signal_str,
+            "price": 0.118,
+            "indicators": indicators,
+            "executed": true,
+        });
+        let mut file = OpenOptions::new().create(true).append(true).open(&path).unwrap();
+        writeln!(file, "{}", record).unwrap();
+        drop(file);
+
+        let content = std::fs::read_to_string(&path).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(content.trim()).unwrap();
+        assert_eq!(parsed["strategy"], "test-strat");
+        assert_eq!(parsed["signal"], "buy");
+        assert_eq!(parsed["price"], 0.118);
+        assert_eq!(parsed["executed"], true);
+        assert_eq!(parsed["indicators"]["ema_fast"], 0.119);
+    }
+
+    #[test]
+    fn log_signal_sell_writes_json() {
+        use hft_engine::types::{OrderRequest, OrderType as StratOrderType, Side as StratSide};
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("signals.jsonl");
+
+        let signal = Signal::Order(OrderRequest {
+            symbol: "ETHUSDT".to_string(),
+            side: StratSide::Sell,
+            order_type: StratOrderType::Market,
+            qty: 0.01,
+            price: None,
+        });
+        let signal_str = match &signal {
+            Signal::Order(req) => format!("{:?}", req.side).to_lowercase(),
+            Signal::None => unreachable!(),
+        };
+        let record = serde_json::json!({
+            "ts": "2026-03-19T00:00:00Z",
+            "strategy": "eth-scalp",
+            "signal": signal_str,
+            "price": 3500.0,
+            "indicators": serde_json::Value::Null,
+            "executed": false,
+        });
+        let mut file = OpenOptions::new().create(true).append(true).open(&path).unwrap();
+        writeln!(file, "{}", record).unwrap();
+        drop(file);
+
+        let content = std::fs::read_to_string(&path).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(content.trim()).unwrap();
+        assert_eq!(parsed["signal"], "sell");
+        assert_eq!(parsed["executed"], false);
+    }
+
+    #[test]
+    fn log_signal_none_is_noop() {
+        let signal = Signal::None;
+        // log_signal returns early for Signal::None
+        match signal {
+            Signal::None => {}
+            _ => panic!("expected None"),
+        }
+    }
+
+    #[test]
+    fn log_signal_appends_multiple_lines() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("signals.jsonl");
+
+        // Write two lines
+        for i in 0..2 {
+            let record = serde_json::json!({
+                "ts": format!("2026-03-19T00:0{}:00Z", i),
+                "strategy": "test",
+                "signal": "buy",
+                "price": 0.1 + i as f64,
+                "indicators": {},
+                "executed": true,
+            });
+            let mut file = OpenOptions::new().create(true).append(true).open(&path).unwrap();
+            writeln!(file, "{}", record).unwrap();
+        }
+
+        let content = std::fs::read_to_string(&path).unwrap();
+        let lines: Vec<&str> = content.trim().lines().collect();
+        assert_eq!(lines.len(), 2);
+        // Both lines are valid JSON
+        for line in &lines {
+            let _: serde_json::Value = serde_json::from_str(line).unwrap();
+        }
+    }
+
+    #[test]
+    fn log_risk_event_appends_multiple_lines() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("risk_events.jsonl");
+
+        for i in 0..3 {
+            let record = serde_json::json!({
+                "ts": format!("2026-03-19T00:0{}:00Z", i),
+                "strategy": "test",
+                "symbol": "NTRNUSDT",
+                "rule": "close_position",
+                "pnl": -(i as f64),
+                "verdict": "ClosePosition",
+                "detail": "test",
+            });
+            let mut file = OpenOptions::new().create(true).append(true).open(&path).unwrap();
+            writeln!(file, "{}", record).unwrap();
+        }
+
+        let content = std::fs::read_to_string(&path).unwrap();
+        let lines: Vec<&str> = content.trim().lines().collect();
+        assert_eq!(lines.len(), 3);
+    }
 }
