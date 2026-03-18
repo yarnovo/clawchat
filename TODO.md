@@ -3,7 +3,10 @@
 ## 日常（持续进行）
 
 - [ ] strategist: 找新策略（batch-backtest + grid-search，30 天达标）
-- [ ] quant: 业务分析、策略评审、风控建议
+- [ ] quant: CLI 量化工具扩展优化（新命令/改进现有工具）
+- [ ] quant: engine 配置扩展优化（strategy/trade/risk json 字段能力）
+- [ ] quant: records 记录扩展优化（缺什么数据、格式改进）
+- [ ] quant: 策略评审、风控建议
 - [ ] trader: 持续监控持仓，判断加仓/减仓/锁利
 - [ ] risk: 审核 risk.json、监控风控状态、评估风控规则是否合理
 - [ ] devops: 运维检查（引擎是否在线/行情是否在流/K线是否增长），异常立即修复

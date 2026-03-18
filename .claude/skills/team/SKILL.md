@@ -49,7 +49,7 @@ WebSocket 实时接收行情（aggTrade + depth + markPrice），30 秒超时自
 
 | 成员 | 产出 | 消费者 |
 |------|------|--------|
-| **quant** | 量化专家：业务分析+策略评审+风控建议+报告（对标 architect 的业务角色，只分析不跑回测） | team-lead + strategist 参考 |
+| **quant** | 量化专家：CLI 工具扩展/engine 配置扩展/records 记录扩展/策略评审/风控建议（只分析不实现） | team-lead 讨论后派 engineer |
 | **strategist** | 策略研发：专门跑回测找策略（batch-backtest + grid-search），动手执行 | 核心产出角色 |
 | **trader** | 交易员：通过 trade.json 控制引擎（加仓/减仓/暂停/平仓） | 引擎文件监听执行 |
 | **risk** | 风控：审核 risk.json、监控风控状态 | 风控引擎执行 |
