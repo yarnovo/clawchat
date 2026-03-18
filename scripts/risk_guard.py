@@ -219,8 +219,10 @@ def main():
     while running:
         try:
             run_check(exchange)
-        except Exception as e:
-            print(f"  [ERROR] {e}")
+        except KeyboardInterrupt:
+            break
+        except BaseException as e:
+            print(f"  [ERROR] {type(e).__name__}: {e}")
         time.sleep(INTERVAL)
 
     print("  风控守护进程已退出")
