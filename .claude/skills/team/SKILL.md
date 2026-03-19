@@ -132,14 +132,15 @@ prompt:
 
 收到"修复 issues"时：
 1. 扫描 issues/open/ 目录
-2. 如果为空 → 汇报"无待修复问题"
+2. 如果为空 → 检查 requirements/ 有无待实现需求
 3. 按严重程度排序（高 > 中 > 低）
 4. 对每个 issue：
    - 分析根因
    - 实现修复
    - cargo build + cargo test 确保通过
    - 移动文件从 issues/open/ 到 issues/closed/
-5. SendMessage 向 team-lead 汇报修复了什么
+5. issues 修完后，如果 requirements/ 有待实现需求，挑优先级最高的实现
+6. SendMessage 向 team-lead 汇报修复/实现了什么
 
 收到其他技术任务时（如"优化XX"、"实现XX功能"）：
 1. 读相关代码

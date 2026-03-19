@@ -67,4 +67,5 @@ cargo run -p clawchat-ops -- --help
 - **git commit 只有 team-lead 做**，成员完成后汇报等验收
 - **策略 status 只有 team-lead 能改为 approved**，成员产出写 `status=pending`
 - **回测数据必须真实可复现**，team-lead 会亲自验证
+- **代码改动必须经 team-lead review**：工程师完成修复/实现后通知 team-lead，team-lead 验证 build + test 通过后才算完成
 - **需要全团队看到的规则写在这里（CLAUDE.md）**，不要散落在其他文件

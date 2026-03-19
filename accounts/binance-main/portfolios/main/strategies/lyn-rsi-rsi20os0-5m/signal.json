@@ -1,0 +1,35 @@
+{
+  "name": "lyn-rsi-rsi20os0-5m",
+  "engine_strategy": "rsi",
+  "symbol": "LYNUSDT",
+  "timeframe": "5m",
+  "timeframe_ms": 300000,
+  "leverage": 3,
+  "position_size": 0.3,
+  "capital": 15,
+  "params": {
+    "rsi_period": 20,
+    "rsi_oversold": 35,
+    "rsi_overbought": 75,
+    "trend_ema": 100,
+    "atr_period": 20,
+    "atr_sl_mult": 1.5,
+    "atr_tp_mult": 1.5
+  },
+  "backtest": {
+    "days": 90,
+    "return_pct": 52.8,
+    "sharpe": 7.3,
+    "max_drawdown_pct": 4.9,
+    "trades": 69,
+    "win_rate": 0.67,
+    "profit_factor": 6.37,
+    "validation_return_pct": 26.5,
+    "validation_sharpe": 6.8
+  },
+  "status": "approved",
+  "lifecycle": {
+    "discovered_at": "2026-03-19",
+    "discovery_engine": "v1"
+  }
+}
