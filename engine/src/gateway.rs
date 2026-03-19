@@ -182,7 +182,13 @@ fn extract_symbol_from_stream(stream: &str) -> Option<String> {
 
 /// 解析组合流消息，返回 (symbol_upper, MarketEvent)
 fn parse_combined_message(raw: &str) -> Option<(String, MarketEvent)> {
-    let combined: BinanceCombinedStream = serde_json::from_str(raw).ok()?;
+    let combined: BinanceCombinedStream = match serde_json::from_str(raw) {
+        Ok(c) => c,
+        Err(e) => {
+            warn!(%e, "failed to parse combined stream wrapper");
+            return None;
+        }
+    };
     let stream = &combined.stream;
     let symbol = extract_symbol_from_stream(stream)?;
 
@@ -258,7 +264,18 @@ async fn combined_feed_loop(
                                         }
                                         if let Some((symbol, event)) = parse_combined_message(&text) {
                                             if let Some(tx) = channels.get(&symbol) {
-                                                let _ = tx.send(event);
+                                                match tx.send(event) {
+                                                    Ok(n) => {
+                                                        if msg_count <= 5 {
+                                                            info!(symbol = %symbol, receivers = n, "gateway: event dispatched");
+                                                        }
+                                                    }
+                                                    Err(_) => {
+                                                        if msg_count <= 5 {
+                                                            warn!(symbol = %symbol, "gateway: no receivers for channel");
+                                                        }
+                                                    }
+                                                }
                                             } else {
                                                 warn!(symbol = %symbol, "gateway: no channel for symbol, dropping");
                                             }

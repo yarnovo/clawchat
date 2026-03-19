@@ -30,7 +30,7 @@ use clawchat_shared::types::SizingMode;
 use hft_engine::filter::SignalFilter;
 use hft_engine::gateway::{Gateway, UserEvent};
 use hft_engine::global_risk::{GlobalRiskConfig, GlobalRiskGuard, GlobalRiskVerdict};
-use hft_engine::ledger::Ledger;
+use hft_engine::ledger::{Ledger, Order};
 use hft_engine::order_router::OrderRouter;
 use hft_engine::risk::EngineRiskGuard;
 use hft_engine::state::{EngineState, TradeStats};
@@ -758,6 +758,25 @@ fn log_funding_rate(symbol: &str, funding_rate: f64, next_funding_time: &str) {
     }
 }
 
+// ── Order writer task (async, non-blocking) ───────────────────
+
+async fn order_writer_task(mut rx: mpsc::Receiver<Order>) {
+    let path = paths::records_dir().join("orders.jsonl");
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+
+    while let Some(order) = rx.recv().await {
+        let path = path.clone();
+        let _ = tokio::task::spawn_blocking(move || {
+            if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&path) {
+                let _ = writeln!(file, "{}", serde_json::to_string(&order).unwrap_or_default());
+            }
+        })
+        .await;
+    }
+}
+
 // ── Order sizing ───────────────────────────────────────────────
 
 fn compute_order_qty(
@@ -785,6 +804,7 @@ async fn execute_signal(
     signal: &Signal,
     exchange: &Exchange,
     rt: &mut StrategyRuntime,
+    order_tx: &mpsc::Sender<Order>,
 ) {
     let Signal::Order(req) = signal else { return };
 
@@ -813,6 +833,16 @@ async fn execute_signal(
         StratSide::Buy => "buy",
         StratSide::Sell => "sell",
     };
+
+    let order_type_str = match req.order_type {
+        StratOrderType::Market => "market",
+        StratOrderType::Limit => "limit",
+        _ => "unknown",
+    };
+
+    let ts_now = chrono::Utc::now();
+    let ts_str = ts_now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+    let order_id = format!("{}-{}-{}", rt.name, rt.symbol, ts_now.timestamp_millis());
 
     let result = match req.order_type {
         StratOrderType::Market => exchange.market_order(side, pos_side, qty).await,
@@ -845,6 +875,33 @@ async fn execute_signal(
                 .get("realizedPnl")
                 .and_then(|v| v.as_str().and_then(|s| s.parse().ok()).or_else(|| v.as_f64()))
                 .unwrap_or(0.0);
+            let client_order_id = resp
+                .get("clientOrderId")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+
+            // Record submitted order to orders.jsonl
+            let order = Order {
+                id: order_id,
+                exchange_id: if client_order_id.is_empty() { None } else { Some(client_order_id) },
+                strategy_name: rt.name.clone(),
+                symbol: rt.symbol.clone(),
+                side: side_str.to_string(),
+                order_type: order_type_str.to_string(),
+                qty,
+                price: req.price,
+                stop_price: None,
+                status: "submitted".to_string(),
+                filled_qty: 0.0,
+                avg_fill_price: avg_price,
+                commission,
+                created_at: ts_str,
+                filled_at: None,
+            };
+            if let Err(e) = order_tx.try_send(order) {
+                warn!("order record channel full, dropping submitted record: {e}");
+            }
 
             log_pnl_by_strategy(
                 &rt.name, &rt.symbol, side_str, qty, rt.last_price, avg_price,
@@ -864,7 +921,31 @@ async fn execute_signal(
                 }
             }
         }
-        Err(e) => error!(strategy = %rt.name, "order failed: {e}"),
+        Err(e) => {
+            error!(strategy = %rt.name, "order failed: {e}");
+
+            // Record rejected order to orders.jsonl
+            let order = Order {
+                id: order_id,
+                exchange_id: None,
+                strategy_name: rt.name.clone(),
+                symbol: rt.symbol.clone(),
+                side: side_str.to_string(),
+                order_type: order_type_str.to_string(),
+                qty,
+                price: req.price,
+                stop_price: None,
+                status: "rejected".to_string(),
+                filled_qty: 0.0,
+                avg_fill_price: 0.0,
+                commission: 0.0,
+                created_at: ts_str,
+                filled_at: None,
+            };
+            if let Err(e) = order_tx.try_send(order) {
+                warn!("order record channel full, dropping rejected record: {e}");
+            }
+        }
     }
 }
 
@@ -1260,6 +1341,10 @@ async fn main() {
     let (config_tx, mut config_rx) = mpsc::channel::<ConfigChange>(256);
     start_config_watcher(paths::strategies_dir(), portfolio_dir.clone(), config_tx);
 
+    // 14. Order record channel + writer task
+    let (order_tx, order_rx) = mpsc::channel::<Order>(4096);
+    tokio::spawn(order_writer_task(order_rx));
+
     // Per-strategy exchange instances (each with correct symbol + order_id_prefix)
     let mut exchanges: HashMap<String, Exchange> = HashMap::new();
     for (name, rt) in &runtimes {
@@ -1395,7 +1480,7 @@ async fn main() {
 
                 // Execute signal
                 if let Some(exchange) = exchanges.get(strategy_name) {
-                    execute_signal(&worker_signal.signal, exchange, rt).await;
+                    execute_signal(&worker_signal.signal, exchange, rt, &order_tx).await;
                 }
 
                 // Save ledger
@@ -1469,6 +1554,15 @@ async fn main() {
                         commission,
                         realized_pnl,
                     } => {
+                        let ts_now = chrono::Utc::now();
+                        let ts_str = ts_now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true);
+
+                        // Extract strategy name from clientOrderId prefix
+                        let strategy_name_from_id = client_order_id
+                            .rsplit_once('-')
+                            .map(|(prefix, _)| prefix.to_string())
+                            .unwrap_or_default();
+
                         if status == "FILLED" {
                             info!(
                                 symbol, client_order_id, side, qty, price,
@@ -1488,8 +1582,84 @@ async fn main() {
                             };
                             order_router.handle_order_update(&update);
 
+                            // Record filled order
+                            let order = Order {
+                                id: format!("{}-fill-{}", client_order_id, ts_now.timestamp_millis()),
+                                exchange_id: Some(client_order_id.clone()),
+                                strategy_name: strategy_name_from_id,
+                                symbol: symbol.clone(),
+                                side: side.to_lowercase(),
+                                order_type: "market".to_string(),
+                                qty,
+                                price: Some(price),
+                                stop_price: None,
+                                status: "filled".to_string(),
+                                filled_qty: qty,
+                                avg_fill_price: price,
+                                commission,
+                                created_at: ts_str,
+                                filled_at: Some(ts_now.to_rfc3339_opts(chrono::SecondsFormat::Millis, true)),
+                            };
+                            if let Err(e) = order_tx.try_send(order) {
+                                warn!("order record channel full, dropping filled record: {e}");
+                            }
+
                             // Save ledger
                             let _ = order_router.ledger().save(&ledger_path);
+                        } else if status == "CANCELED" || status == "EXPIRED" {
+                            info!(
+                                symbol, client_order_id, side, status,
+                                "ORDER_TRADE_UPDATE: {status}"
+                            );
+
+                            // Record canceled order
+                            let order = Order {
+                                id: format!("{}-cancel-{}", client_order_id, ts_now.timestamp_millis()),
+                                exchange_id: Some(client_order_id.clone()),
+                                strategy_name: strategy_name_from_id,
+                                symbol: symbol.clone(),
+                                side: side.to_lowercase(),
+                                order_type: "market".to_string(),
+                                qty,
+                                price: Some(price),
+                                stop_price: None,
+                                status: "canceled".to_string(),
+                                filled_qty: 0.0,
+                                avg_fill_price: 0.0,
+                                commission: 0.0,
+                                created_at: ts_str,
+                                filled_at: None,
+                            };
+                            if let Err(e) = order_tx.try_send(order) {
+                                warn!("order record channel full, dropping canceled record: {e}");
+                            }
+                        } else if status == "REJECTED" {
+                            warn!(
+                                symbol, client_order_id, side,
+                                "ORDER_TRADE_UPDATE: REJECTED"
+                            );
+
+                            // Record rejected order
+                            let order = Order {
+                                id: format!("{}-reject-{}", client_order_id, ts_now.timestamp_millis()),
+                                exchange_id: Some(client_order_id.clone()),
+                                strategy_name: strategy_name_from_id,
+                                symbol: symbol.clone(),
+                                side: side.to_lowercase(),
+                                order_type: "market".to_string(),
+                                qty,
+                                price: Some(price),
+                                stop_price: None,
+                                status: "rejected".to_string(),
+                                filled_qty: 0.0,
+                                avg_fill_price: 0.0,
+                                commission: 0.0,
+                                created_at: ts_str,
+                                filled_at: None,
+                            };
+                            if let Err(e) = order_tx.try_send(order) {
+                                warn!("order record channel full, dropping rejected record: {e}");
+                            }
                         }
                     }
                 }

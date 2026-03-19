@@ -60,6 +60,7 @@ async fn worker_loop(
     signal_tx: mpsc::Sender<StrategySignal>,
 ) {
     let mut aggregator = CandleAggregator::new(config.timeframe_ms);
+    let mut tick_count: u64 = 0;
 
     info!(
         strategy = %config.strategy_name,
@@ -76,8 +77,25 @@ async fn worker_loop(
                     continue;
                 }
 
+                tick_count += 1;
+                if tick_count <= 3 || tick_count % 500 == 0 {
+                    info!(
+                        strategy = %config.strategy_name,
+                        symbol = %config.symbol,
+                        tick_count,
+                        price = tick.price,
+                        "tick received"
+                    );
+                }
+
                 // 聚合 K 线
                 if let Some(candle) = aggregator.update(&tick) {
+                    info!(
+                        strategy = %config.strategy_name,
+                        symbol = %config.symbol,
+                        close = candle.close,
+                        "candle aggregated"
+                    );
                     // 每根 K 线递减 cooldown
                     config.filter.on_bar();
 
