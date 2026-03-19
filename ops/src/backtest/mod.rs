@@ -26,12 +26,14 @@ pub struct Trade {
     pub side: &'static str,
     pub entry_price: f64,
     pub exit_price: f64,
-    /// Net PnL (after close fee, excludes open fee which was deducted at open)
+    /// Net PnL (after close fee + funding cost)
     pub pnl: f64,
     /// Gross PnL (before close fee)
     pub gross_pnl: f64,
     /// Total fees (open + close)
     pub fees: f64,
+    /// Total funding cost accumulated during this trade
+    pub funding_cost: f64,
     pub qty: f64,
     pub entry_idx: usize,
     pub exit_idx: usize,
@@ -56,6 +58,13 @@ pub struct BacktestConfig {
     pub position_pct: f64,
     pub taker_fee: f64,
     pub slippage: f64,
+    /// Funding rate per 8h settlement (default 0.01% = 0.0001).
+    /// Applied every `funding_interval` candles while a position is open.
+    pub funding_rate_per_8h: f64,
+    /// Number of candles between each funding rate settlement.
+    /// Calculated from timeframe: 8h / candle_duration.
+    /// Set to 0 to disable funding cost.
+    pub funding_interval_candles: usize,
 }
 
 impl Default for BacktestConfig {
@@ -66,7 +75,23 @@ impl Default for BacktestConfig {
             position_pct: 0.3,
             taker_fee: TAKER_FEE,
             slippage: SLIPPAGE,
+            funding_rate_per_8h: 0.0001, // 0.01% per 8h ≈ 13% annualized
+            funding_interval_candles: 0,   // disabled by default for backwards compat
         }
+    }
+}
+
+impl BacktestConfig {
+    /// Create config with funding rate enabled for a given timeframe.
+    pub fn with_funding(mut self, timeframe_ms: u64) -> Self {
+        if timeframe_ms > 0 {
+            let eight_hours_ms: u64 = 8 * 3600 * 1000;
+            self.funding_interval_candles = (eight_hours_ms / timeframe_ms) as usize;
+            if self.funding_interval_candles == 0 {
+                self.funding_interval_candles = 1; // at least every candle for very long timeframes
+            }
+        }
+        self
     }
 }
 
@@ -84,6 +109,7 @@ pub struct Metrics {
     pub profit_factor: f64,
     pub expectancy: f64,
     pub total_fees: f64,
+    pub total_funding_cost: f64,
     pub sharpe: f64,
     pub max_drawdown: f64,
     pub max_drawdown_pct: f64,
@@ -100,6 +126,8 @@ struct OpenPosition {
     margin: f64,
     open_fee: f64,
     open_idx: usize,
+    /// Accumulated funding cost for this position
+    funding_cost: f64,
 }
 
 // ── Backtest engine ────────────────────────────────────────────
@@ -124,8 +152,27 @@ pub fn run_backtest(
     let slippage = config.slippage;
     let position_pct = config.position_pct;
 
+    let funding_rate = config.funding_rate_per_8h;
+    let funding_interval = config.funding_interval_candles;
+
     for (idx, &(o, h, l, c, v)) in candles.iter().enumerate() {
         let signal = strategy.on_candle(o, h, l, c, v);
+
+        // Apply funding cost at settlement intervals
+        if funding_interval > 0 && idx > 0 && idx % funding_interval == 0 {
+            if let Some(ref mut pos) = position {
+                // Funding cost = position_notional * funding_rate
+                // Long pays positive rate, short pays negative rate (inverted)
+                let notional = pos.qty * c;
+                let cost = if pos.side == "long" {
+                    notional * funding_rate
+                } else {
+                    -notional * funding_rate // short receives when rate > 0
+                };
+                pos.funding_cost += cost;
+                balance -= cost;
+            }
+        }
 
         // Record equity
         let equity = if let Some(ref pos) = position {
@@ -157,6 +204,7 @@ pub fn run_backtest(
                         margin,
                         open_fee: fee,
                         open_idx: idx,
+                        funding_cost: 0.0,
                     });
                 } else if position.as_ref().unwrap().side == "short" {
                     // Close short
@@ -164,8 +212,8 @@ pub fn run_backtest(
                     let exit_price = c * (1.0 + slippage);
                     let gross_pnl = (pos.entry - exit_price) * pos.qty;
                     let fee = exit_price * pos.qty * taker_fee;
-                    let net_pnl = gross_pnl - fee;
-                    balance += pos.margin + net_pnl;
+                    let net_pnl = gross_pnl - fee - pos.funding_cost;
+                    balance += pos.margin + net_pnl + pos.funding_cost; // funding already deducted from balance
                     trades.push(Trade {
                         side: "short",
                         entry_price: pos.entry,
@@ -173,6 +221,7 @@ pub fn run_backtest(
                         pnl: net_pnl,
                         gross_pnl,
                         fees: pos.open_fee + fee,
+                        funding_cost: pos.funding_cost,
                         qty: pos.qty,
                         entry_idx: pos.open_idx,
                         exit_idx: idx,
@@ -197,6 +246,7 @@ pub fn run_backtest(
                         margin,
                         open_fee: fee,
                         open_idx: idx,
+                        funding_cost: 0.0,
                     });
                 } else if position.as_ref().unwrap().side == "long" {
                     // Close long
@@ -204,8 +254,8 @@ pub fn run_backtest(
                     let exit_price = c * (1.0 - slippage);
                     let gross_pnl = (exit_price - pos.entry) * pos.qty;
                     let fee = exit_price * pos.qty * taker_fee;
-                    let net_pnl = gross_pnl - fee;
-                    balance += pos.margin + net_pnl;
+                    let net_pnl = gross_pnl - fee - pos.funding_cost;
+                    balance += pos.margin + net_pnl + pos.funding_cost; // funding already deducted
                     trades.push(Trade {
                         side: "long",
                         entry_price: pos.entry,
@@ -213,6 +263,7 @@ pub fn run_backtest(
                         pnl: net_pnl,
                         gross_pnl,
                         fees: pos.open_fee + fee,
+                        funding_cost: pos.funding_cost,
                         qty: pos.qty,
                         entry_idx: pos.open_idx,
                         exit_idx: idx,
@@ -234,6 +285,7 @@ pub fn run_backtest(
                 pnl: -pos.margin,
                 gross_pnl: -pos.margin,
                 fees: pos.open_fee,
+                funding_cost: pos.funding_cost,
                 qty: pos.qty,
                 entry_idx: pos.open_idx,
                 exit_idx: idx,
@@ -256,8 +308,8 @@ pub fn run_backtest(
                 (ep, (pos.entry - ep) * pos.qty)
             };
             let fee = exit_price * pos.qty * taker_fee;
-            let net_pnl = gross_pnl - fee;
-            balance += pos.margin + net_pnl;
+            let net_pnl = gross_pnl - fee - pos.funding_cost;
+            balance += pos.margin + net_pnl + pos.funding_cost; // funding already deducted
             trades.push(Trade {
                 side: pos.side,
                 entry_price: pos.entry,
@@ -265,6 +317,7 @@ pub fn run_backtest(
                 pnl: net_pnl,
                 gross_pnl,
                 fees: pos.open_fee + fee,
+                funding_cost: pos.funding_cost,
                 qty: pos.qty,
                 entry_idx: pos.open_idx,
                 exit_idx: candles.len() - 1,
@@ -340,6 +393,7 @@ pub fn calc_metrics(result: &BacktestResult, timeframe_ms: u64) -> Metrics {
             profit_factor: 0.0,
             expectancy: 0.0,
             total_fees: 0.0,
+            total_funding_cost: 0.0,
             sharpe: 0.0,
             max_drawdown: 0.0,
             max_drawdown_pct: 0.0,
@@ -380,6 +434,9 @@ pub fn calc_metrics(result: &BacktestResult, timeframe_ms: u64) -> Metrics {
 
     // Total fees
     let total_fees = trades.iter().map(|t| t.fees).sum::<f64>();
+
+    // Total funding cost
+    let total_funding_cost = trades.iter().map(|t| t.funding_cost).sum::<f64>();
 
     // Max drawdown
     let mut peak = if !equity.is_empty() { equity[0] } else { capital };
@@ -434,6 +491,7 @@ pub fn calc_metrics(result: &BacktestResult, timeframe_ms: u64) -> Metrics {
         profit_factor,
         expectancy,
         total_fees,
+        total_funding_cost,
         sharpe,
         max_drawdown: max_dd,
         max_drawdown_pct: max_dd_pct,
@@ -566,6 +624,7 @@ mod tests {
                 pnl: 20.0,
                 gross_pnl: 20.5,
                 fees: 0.5,
+                funding_cost: 0.0,
                 qty: 2.0,
                 entry_idx: 0,
                 exit_idx: 1,
@@ -590,6 +649,7 @@ mod tests {
                 pnl: -50.0,
                 gross_pnl: -49.5,
                 fees: 0.5,
+                funding_cost: 0.0,
                 qty: 5.0,
                 entry_idx: 0,
                 exit_idx: 1,
@@ -612,6 +672,7 @@ mod tests {
             pnl,
             gross_pnl: pnl + fees,
             fees,
+            funding_cost: 0.0,
             qty: 1.0,
             entry_idx: 0,
             exit_idx: 1,
@@ -851,6 +912,7 @@ mod tests {
             profit_factor: 2.0,
             expectancy: 1.2,
             total_fees: 1.0,
+            total_funding_cost: 0.0,
             sharpe: 6.0,
             max_drawdown: 10.0,
             max_drawdown_pct: 5.0,
@@ -898,6 +960,7 @@ mod tests {
             position_pct: 0.3,
             taker_fee: TAKER_FEE,
             slippage: SLIPPAGE,
+            ..Default::default()
         };
         let result = run_backtest(&candles, strat.as_mut(), &config);
         let metrics = calc_metrics(&result, 3_600_000); // 1h candles
@@ -952,6 +1015,7 @@ mod tests {
             position_pct: 0.4,
             taker_fee: TAKER_FEE,
             slippage: SLIPPAGE,
+            ..Default::default()
         };
         let result = run_backtest(&candles, &mut strat, &config);
 
@@ -974,5 +1038,57 @@ mod tests {
         assert!((t.qty - qty).abs() < 1e-10, "qty mismatch");
         // open_fee is part of total fees
         assert!(t.fees >= fee - 1e-10, "fee should include open fee");
+    }
+
+    // ── 资金费率成本测试 ──────────────────────────────────────
+
+    #[test]
+    fn funding_cost_disabled_by_default() {
+        let candles = make_candles(200, 100.0);
+        let mut strat = AlternatingStrategy::new(10);
+        let config = BacktestConfig::default();
+        assert_eq!(config.funding_interval_candles, 0);
+        let result = run_backtest(&candles, &mut strat, &config);
+        // All trades should have zero funding cost
+        for t in &result.trades {
+            assert!((t.funding_cost).abs() < 1e-10, "funding cost should be 0 when disabled");
+        }
+    }
+
+    #[test]
+    fn funding_cost_applied_when_enabled() {
+        let price = 100.0;
+        // 100 candles at fixed price, trade every 10 candles, funding every 5
+        let candles: Vec<(f64, f64, f64, f64, f64)> = (0..100)
+            .map(|_| (price, price + 0.5, price - 0.5, price, 1000.0))
+            .collect();
+        let mut strat = AlternatingStrategy::new(10);
+        let config = BacktestConfig {
+            capital: 200.0,
+            leverage: 3,
+            position_pct: 0.3,
+            taker_fee: TAKER_FEE,
+            slippage: SLIPPAGE,
+            funding_rate_per_8h: 0.001, // 0.1% per settlement
+            funding_interval_candles: 5, // every 5 candles
+        };
+        let result = run_backtest(&candles, &mut strat, &config);
+        let metrics = calc_metrics(&result, 300_000);
+
+        // Should have trades with non-zero funding cost
+        let total_funding: f64 = result.trades.iter().map(|t| t.funding_cost).sum();
+        assert!(total_funding.abs() > 0.0, "funding cost should be non-zero when enabled");
+        assert!((metrics.total_funding_cost - total_funding).abs() < 1e-10);
+    }
+
+    #[test]
+    fn with_funding_calculates_interval() {
+        let config = BacktestConfig::default().with_funding(300_000); // 5m candles
+        // 8h = 28800000ms, 5m = 300000ms → 96 candles per settlement
+        assert_eq!(config.funding_interval_candles, 96);
+
+        let config_1h = BacktestConfig::default().with_funding(3_600_000); // 1h candles
+        // 8h / 1h = 8
+        assert_eq!(config_1h.funding_interval_candles, 8);
     }
 }

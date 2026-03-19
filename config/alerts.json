@@ -1,0 +1,6 @@
+{
+  "file_enabled": true,
+  "webhook_enabled": false,
+  "webhook_url": "",
+  "email_enabled": false
+}

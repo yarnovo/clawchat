@@ -38,6 +38,15 @@ pub struct Ctx {
 #[derive(Subcommand)]
 enum Command {
     // ── 查询 ──
+    /// 告警事件查询
+    Alerts {
+        /// 按级别过滤: red, yellow, info
+        #[arg(long)]
+        level: Option<String>,
+        /// 最近多少小时（默认 24）
+        #[arg(long, default_value_t = 24)]
+        hours: u32,
+    },
     /// 总览面板（账户+策略+风控）
     Status {
         #[arg(long)]
@@ -76,6 +85,8 @@ enum Command {
     },
     /// 数据引擎状态
     DataStatus,
+    /// 策略容量利用率
+    Capacity,
 
     // ── 分析 ──
     /// 单策略回测
@@ -344,6 +355,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match cli.command {
         // ── 查询 ──────────────────────────────────
+        Command::Alerts { level, hours } => {
+            cmd::alerts::run(&ctx, level, hours)?;
+        }
         Command::Status { strategy } => {
             cmd::status::status(&ctx, strategy).await?;
         }
@@ -368,6 +382,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Command::DataStatus => {
             cmd::data_status::run(&ctx)?;
+        }
+        Command::Capacity => {
+            cmd::capacity::run(&ctx).await?;
         }
 
         // ── 分析 ──────────────────────────────────

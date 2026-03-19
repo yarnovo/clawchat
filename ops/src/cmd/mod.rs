@@ -1,4 +1,6 @@
+pub mod alerts;
 pub mod backtest;
+pub mod capacity;
 pub mod compare;
 pub mod correlation;
 pub mod create_portfolio;

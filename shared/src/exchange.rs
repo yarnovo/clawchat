@@ -47,6 +47,18 @@ pub struct OrderResponse {
     pub side: String,
 }
 
+/// Premium index data from /fapi/v1/premiumIndex.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PremiumIndex {
+    pub symbol: String,
+    /// Last funding rate (per 8h settlement)
+    pub last_funding_rate: f64,
+    /// Mark price
+    pub mark_price: f64,
+    /// Next funding time (unix ms)
+    pub next_funding_time: u64,
+}
+
 /// Position risk data from /fapi/v2/positionRisk (non-zero positions only).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PositionRisk {
@@ -608,7 +620,7 @@ impl Exchange {
         Ok(body.as_array().cloned().unwrap_or_default())
     }
 
-    /// Fetch premium index (funding rate)
+    /// Fetch premium index (funding rate) — raw JSON
     pub async fn fetch_premium_index(
         &self,
         symbol: Option<&str>,
@@ -618,6 +630,48 @@ impl Exchange {
             None => vec![],
         };
         self.public_get("/fapi/v1/premiumIndex", &params).await
+    }
+
+    /// Fetch premium index as typed structs.
+    /// If `symbol` is None, returns all symbols.
+    pub async fn get_premium_index(
+        &self,
+        symbol: Option<&str>,
+    ) -> Result<Vec<PremiumIndex>, ExchangeError> {
+        let body = self.fetch_premium_index(symbol).await?;
+
+        let items: Vec<serde_json::Value> = if body.is_array() {
+            body.as_array().cloned().unwrap_or_default()
+        } else {
+            vec![body]
+        };
+
+        let mut result = Vec::new();
+        for item in items {
+            let sym = item.get("symbol").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let last_funding_rate: f64 = item
+                .get("lastFundingRate")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0.0);
+            let mark_price: f64 = item
+                .get("markPrice")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0.0);
+            let next_funding_time: u64 = item
+                .get("nextFundingTime")
+                .and_then(|v| v.as_u64().or_else(|| v.as_i64().map(|i| i as u64)))
+                .unwrap_or(0);
+
+            result.push(PremiumIndex {
+                symbol: sym,
+                last_funding_rate,
+                mark_price,
+                next_funding_time,
+            });
+        }
+        Ok(result)
     }
 
     /// Fetch funding rate history

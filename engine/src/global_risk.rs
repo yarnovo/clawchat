@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use crate::ledger::{Ledger, StrategyAllocation};
+use clawchat_shared::alerts::{emit_alert, AlertEvent, AlertLevel};
 
 // ── Verdict ─────────────────────────────────────────────────────
 
@@ -144,6 +145,42 @@ impl GlobalRiskGuard {
         } else {
             StrategyRiskLevel::Normal
         }
+    }
+
+    /// Check global risk and emit alert if triggered.
+    /// Returns the same verdict as `check()`.
+    pub fn check_and_alert(
+        &self,
+        ledger: &Ledger,
+        records_dir: &std::path::Path,
+    ) -> GlobalRiskVerdict {
+        let verdict = self.check(ledger);
+        match &verdict {
+            GlobalRiskVerdict::CloseAll(reason) => {
+                emit_alert(
+                    records_dir,
+                    &AlertEvent::new(
+                        AlertLevel::Red,
+                        "global_risk",
+                        None,
+                        format!("CloseAll 触发: {reason}"),
+                    ),
+                );
+            }
+            GlobalRiskVerdict::Block(reason) => {
+                emit_alert(
+                    records_dir,
+                    &AlertEvent::new(
+                        AlertLevel::Yellow,
+                        "global_risk",
+                        None,
+                        format!("Block 触发: {reason}"),
+                    ),
+                );
+            }
+            GlobalRiskVerdict::Pass => {}
+        }
+        verdict
     }
 
     pub fn config(&self) -> &GlobalRiskConfig {

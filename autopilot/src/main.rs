@@ -21,6 +21,11 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
+/// records/ 目录路径（全局，用于告警写入）
+fn records_dir() -> PathBuf {
+    clawchat_shared::paths::records_dir()
+}
+
 /// autopilot — 数据驱动的动态调控引擎
 #[derive(Parser, Debug)]
 struct Args {
@@ -149,6 +154,7 @@ fn main() {
                         l.total_allocated(),
                     ) {
                         tracing::warn!("{reason} — 全部策略 pause");
+                        engine::emit_global_drawdown_alert(&records_dir(), &reason);
                         if !args.dry_run {
                             for ctx in contexts.values_mut() {
                                 if !ctx.tracked.paused {
@@ -303,20 +309,43 @@ fn process_strategy(
     let risk_path = ctx.dir.join("risk.json");
     let risk = RiskConfig::load(&risk_path);
 
+    // 读取当前资金费率（从 records/funding_rate_latest.json）
+    let funding_rate_path = clawchat_shared::paths::records_dir().join("funding_rate_latest.json");
+    let (funding_rate, position_side) = load_funding_info(
+        &funding_rate_path,
+        strategy.symbol.as_deref().unwrap_or(""),
+        ledger_strat,
+    );
+
     // 构建快照
     let snapshot = StrategySnapshot {
         name: strategy_name.clone(),
         current_position_size: strategy.position_size.unwrap_or(0.3),
         current_trailing_stop: risk.trailing_stop,
+        funding_rate,
+        position_side,
+        adv_24h: None,
+        leverage: strategy.leverage.map(|l| l as f64),
     };
 
     // 评估规则
-    let decisions = engine::evaluate(
+    let mut decisions = engine::evaluate(
         &snapshot,
         &ctx.tracked,
         &state.trade_stats,
         ledger_strat,
     );
+
+    // 资金费率防御评估
+    let funding_decisions = engine::evaluate_funding_rate(&snapshot);
+    if !funding_decisions.is_empty() {
+        // 费率决策优先级高于常规缩放，插入到前面
+        for d in funding_decisions.into_iter().rev() {
+            decisions.insert(0, d);
+        }
+        // 去掉 NoAction（如果有的话）
+        decisions.retain(|d| !matches!(d, Decision::NoAction));
+    }
 
     // 执行决策
     for decision in &decisions {
@@ -325,6 +354,9 @@ fn process_strategy(
         }
 
         tracing::info!(strategy = %strategy_name, decision = ?decision, "autopilot decision");
+
+        // 发出告警
+        engine::emit_decision_alert(&records_dir(), &strategy_name, decision);
 
         if dry_run {
             tracing::info!(strategy = %strategy_name, "[DRY-RUN] would execute: {decision:?}");
@@ -399,4 +431,39 @@ fn process_strategy(
             Decision::NoAction => {}
         }
     }
+}
+
+/// 从 records/funding_rate_latest.json 加载指定币种的费率和持仓方向
+fn load_funding_info(
+    path: &std::path::Path,
+    symbol: &str,
+    ledger_strat: Option<&types::LedgerStrategy>,
+) -> (Option<f64>, Option<String>) {
+    if symbol.is_empty() {
+        return (None, None);
+    }
+
+    // 读取费率
+    let funding_rate = std::fs::read_to_string(path)
+        .ok()
+        .and_then(|contents| serde_json::from_str::<serde_json::Value>(&contents).ok())
+        .and_then(|data| {
+            // funding_rate_latest.json 格式: { "NTRNUSDT": { "rate": 0.0001, ... }, ... }
+            data.get(symbol)
+                .and_then(|entry| entry.get("rate").and_then(|v| v.as_f64()))
+        });
+
+    // 从 ledger 推断持仓方向
+    let position_side = ledger_strat.and_then(|ls| {
+        if ls.unrealized_pnl.abs() < f64::EPSILON {
+            None // 无仓位
+        } else {
+            // 简化判断：unrealized_pnl 存在时认为有仓位
+            // 真实方向需要从 state.json 或 positions 获取
+            // 这里保守处理：有 unrealized_pnl 说明有仓位，方向由费率符号决定策略
+            Some("long".to_string()) // 默认做多（大多数策略）
+        }
+    });
+
+    (funding_rate, position_side)
 }

@@ -33,3 +33,25 @@ pub const NEGATIVE_PNL_SUSPEND_HOURS: u64 = 48;
 
 /// 总亏损占 capital 比例 → suspend
 pub const TOTAL_LOSS_SUSPEND_PCT: f64 = 0.20;
+
+// ── 资金费率防御 ─────────────────────────────────────────────
+
+/// 年化费率 > 50% 且持仓方向不利 → 缩仓 30%
+pub const FUNDING_RATE_SCALE_DOWN_ANNUALIZED: f64 = 0.50;
+pub const FUNDING_RATE_SCALE_DOWN_FACTOR: f64 = 0.70;
+
+/// 年化费率 > 100% → 暂停该策略
+pub const FUNDING_RATE_PAUSE_ANNUALIZED: f64 = 1.00;
+
+/// 年化费率 < -20% 且持仓方向有利 → 标记费率有利（允许扩仓）
+pub const FUNDING_RATE_FAVORABLE_ANNUALIZED: f64 = -0.20;
+
+/// 每 8h 费率 → 年化: rate * 3 * 365
+pub const FUNDING_PERIODS_PER_YEAR: f64 = 1095.0;
+
+// ── 容量利用率 ──────────────────────────────────────────────
+
+/// 利用率 > 120% → 自动缩仓至 80%
+pub const CAPACITY_SCALE_DOWN_PCT: f64 = 1.20;
+/// 缩仓目标利用率
+pub const CAPACITY_TARGET_PCT: f64 = 0.80;

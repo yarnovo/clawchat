@@ -106,15 +106,17 @@ pub async fn backtest(
     };
 
     println!("  正在回测 [{strategy}] 策略...");
+    let tf_ms = timeframe_to_ms(timeframe);
     let config = BacktestConfig {
         capital,
         leverage,
         position_pct: position_size,
         taker_fee: TAKER_FEE,
         slippage: SLIPPAGE,
-    };
+        funding_rate_per_8h: 0.0001, // 0.01% per 8h
+        funding_interval_candles: 0,  // will be set by with_funding
+    }.with_funding(tf_ms);
     let result = backtest::run_backtest(&candles, strat.as_mut(), &config);
-    let tf_ms = timeframe_to_ms(timeframe);
     let metrics = backtest::calc_metrics(&result, tf_ms);
 
     print_report(symbol, strategy, timeframe, days, leverage, capital, position_size, &metrics, candles.len());
@@ -144,6 +146,9 @@ fn print_report(
     println!("  净利润:     ${:.2}", m.net_profit);
     println!("  收益率:     {:.2}%", m.roi);
     println!("  总手续费:   ${:.2}", m.total_fees);
+    if m.total_funding_cost.abs() > 0.001 {
+        println!("  资金费率:   ${:.2}", m.total_funding_cost);
+    }
 
     println!("\n  {}", "─".repeat(55));
     println!("  交易");

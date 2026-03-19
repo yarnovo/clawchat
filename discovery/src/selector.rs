@@ -1,8 +1,12 @@
 use crate::evaluator::{backtest, BacktestConfig};
 use crate::generator::StrategyType;
 use clawchat_shared::candle::Candle;
+use clawchat_shared::capacity;
 use clawchat_shared::criteria::{passes, BacktestMetrics};
 use std::collections::HashMap;
+
+/// 当前阶段容量过滤阈值（$500）
+const MIN_CAPACITY_THRESHOLD: f64 = 500.0;
 
 /// 单个候选策略的完整结果
 #[derive(Debug, Clone)]
@@ -40,6 +44,22 @@ pub fn select(
         .collect();
 
     if passing.is_empty() {
+        return Vec::new();
+    }
+
+    // Step 1.5: 容量过滤 — 估算 24h 成交量，过滤 max_capacity < $500 的候选
+    let adv_24h = estimate_24h_volume(candles);
+    let leverage = config.leverage as f64;
+    let max_cap = capacity::max_capacity(adv_24h, leverage);
+    if max_cap < MIN_CAPACITY_THRESHOLD {
+        tracing::info!(
+            symbol,
+            adv_24h,
+            max_cap,
+            "capacity filter: max_capacity ${:.0} < ${:.0}, skipping all candidates",
+            max_cap,
+            MIN_CAPACITY_THRESHOLD
+        );
         return Vec::new();
     }
 
@@ -175,6 +195,29 @@ fn generate_neighbors(
     }
 
     neighbors
+}
+
+/// 从 K 线数据估算 24h 平均成交额（USDT）
+/// 取最近的 K 线计算日均 quote volume
+fn estimate_24h_volume(candles: &[Candle]) -> f64 {
+    if candles.is_empty() {
+        return 0.0;
+    }
+    // 使用最近 7 天的数据估算日均成交额
+    let last_ts = candles.last().unwrap().timestamp;
+    let week_ago = last_ts.saturating_sub(7 * 86_400_000);
+    let recent: Vec<&Candle> = candles.iter().filter(|c| c.timestamp >= week_ago).collect();
+    if recent.is_empty() {
+        return 0.0;
+    }
+    // quote volume ≈ volume * close (USDT)
+    let total_quote_vol: f64 = recent.iter().map(|c| c.volume * c.close).sum();
+    let span_ms = last_ts - recent.first().unwrap().timestamp;
+    if span_ms == 0 {
+        return total_quote_vol;
+    }
+    // 换算为 24h
+    total_quote_vol / (span_ms as f64 / 86_400_000.0)
 }
 
 /// 检查两个参数组合是否"太近"（每个维度差值 < 2 step）

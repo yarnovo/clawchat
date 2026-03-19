@@ -108,3 +108,8 @@ pub fn default_symbols_json() -> PathBuf {
 pub fn schedule_json() -> PathBuf {
     config_dir().join("schedule.json")
 }
+
+/// 告警配置: config/alerts.json
+pub fn alerts_json() -> PathBuf {
+    config_dir().join("alerts.json")
+}

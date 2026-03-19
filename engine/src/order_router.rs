@@ -52,6 +52,8 @@ pub struct OrderRouter {
     pub global_risk: GlobalRiskGuard,
     strategy_guards: HashMap<String, EngineRiskGuard>,
     risk_configs: HashMap<String, RiskConfig>,
+    /// Cached funding rates per symbol (from markPrice stream or periodic fetch)
+    funding_rates: HashMap<String, f64>,
 }
 
 impl OrderRouter {
@@ -61,6 +63,7 @@ impl OrderRouter {
             global_risk,
             strategy_guards: HashMap::new(),
             risk_configs: HashMap::new(),
+            funding_rates: HashMap::new(),
         }
     }
 
@@ -89,11 +92,15 @@ impl OrderRouter {
             .ok_or_else(|| format!("strategy guard not found: {strategy_name}"))?;
 
         let is_long = signal.side == "long";
+        let current_funding_rate = self.funding_rates
+            .get(&signal.symbol)
+            .copied()
+            .unwrap_or(0.0);
         guard.pre_trade_check(
             signal.position_size,
             signal.leverage,
             is_long,
-            0.0, // funding rate can be injected later
+            current_funding_rate,
         )?;
 
         // 2. Virtual account balance check + dynamic quota
@@ -223,6 +230,16 @@ impl OrderRouter {
         // Update global risk peak equity
         let total_eq = self.ledger.total_equity();
         self.global_risk.update(total_eq);
+    }
+
+    /// Update the cached funding rate for a symbol (called from markPrice stream).
+    pub fn update_funding_rate(&mut self, symbol: &str, rate: f64) {
+        self.funding_rates.insert(symbol.to_string(), rate);
+    }
+
+    /// Get the current cached funding rate for a symbol.
+    pub fn get_funding_rate(&self, symbol: &str) -> Option<f64> {
+        self.funding_rates.get(symbol).copied()
     }
 
     pub fn ledger(&self) -> &Ledger {

@@ -2,6 +2,7 @@
 
 use crate::config;
 use crate::types::{LedgerStrategy, TradeStats};
+use clawchat_shared::alerts::{emit_alert, AlertEvent, AlertLevel};
 
 /// autopilot 对单个策略的决策
 #[derive(Debug, Clone, PartialEq)]
@@ -30,6 +31,14 @@ pub struct StrategySnapshot {
     pub name: String,
     pub current_position_size: f64,
     pub current_trailing_stop: f64,
+    /// 当前 8h 资金费率（从 premiumIndex 获取），None 表示未获取
+    pub funding_rate: Option<f64>,
+    /// 当前持仓方向: "long", "short", 或 None（无仓位）
+    pub position_side: Option<String>,
+    /// 币种 24h 成交额（USDT），用于容量计算。None 表示未获取
+    pub adv_24h: Option<f64>,
+    /// 策略杠杆倍数
+    pub leverage: Option<f64>,
 }
 
 /// autopilot 对单个策略的跟踪状态
@@ -254,6 +263,150 @@ pub fn evaluate(
     decisions
 }
 
+/// 评估资金费率，产出决策
+///
+/// 规则：
+/// - 年化费率 > 100% → Pause（极端市场）
+/// - 年化费率 > 50% 且持仓方向不利 → ScaleDown 30%
+/// - 年化费率 < -20% 且持仓方向有利 → 标记为费率有利（日志，不自动扩仓）
+pub fn evaluate_funding_rate(snapshot: &StrategySnapshot) -> Vec<Decision> {
+    let mut decisions = Vec::new();
+
+    let rate = match snapshot.funding_rate {
+        Some(r) => r,
+        None => return decisions,
+    };
+
+    let annualized = rate * config::FUNDING_PERIODS_PER_YEAR;
+
+    // 正费率做多付费，负费率做空付费
+    let is_long = snapshot.position_side.as_deref() == Some("long");
+    let is_short = snapshot.position_side.as_deref() == Some("short");
+    let has_position = is_long || is_short;
+
+    if !has_position {
+        return decisions;
+    }
+
+    // 费率方向不利：做多时正费率，做空时负费率
+    let unfavorable = (is_long && rate > 0.0) || (is_short && rate < 0.0);
+    let favorable = (is_long && rate < 0.0) || (is_short && rate > 0.0);
+
+    // 极端费率 → Pause
+    if unfavorable && annualized.abs() >= config::FUNDING_RATE_PAUSE_ANNUALIZED {
+        decisions.push(Decision::Pause {
+            reason: format!(
+                "资金费率极端: {:.4}% (年化 {:.1}%), 暂停{}方向",
+                rate * 100.0,
+                annualized * 100.0,
+                if is_long { "多" } else { "空" }
+            ),
+        });
+        return decisions;
+    }
+
+    // 高费率 → 缩仓
+    if unfavorable && annualized.abs() >= config::FUNDING_RATE_SCALE_DOWN_ANNUALIZED {
+        let new_ps = snapshot.current_position_size * config::FUNDING_RATE_SCALE_DOWN_FACTOR;
+        let new_ps = new_ps.max(config::POSITION_SIZE_MIN);
+        if (new_ps - snapshot.current_position_size).abs() > 0.001 {
+            decisions.push(Decision::ScaleDown {
+                new_position_size: new_ps,
+                reason: format!(
+                    "资金费率偏高: {:.4}% (年化 {:.1}%), 缩仓 {:.2} → {:.2}",
+                    rate * 100.0,
+                    annualized * 100.0,
+                    snapshot.current_position_size,
+                    new_ps
+                ),
+            });
+        }
+    }
+
+    // 有利费率 → 日志记录（不自动扩仓，留给人工决策）
+    if favorable && annualized.abs() >= config::FUNDING_RATE_FAVORABLE_ANNUALIZED.abs() {
+        tracing::info!(
+            strategy = %snapshot.name,
+            rate = rate,
+            annualized = annualized,
+            "资金费率有利，可考虑扩仓"
+        );
+    }
+
+    decisions
+}
+
+/// 评估策略容量利用率，产出决策
+///
+/// 规则：
+/// - 利用率 > 120% → ScaleDown（自动缩仓至 80%）
+/// - 利用率 > 80% → 日志警告
+/// - 利用率 < 30% → 日志标记可扩仓
+pub fn evaluate_capacity(snapshot: &StrategySnapshot, ledger: Option<&LedgerStrategy>) -> Vec<Decision> {
+    let mut decisions = Vec::new();
+
+    let adv_24h = match snapshot.adv_24h {
+        Some(v) if v > 0.0 => v,
+        _ => return decisions,
+    };
+    let leverage = snapshot.leverage.unwrap_or(3.0);
+    let allocated = ledger.map(|l| l.allocated_capital).unwrap_or(0.0);
+    if allocated <= 0.0 {
+        return decisions;
+    }
+
+    let max_cap = clawchat_shared::capacity::max_capacity(adv_24h, leverage);
+    if max_cap <= 0.0 {
+        return decisions;
+    }
+
+    let util = clawchat_shared::capacity::utilization(allocated, max_cap);
+    let status = clawchat_shared::capacity::CapacityStatus::from_utilization(util);
+
+    match status {
+        clawchat_shared::capacity::CapacityStatus::Overcapacity => {
+            let target_alloc = clawchat_shared::capacity::scale_down_target(max_cap, config::CAPACITY_TARGET_PCT);
+            let scale_factor = target_alloc / allocated;
+            let new_ps = (snapshot.current_position_size * scale_factor)
+                .max(config::POSITION_SIZE_MIN);
+            if (new_ps - snapshot.current_position_size).abs() > 0.001 {
+                decisions.push(Decision::ScaleDown {
+                    new_position_size: new_ps,
+                    reason: format!(
+                        "容量超载: 利用率 {:.0}% > {:.0}%, ADV=${:.0}, max_cap=${:.0}, 缩仓 {:.2} → {:.2}",
+                        util * 100.0,
+                        config::CAPACITY_SCALE_DOWN_PCT * 100.0,
+                        adv_24h,
+                        max_cap,
+                        snapshot.current_position_size,
+                        new_ps
+                    ),
+                });
+            }
+        }
+        clawchat_shared::capacity::CapacityStatus::Warning => {
+            tracing::warn!(
+                strategy = %snapshot.name,
+                util_pct = format!("{:.0}", util * 100.0),
+                adv_24h,
+                max_cap,
+                "容量警告"
+            );
+        }
+        clawchat_shared::capacity::CapacityStatus::Expandable => {
+            tracing::info!(
+                strategy = %snapshot.name,
+                util_pct = format!("{:.0}", util * 100.0),
+                max_cap,
+                "容量充裕，可扩仓"
+            );
+        }
+        clawchat_shared::capacity::CapacityStatus::Normal => {}
+    }
+
+    decisions
+}
+
 /// 检查全局回撤是否接近红线
 pub fn check_global_drawdown(total_equity: f64, total_allocated: f64) -> Option<String> {
     if total_allocated > 0.0 && total_equity < total_allocated {
@@ -269,6 +422,62 @@ pub fn check_global_drawdown(total_equity: f64, total_allocated: f64) -> Option<
     None
 }
 
+/// 为 autopilot 决策发出告警
+///
+/// 规则：
+/// - Stop / Suspend → 红色告警
+/// - Pause / ScaleDown → 黄色告警
+/// - ScaleUp / Resume / AdjustTrailingStop → 信息告警
+/// - NoAction → 不发告警
+pub fn emit_decision_alert(
+    records_dir: &std::path::Path,
+    strategy_name: &str,
+    decision: &Decision,
+) {
+    let (level, message) = match decision {
+        Decision::Stop { reason } => (AlertLevel::Red, format!("全平: {reason}")),
+        Decision::Suspend { reason } => (AlertLevel::Red, format!("停机: {reason}")),
+        Decision::Pause { reason } => (AlertLevel::Yellow, format!("暂停: {reason}")),
+        Decision::ScaleDown { new_position_size, reason } => (
+            AlertLevel::Yellow,
+            format!("缩仓 → {new_position_size:.2}: {reason}"),
+        ),
+        Decision::ScaleUp { new_position_size, reason } => (
+            AlertLevel::Info,
+            format!("扩仓 → {new_position_size:.2}: {reason}"),
+        ),
+        Decision::Resume { reason } => (AlertLevel::Info, format!("恢复: {reason}")),
+        Decision::AdjustTrailingStop { new_value, reason } => (
+            AlertLevel::Info,
+            format!("调节 trailing_stop → {new_value:.3}: {reason}"),
+        ),
+        Decision::NoAction => return,
+    };
+
+    emit_alert(
+        records_dir,
+        &AlertEvent::new(
+            level,
+            "autopilot",
+            Some(strategy_name.to_string()),
+            message,
+        ),
+    );
+}
+
+/// 为全局回撤发出告警
+pub fn emit_global_drawdown_alert(records_dir: &std::path::Path, reason: &str) {
+    emit_alert(
+        records_dir,
+        &AlertEvent::new(
+            AlertLevel::Red,
+            "autopilot",
+            None,
+            format!("全局回撤触发: {reason}"),
+        ),
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -279,6 +488,10 @@ mod tests {
             name: "test".to_string(),
             current_position_size: 0.30,
             current_trailing_stop: 0.02,
+            funding_rate: None,
+            position_side: None,
+            adv_24h: None,
+            leverage: None,
         }
     }
 
@@ -468,6 +681,90 @@ mod tests {
         assert_eq!(decisions, vec![Decision::NoAction]);
     }
 
+    // ── 资金费率防御测试 ──────────────────────────────────────
+
+    #[test]
+    fn funding_rate_no_position_no_action() {
+        let snap = StrategySnapshot {
+            funding_rate: Some(0.001),
+            position_side: None,
+            ..default_snapshot()
+        };
+        let decisions = evaluate_funding_rate(&snap);
+        assert!(decisions.is_empty());
+    }
+
+    #[test]
+    fn funding_rate_none_no_action() {
+        let snap = StrategySnapshot {
+            funding_rate: None,
+            position_side: Some("long".to_string()),
+            ..default_snapshot()
+        };
+        let decisions = evaluate_funding_rate(&snap);
+        assert!(decisions.is_empty());
+    }
+
+    #[test]
+    fn funding_rate_extreme_long_pauses() {
+        // 年化 > 100%: rate = 1.0 / 1095 ≈ 0.000913 per 8h → annualized = 100%
+        let snap = StrategySnapshot {
+            funding_rate: Some(0.001), // annualized ~109.5%
+            position_side: Some("long".to_string()),
+            ..default_snapshot()
+        };
+        let decisions = evaluate_funding_rate(&snap);
+        assert!(decisions.iter().any(|d| matches!(d, Decision::Pause { .. })));
+    }
+
+    #[test]
+    fn funding_rate_high_long_scales_down() {
+        // 年化 > 50% but < 100%: rate ≈ 0.0005 → annualized ~54.75%
+        let snap = StrategySnapshot {
+            funding_rate: Some(0.0005),
+            position_side: Some("long".to_string()),
+            ..default_snapshot()
+        };
+        let decisions = evaluate_funding_rate(&snap);
+        assert!(decisions.iter().any(|d| matches!(d, Decision::ScaleDown { .. })));
+    }
+
+    #[test]
+    fn funding_rate_favorable_long_no_action() {
+        // 做多，负费率 = 有利，不自动扩仓
+        let snap = StrategySnapshot {
+            funding_rate: Some(-0.001),
+            position_side: Some("long".to_string()),
+            ..default_snapshot()
+        };
+        let decisions = evaluate_funding_rate(&snap);
+        assert!(decisions.is_empty());
+    }
+
+    #[test]
+    fn funding_rate_extreme_short_pauses() {
+        // 做空，负费率 = 不利
+        let snap = StrategySnapshot {
+            funding_rate: Some(-0.001), // annualized ~-109.5%, abs > 100%
+            position_side: Some("short".to_string()),
+            ..default_snapshot()
+        };
+        let decisions = evaluate_funding_rate(&snap);
+        assert!(decisions.iter().any(|d| matches!(d, Decision::Pause { .. })));
+    }
+
+    #[test]
+    fn funding_rate_normal_no_action() {
+        // 正常费率 0.01% = 0.0001, annualized ~10.95%
+        let snap = StrategySnapshot {
+            funding_rate: Some(0.0001),
+            position_side: Some("long".to_string()),
+            ..default_snapshot()
+        };
+        let decisions = evaluate_funding_rate(&snap);
+        assert!(decisions.is_empty());
+    }
+
     #[test]
     fn position_size_clamped_to_max() {
         let snap = StrategySnapshot {
@@ -502,5 +799,53 @@ mod tests {
         if let Some(Decision::ScaleDown { new_position_size, .. }) = decisions.first() {
             assert!(*new_position_size >= config::POSITION_SIZE_MIN);
         }
+    }
+
+    // ── 容量利用率测试 ──────────────────────────────────────────
+
+    #[test]
+    fn capacity_overcapacity_triggers_scale_down() {
+        // ADV=$100K, leverage=3 → max_cap=$33.33
+        // allocated=$50 → utilization=150% > 120%
+        let snap = StrategySnapshot {
+            adv_24h: Some(100_000.0),
+            leverage: Some(3.0),
+            ..default_snapshot()
+        };
+        let ledger = default_ledger(50.0, 0.0);
+        let decisions = evaluate_capacity(&snap, Some(&ledger));
+        assert!(
+            decisions.iter().any(|d| matches!(d, Decision::ScaleDown { .. })),
+            "should trigger scale down when overcapacity: {decisions:?}"
+        );
+    }
+
+    #[test]
+    fn capacity_normal_no_scale_down() {
+        // ADV=$10M, leverage=3 → max_cap=$3333
+        // allocated=$200 → utilization=6% (well within limits)
+        let snap = StrategySnapshot {
+            adv_24h: Some(10_000_000.0),
+            leverage: Some(3.0),
+            ..default_snapshot()
+        };
+        let ledger = default_ledger(200.0, 0.0);
+        let decisions = evaluate_capacity(&snap, Some(&ledger));
+        assert!(
+            decisions.is_empty(),
+            "should not scale down when utilization is normal: {decisions:?}"
+        );
+    }
+
+    #[test]
+    fn capacity_no_adv_data_no_action() {
+        let snap = StrategySnapshot {
+            adv_24h: None,
+            leverage: Some(3.0),
+            ..default_snapshot()
+        };
+        let ledger = default_ledger(200.0, 0.0);
+        let decisions = evaluate_capacity(&snap, Some(&ledger));
+        assert!(decisions.is_empty());
     }
 }

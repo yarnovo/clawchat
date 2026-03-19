@@ -1865,8 +1865,9 @@ async fn main() {
                     }
                 }
 
-                // Global risk check
-                match order_router.global_risk.check(order_router.ledger()) {
+                // Global risk check (with alert emission)
+                let records_dir = clawchat_shared::paths::records_dir();
+                match order_router.global_risk.check_and_alert(order_router.ledger(), &records_dir) {
                     GlobalRiskVerdict::Pass => {}
                     GlobalRiskVerdict::Block(reason) => {
                         warn!(strategy = strategy_name, %reason, "global risk block");
@@ -1928,15 +1929,34 @@ async fn main() {
                         }
 
                         // Check per-strategy drawdown levels
+                        let records_dir = clawchat_shared::paths::records_dir();
                         for (name, _rt) in runtimes.iter() {
                             if let Some(alloc) = order_router.ledger().get(name) {
                                 let level = GlobalRiskGuard::check_strategy_drawdown(alloc);
                                 match level {
                                     hft_engine::global_risk::StrategyRiskLevel::Red(dd) => {
                                         warn!(strategy = %name, drawdown = dd, "strategy in RED zone");
+                                        clawchat_shared::alerts::emit_alert(
+                                            &records_dir,
+                                            &clawchat_shared::alerts::AlertEvent::new(
+                                                clawchat_shared::alerts::AlertLevel::Yellow,
+                                                "global_risk",
+                                                Some(name.to_string()),
+                                                format!("策略回撤 RED: {dd:.1}% >= 25%"),
+                                            ),
+                                        );
                                     }
                                     hft_engine::global_risk::StrategyRiskLevel::Meltdown(dd) => {
                                         error!(strategy = %name, drawdown = dd, "strategy MELTDOWN — should close");
+                                        clawchat_shared::alerts::emit_alert(
+                                            &records_dir,
+                                            &clawchat_shared::alerts::AlertEvent::new(
+                                                clawchat_shared::alerts::AlertLevel::Red,
+                                                "global_risk",
+                                                Some(name.to_string()),
+                                                format!("策略熔断 MELTDOWN: {dd:.1}% >= 35%"),
+                                            ),
+                                        );
                                     }
                                     _ => {}
                                 }
