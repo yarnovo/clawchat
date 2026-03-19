@@ -189,10 +189,12 @@ prompt:
    - discover → 并行创建 N 个 quant（team-lead 先分析再派活）
    - evaluate → SendMessage analyst: "执行策略评估"
    - fix_issues → 多个 issue 时并行创建多个 engineer 修复（同 impl_requirements）
-   - impl_requirements → 多个需求时并行创建多个 engineer（eng2, eng3...），team-lead 调度：
-     - 拆分任务确保不改同一文件
-     - 有依赖的排序（先基础后上层）
-     - 每个完成后 review + 集成提交
+   - impl_requirements → 多个需求时并行创建多个 engineer，team-lead 调度
+   - symbol_scan → 派 quant：
+     1. clawchat scan-symbols --top 10（发现候选币种）
+     2. 对 top 候选逐个 clawchat expand-symbol（回填+策略发现）
+     3. 有发现 → 上线到 strategies/
+     4. 汇报结果
 
 5. 更新 records/schedule_state.json 的 last_run
 
