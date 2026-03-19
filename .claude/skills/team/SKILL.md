@@ -21,6 +21,15 @@ user-invocable: true
 - 回撤接近红线 → 减仓、暂停弱策略、收紧风控
 - 一切正常 → 保持节奏，持续优化
 
+## team-lead 行为准则
+
+**信任但验证（Trust but verify）**：
+- **不自己执行**：不直接调 ops 命令获取原始数据，派成员做
+- **验证产出**：成员汇报后检查结论是否合理，不重跑过程
+- **存疑时派人复查**：不确定的结果派另一个成员验证，而不是自己做
+- **只做决策**：创建组合、审批上线、调整配额、git commit — 这些是 team-lead 的专属动作
+- **并行优先**：派活前检查有没有多个独立任务可以并行给不同成员
+
 ## 架构
 
 ```
@@ -215,8 +224,10 @@ prompt:
    - 无异常且无重要结果 → 静默（不打扰用户）
 
 7. team-lead review 完成后的收尾工作
-   - engineer 修复 issue → review 通过 → team-lead 移 issues/open/ 到 issues/closed/
-   - engineer 实现需求 → review 通过 → team-lead 移 requirements/open/ 到 requirements/closed/
+   - issues: 成员写 pending/ → team-lead 自己评审 → 合理移到 open/（不需要找用户确认）
+   - requirements: 成员写 pending/ → team-lead 找用户确认 → 用户同意移到 open/
+   - engineer 修复 issue → review 通过 → team-lead 移 open/ 到 closed/
+   - engineer 实现需求 → review 通过 → team-lead 移 open/ 到 closed/
    - team-lead 提交 git commit
 ```
 

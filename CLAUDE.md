@@ -33,11 +33,11 @@ cargo run -p clawchat-ops -- --help
 - `schedule.json` — 运维级调度（心跳读）
 
 **issues/** — 问题上报，用文件夹管理状态。
-- `issues/open/` — 未解决的问题
-- `issues/closed/` — 已解决的问题
+- `issues/pending/` — 成员上报，等 team-lead 评审
+- `issues/open/` — team-lead 确认，待修复
+- `issues/closed/` — 已解决
 - 格式：`{日期}-{简述}.md`
-- 新问题写到 `open/`，解决后移到 `closed/`
-- 来源：patrol/health-check/evaluate 发现异常时写入，engineer 定时扫描修复
+- 成员写到 `pending/`，team-lead 评审后移到 `open/`，修复后移到 `closed/`
 
 **notes/** — 经验记录。已发生的事实、踩过的坑、API 用法、调试经验等，供未来参考。
 - 格式：`notes/{日期}-{主题}.md`
@@ -45,11 +45,11 @@ cargo run -p clawchat-ops -- --help
 - 例：`notes/2026-03-19-agentmail-api.md` — AgentMail 发送 endpoint 和参数格式
 
 **requirements/** — 需求文档，用文件夹管理状态。
-- `requirements/open/` — 待实现
+- `requirements/pending/` — 成员提出，等 team-lead 评审
+- `requirements/open/` — team-lead 确认，待实现
 - `requirements/closed/` — 已实现
 - 格式：`{日期}-{功能名}.md`
-- 新需求写到 `open/`，实现后移到 `closed/`
-- 来源：loop 进程发现能力缺失时写入，engineer 定时消化实现
+- 成员写到 `pending/`，team-lead 评审后移到 `open/`，实现后移到 `closed/`
 
 **discovered/** — 待审批策略（发现引擎产出）
 **records/** — 交易/风控/PnL 记录（引擎写入）

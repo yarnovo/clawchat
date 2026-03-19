@@ -16,7 +16,7 @@ user-invocable: true
 ## 流程
 
 1. 分析问题（如果是代码问题，搜索相关文件定位）
-2. 写入 `issues/open/{YYYY-MM-DD}-{简述}.md`
+2. 写入 `issues/pending/{YYYY-MM-DD}-{简述}.md`
 
 ## 文件格式
 
