@@ -1,6 +1,7 @@
 //! Gateway — WS combined stream + 行情广播
 //!
-//! 所有 symbol 共享一条 combined stream WS 连接，按 symbol 分发到对应的 broadcast channel。
+//! 启动时所有 symbol 共享一条 combined stream WS 连接，按 symbol 分发到对应的 broadcast channel。
+//! 运行中新增 symbol 时，通过 `add_symbol()` 建立独立 WS 连接，不中断现有流。
 //! 复用 ws_feed.rs 的连接/重连模式（指数退避，max 30s）。
 
 use std::collections::HashMap;
@@ -146,6 +147,41 @@ impl Gateway {
         });
 
         vec![handle]
+    }
+
+    /// 动态添加新 symbol（运行中热加载）
+    ///
+    /// 为新 symbol 创建 broadcast channel 并启动独立 WS 连接。
+    /// 不影响现有 combined stream。已存在的 symbol 会被忽略。
+    /// 返回新 symbol 的 WS feed JoinHandle（None 表示 symbol 已存在）。
+    pub async fn add_symbol(
+        &mut self,
+        symbol: &str,
+        feed_config: FeedConfig,
+    ) -> Option<tokio::task::JoinHandle<()>> {
+        let upper = symbol.to_uppercase();
+        if self.channels.contains_key(&upper) {
+            info!(symbol = %upper, "gateway: symbol already exists, skipping add");
+            return None;
+        }
+
+        // Create broadcast channel
+        let (tx, _) = broadcast::channel(CHANNEL_CAPACITY);
+        self.channels.insert(upper.clone(), tx.clone());
+
+        // Spawn independent WS feed for this single symbol
+        let channels = {
+            let mut m = HashMap::new();
+            m.insert(upper.clone(), tx);
+            m
+        };
+
+        let handle = tokio::spawn(async move {
+            combined_feed_loop(feed_config, channels).await;
+        });
+
+        info!(symbol = %upper, "gateway: new symbol added with independent WS feed");
+        Some(handle)
     }
 
     /// 获取用户数据流的 broadcast sender（供外部 user data stream task 使用）
@@ -475,6 +511,76 @@ mod tests {
         let (symbol, event) = result.unwrap();
         assert_eq!(symbol, "BTCUSDT");
         assert!(matches!(event, MarketEvent::Tick(_)));
+    }
+
+    #[tokio::test]
+    async fn add_symbol_creates_channel() {
+        let mut gw = Gateway::new(&["BTCUSDT".to_string()]);
+        assert!(gw.subscribe_market("SOLUSDT").is_none());
+
+        let config = FeedConfig {
+            symbols: vec!["solusdt".into()],
+            agg_trade: true,
+            depth: false,
+            depth_speed: "100ms".into(),
+            mark_price: false,
+        };
+        let handle = gw.add_symbol("SOLUSDT", config).await;
+        assert!(handle.is_some());
+
+        // Channel should now exist
+        assert!(gw.subscribe_market("SOLUSDT").is_some());
+        // Total channels: BTC + SOL
+        assert_eq!(gw.channels.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn add_symbol_duplicate_returns_none() {
+        let mut gw = Gateway::new(&["BTCUSDT".to_string()]);
+        let config = FeedConfig {
+            symbols: vec!["btcusdt".into()],
+            agg_trade: true,
+            depth: false,
+            depth_speed: "100ms".into(),
+            mark_price: false,
+        };
+        let handle = gw.add_symbol("BTCUSDT", config).await;
+        assert!(handle.is_none());
+        assert_eq!(gw.channels.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn add_symbol_broadcast_works() {
+        let mut gw = Gateway::new(&[]);
+        let config = FeedConfig {
+            symbols: vec!["ethusdt".into()],
+            agg_trade: true,
+            depth: false,
+            depth_speed: "100ms".into(),
+            mark_price: false,
+        };
+        gw.add_symbol("ETHUSDT", config).await;
+
+        let mut rx = gw.subscribe_market("ETHUSDT").unwrap();
+        // Send via the channel directly (simulating feed loop)
+        let tx = gw.channels.get("ETHUSDT").unwrap();
+        let tick = crate::types::TickData {
+            symbol: "ETHUSDT".to_string(),
+            price: 3500.0,
+            qty: 0.5,
+            timestamp: 3000,
+            is_buyer_maker: false,
+        };
+        tx.send(MarketEvent::Tick(tick)).unwrap();
+
+        let event = rx.recv().await.unwrap();
+        match event {
+            MarketEvent::Tick(t) => {
+                assert_eq!(t.symbol, "ETHUSDT");
+                assert!((t.price - 3500.0).abs() < 0.01);
+            }
+            _ => panic!("expected Tick event"),
+        }
     }
 
     #[test]

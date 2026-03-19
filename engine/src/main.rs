@@ -1263,7 +1263,7 @@ async fn main() {
     }
 
     // 8. Create Gateway
-    let gateway = Gateway::new(&symbols);
+    let mut gateway = Gateway::new(&symbols);
 
     // 9. Create signal channel (workers → main loop)
     let (signal_tx, mut signal_rx) = mpsc::channel::<worker::StrategySignal>(4096);
@@ -1763,12 +1763,31 @@ async fn main() {
 
                                         exchanges.insert(name.clone(), ex);
 
-                                        // Check if this symbol already has a market channel
-                                        // If not, we can't spawn a worker for it (would need gateway restart)
-                                        let has_market_channel = gateway.subscribe_market(&symbol).is_some();
+                                        // Dynamically add symbol if not yet in gateway
+                                        if gateway.subscribe_market(&symbol).is_none() {
+                                            let feed_config = FeedConfig {
+                                                symbols: vec![symbol.to_lowercase()],
+                                                agg_trade: true,
+                                                depth: true,
+                                                depth_speed: "100ms".to_string(),
+                                                mark_price: false,
+                                            };
+                                            if let Some(handle) = gateway.add_symbol(&symbol, feed_config).await {
+                                                worker_handles.push(handle);
+                                            }
 
-                                        if has_market_channel {
-                                            // Build and spawn worker
+                                            // Also add to combined markPrice feed
+                                            {
+                                                let tx = user_tx.clone();
+                                                let sym = symbol.clone();
+                                                tokio::spawn(async move {
+                                                    start_combined_mark_price_feed(vec![sym], tx).await;
+                                                });
+                                            }
+                                        }
+
+                                        // Build and spawn worker
+                                        {
                                             let trade_dir = sf.trade_direction();
                                             let cooldown = sf.cooldown_bars.unwrap_or(0);
                                             let min_vol = sf.min_volume.unwrap_or(0.0);
@@ -1782,13 +1801,6 @@ async fn main() {
                                                 worker_handles.push(handle);
                                                 info!(strategy = %name, symbol = %symbol, "new strategy worker spawned");
                                             }
-                                        } else {
-                                            warn!(
-                                                strategy = %name, symbol = %symbol,
-                                                "new strategy detected but no market channel for symbol — \
-                                                 worker cannot be started without gateway restart. \
-                                                 Strategy added to ledger; restart engine to activate."
-                                            );
                                         }
 
                                         // Insert runtime
