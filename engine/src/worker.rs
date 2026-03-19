@@ -65,7 +65,23 @@ async fn worker_loop(
     let mut tick_count: u64 = 0;
 
     // ── 快速预热：用历史 K 线驱动策略指标，忽略信号 ──
-    let warmup_count = config.warmup_candles.len();
+    let mut warmup_candles = std::mem::take(&mut config.warmup_candles);
+    // 截断最后一根不完整 candle：如果 last.timestamp + timeframe_ms > 当前时间，说明还未收盘
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as u64;
+    if let Some(last) = warmup_candles.last() {
+        if last.timestamp + config.timeframe_ms > now_ms {
+            warmup_candles.pop();
+            info!(
+                strategy = %config.strategy_name,
+                symbol = %config.symbol,
+                "warmup: dropped incomplete last candle"
+            );
+        }
+    }
+    let warmup_count = warmup_candles.len();
     if warmup_count > 0 {
         info!(
             strategy = %config.strategy_name,
@@ -73,7 +89,7 @@ async fn worker_loop(
             candles = warmup_count,
             "warmup: feeding historical candles"
         );
-        for candle in &config.warmup_candles {
+        for candle in &warmup_candles {
             // 只更新指标，丢弃产生的信号
             let _ = config.strategy.on_candle(candle);
         }
