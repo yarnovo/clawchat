@@ -1,6 +1,6 @@
-//! Gateway — WS 连接池 + 行情广播
+//! Gateway — WS combined stream + 行情广播
 //!
-//! 每个 unique symbol 一个 WS 连接，通过 broadcast channel 广播 MarketEvent。
+//! 所有 symbol 共享一条 combined stream WS 连接，按 symbol 分发到对应的 broadcast channel。
 //! 复用 ws_feed.rs 的连接/重连模式（指数退避，max 30s）。
 
 use std::collections::HashMap;
@@ -91,38 +91,61 @@ impl Gateway {
         self.user_tx.subscribe()
     }
 
-    /// 启动所有 WS 连接（每个 unique symbol 一个 combined stream task）
+    /// 启动一条 combined stream WS 连接（所有 symbol 合并）
     ///
     /// `feed_configs` 用于确定每个 symbol 订阅哪些流（aggTrade/depth/markPrice）。
+    /// 所有 symbol 合并到一条 WS，收到消息后按 symbol 分发到对应的 broadcast channel。
     /// 返回 JoinHandle 列表。
     pub async fn start(
         &self,
         feed_configs: Vec<FeedConfig>,
     ) -> Vec<tokio::task::JoinHandle<()>> {
-        let mut handles = Vec::new();
+        // Merge all feed_configs into one combined config
+        let mut all_symbols = Vec::new();
+        let mut has_agg_trade = false;
+        let mut has_depth = false;
+        let mut has_mark_price = false;
+        let mut depth_speed = "100ms".to_string();
 
-        for config in feed_configs {
-            // FeedConfig 的 symbols 可能包含多个 symbol，但 Gateway 设计是 per-symbol
-            // 为兼容，遍历 config 中每个 symbol，克隆 config 并单独启动
+        for config in &feed_configs {
             for sym in &config.symbols {
-                let upper = sym.to_uppercase();
-                if let Some(tx) = self.channels.get(&upper) {
-                    let tx = tx.clone();
-                    let single_config = FeedConfig {
-                        symbols: vec![sym.clone()],
-                        agg_trade: config.agg_trade,
-                        depth: config.depth,
-                        depth_speed: config.depth_speed.clone(),
-                        mark_price: config.mark_price,
-                    };
-                    handles.push(tokio::spawn(async move {
-                        feed_loop(single_config, tx).await;
-                    }));
+                let lower = sym.to_lowercase();
+                if !all_symbols.contains(&lower) {
+                    all_symbols.push(lower);
                 }
+            }
+            if config.agg_trade {
+                has_agg_trade = true;
+            }
+            if config.depth {
+                has_depth = true;
+                depth_speed = config.depth_speed.clone();
+            }
+            if config.mark_price {
+                has_mark_price = true;
             }
         }
 
-        handles
+        if all_symbols.is_empty() {
+            return Vec::new();
+        }
+
+        let merged_config = FeedConfig {
+            symbols: all_symbols,
+            agg_trade: has_agg_trade,
+            depth: has_depth,
+            depth_speed,
+            mark_price: has_mark_price,
+        };
+
+        // Clone channel map for the combined feed task
+        let channels = self.channels.clone();
+
+        let handle = tokio::spawn(async move {
+            combined_feed_loop(merged_config, channels).await;
+        });
+
+        vec![handle]
     }
 
     /// 获取用户数据流的 broadcast sender（供外部 user data stream task 使用）
@@ -151,14 +174,21 @@ fn build_stream_url(config: &FeedConfig) -> String {
     format!("{}?streams={}", BINANCE_FSTREAM_WS, streams.join("/"))
 }
 
-/// 解析组合流消息
-fn parse_combined_message(raw: &str) -> Option<MarketEvent> {
+/// 从 stream 名称中提取 symbol（大写）
+/// e.g. "ntrnusdt@aggTrade" -> "NTRNUSDT"
+fn extract_symbol_from_stream(stream: &str) -> Option<String> {
+    stream.split('@').next().map(|s| s.to_uppercase())
+}
+
+/// 解析组合流消息，返回 (symbol_upper, MarketEvent)
+fn parse_combined_message(raw: &str) -> Option<(String, MarketEvent)> {
     let combined: BinanceCombinedStream = serde_json::from_str(raw).ok()?;
     let stream = &combined.stream;
+    let symbol = extract_symbol_from_stream(stream)?;
 
     if stream.ends_with("@aggTrade") {
         match serde_json::from_value::<BinanceAggTrade>(combined.data) {
-            Ok(agg) => Some(MarketEvent::Tick(agg.into_tick())),
+            Ok(agg) => Some((symbol, MarketEvent::Tick(agg.into_tick()))),
             Err(e) => {
                 warn!(%stream, %e, "failed to parse aggTrade");
                 None
@@ -166,7 +196,7 @@ fn parse_combined_message(raw: &str) -> Option<MarketEvent> {
         }
     } else if stream.contains("@depth") {
         match serde_json::from_value::<BinanceDepthUpdate>(combined.data) {
-            Ok(depth) => Some(MarketEvent::Depth(depth.into_depth())),
+            Ok(depth) => Some((symbol, MarketEvent::Depth(depth.into_depth()))),
             Err(e) => {
                 warn!(%stream, %e, "failed to parse depth");
                 None
@@ -174,7 +204,7 @@ fn parse_combined_message(raw: &str) -> Option<MarketEvent> {
         }
     } else if stream.contains("@markPrice") {
         match serde_json::from_value::<BinanceMarkPrice>(combined.data) {
-            Ok(mp) => Some(MarketEvent::MarkPrice(mp.into_mark_price())),
+            Ok(mp) => Some((symbol, MarketEvent::MarkPrice(mp.into_mark_price()))),
             Err(e) => {
                 warn!(%stream, %e, "failed to parse markPrice");
                 None
@@ -186,93 +216,114 @@ fn parse_combined_message(raw: &str) -> Option<MarketEvent> {
     }
 }
 
-/// 主循环：连接 → 读取 → 广播 → 断开 → 重连（指数退避，max 30s）
-async fn feed_loop(config: FeedConfig, tx: broadcast::Sender<MarketEvent>) {
+/// Combined stream 主循环：一条 WS 连接所有 symbol，按 symbol 分发到对应 channel
+async fn combined_feed_loop(
+    config: FeedConfig,
+    channels: HashMap<String, broadcast::Sender<MarketEvent>>,
+) {
     let url_str = build_stream_url(&config);
     let mut retry_delay = std::time::Duration::from_secs(1);
     let max_delay = std::time::Duration::from_secs(30);
     let read_timeout = std::time::Duration::from_secs(30);
 
     loop {
-        info!(url = %url_str, "gateway: connecting to binance ws");
+        info!(url = %url_str, symbols = config.symbols.len(), "gateway: connecting combined stream");
 
         match connect_async(&url_str).await {
             Ok((ws_stream, _)) => {
-                info!("gateway: ws connected");
+                info!(symbols = config.symbols.len(), "gateway: combined stream connected");
                 retry_delay = std::time::Duration::from_secs(1);
                 let mut msg_count: u64 = 0;
 
                 let (mut write, mut read) = ws_stream.split();
+                let mut ping_interval = tokio::time::interval(std::time::Duration::from_secs(20));
 
                 loop {
-                    match tokio::time::timeout(read_timeout, read.next()).await {
-                        Ok(Some(msg)) => match msg {
-                            Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
-                                msg_count += 1;
-                                if msg_count <= 5 {
-                                    if let Ok(v) =
-                                        serde_json::from_str::<serde_json::Value>(&text)
-                                    {
-                                        let stream_name = v
-                                            .get("stream")
-                                            .and_then(|s| s.as_str())
-                                            .unwrap_or("?");
-                                        info!(msg_count, stream = stream_name, "gateway: ws feed received");
+                    tokio::select! {
+                        msg = tokio::time::timeout(read_timeout, read.next()) => {
+                            match msg {
+                                Ok(Some(msg)) => match msg {
+                                    Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
+                                        msg_count += 1;
+                                        if msg_count <= 5 {
+                                            if let Ok(v) =
+                                                serde_json::from_str::<serde_json::Value>(&text)
+                                            {
+                                                let stream_name = v
+                                                    .get("stream")
+                                                    .and_then(|s| s.as_str())
+                                                    .unwrap_or("?");
+                                                info!(msg_count, stream = stream_name, "gateway: combined feed received");
+                                            }
+                                        }
+                                        if let Some((symbol, event)) = parse_combined_message(&text) {
+                                            if let Some(tx) = channels.get(&symbol) {
+                                                let _ = tx.send(event);
+                                            } else {
+                                                warn!(symbol = %symbol, "gateway: no channel for symbol, dropping");
+                                            }
+                                        }
+                                        if msg_count % 500 == 0 {
+                                            info!(msg_count, "gateway: combined feed messages received");
+                                        }
                                     }
+                                    Ok(tokio_tungstenite::tungstenite::Message::Ping(data)) => {
+                                        if let Err(e) = write
+                                            .send(tokio_tungstenite::tungstenite::Message::Pong(data))
+                                            .await
+                                        {
+                                            error!(%e, "gateway: failed to send pong");
+                                            break;
+                                        }
+                                    }
+                                    Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => {
+                                        warn!("gateway: combined stream server sent close frame");
+                                        break;
+                                    }
+                                    Err(e) => {
+                                        error!(%e, "gateway: combined stream read error");
+                                        break;
+                                    }
+                                    _ => {}
+                                },
+                                Ok(None) => {
+                                    warn!("gateway: combined stream ended");
+                                    break;
                                 }
-                                if let Some(event) = parse_combined_message(&text) {
-                                    // broadcast: 如果没有 receiver 也不 panic
-                                    let _ = tx.send(event);
-                                }
-                                if msg_count % 500 == 0 {
-                                    info!(msg_count, "gateway: ws feed messages received");
-                                }
-                            }
-                            Ok(tokio_tungstenite::tungstenite::Message::Ping(data)) => {
-                                if let Err(e) = write
-                                    .send(tokio_tungstenite::tungstenite::Message::Pong(data))
-                                    .await
-                                {
-                                    error!(%e, "gateway: failed to send pong");
+                                Err(_) => {
+                                    warn!(
+                                        timeout_secs = read_timeout.as_secs(),
+                                        msg_count, "gateway: combined stream read timeout, reconnecting"
+                                    );
                                     break;
                                 }
                             }
-                            Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => {
-                                warn!("gateway: ws server sent close frame");
-                                break;
-                            }
-                            Err(e) => {
-                                error!(%e, "gateway: ws read error");
-                                break;
-                            }
-                            _ => {}
-                        },
-                        Ok(None) => {
-                            warn!("gateway: ws stream ended");
-                            break;
                         }
-                        Err(_) => {
-                            warn!(
-                                timeout_secs = read_timeout.as_secs(),
-                                msg_count, "gateway: ws read timeout, reconnecting"
-                            );
-                            break;
+                        _ = ping_interval.tick() => {
+                            if let Err(e) = write
+                                .send(tokio_tungstenite::tungstenite::Message::Ping(vec![].into()))
+                                .await
+                            {
+                                error!(%e, "gateway: failed to send ping");
+                                break;
+                            }
                         }
                     }
                 }
             }
             Err(e) => {
-                error!(%e, "gateway: ws connect failed");
+                error!(%e, "gateway: combined stream connect failed");
             }
         }
 
-        // 如果没有订阅者了，停止
-        if tx.receiver_count() == 0 {
-            info!("gateway: no receivers left, stopping feed");
+        // 检查是否还有任何 receiver
+        let total_receivers: usize = channels.values().map(|tx| tx.receiver_count()).sum();
+        if total_receivers == 0 {
+            info!("gateway: no receivers left, stopping combined feed");
             return;
         }
 
-        warn!(delay_secs = retry_delay.as_secs(), "gateway: reconnecting after delay");
+        warn!(delay_secs = retry_delay.as_secs(), "gateway: combined stream reconnecting after delay");
         tokio::time::sleep(retry_delay).await;
         retry_delay = (retry_delay * 2).min(max_delay);
     }
@@ -381,5 +432,53 @@ mod tests {
         // 两个 receiver 都应该能拿到
         assert!(rx1.try_recv().is_ok());
         assert!(rx2.try_recv().is_ok());
+    }
+
+    #[test]
+    fn extract_symbol_from_stream_works() {
+        assert_eq!(
+            extract_symbol_from_stream("ntrnusdt@aggTrade"),
+            Some("NTRNUSDT".to_string())
+        );
+        assert_eq!(
+            extract_symbol_from_stream("btcusdt@depth@100ms"),
+            Some("BTCUSDT".to_string())
+        );
+        assert_eq!(
+            extract_symbol_from_stream("suiusdt@markPrice@1s"),
+            Some("SUIUSDT".to_string())
+        );
+    }
+
+    #[test]
+    fn parse_combined_message_returns_symbol() {
+        let raw = r#"{"stream":"btcusdt@aggTrade","data":{"e":"aggTrade","E":1700000000000,"s":"BTCUSDT","p":"42000.50","q":"0.001","T":1700000000000,"m":false}}"#;
+        let result = parse_combined_message(raw);
+        assert!(result.is_some());
+        let (symbol, event) = result.unwrap();
+        assert_eq!(symbol, "BTCUSDT");
+        assert!(matches!(event, MarketEvent::Tick(_)));
+    }
+
+    #[test]
+    fn build_combined_stream_url_multi_symbol() {
+        let config = FeedConfig {
+            symbols: vec![
+                "bardusdt".into(),
+                "ntrnusdt".into(),
+                "fetusdt".into(),
+            ],
+            agg_trade: true,
+            depth: true,
+            depth_speed: "100ms".into(),
+            mark_price: false,
+        };
+        let url = build_stream_url(&config);
+        assert!(url.starts_with("wss://fstream.binance.com/stream?streams="));
+        assert!(url.contains("bardusdt@aggTrade"));
+        assert!(url.contains("ntrnusdt@aggTrade"));
+        assert!(url.contains("fetusdt@aggTrade"));
+        assert!(url.contains("ntrnusdt@depth@100ms"));
+        assert!(!url.contains("markPrice"));
     }
 }

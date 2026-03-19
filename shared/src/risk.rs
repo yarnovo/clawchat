@@ -91,6 +91,89 @@ impl RiskConfig {
             }
         }
     }
+
+    /// 从 portfolio 默认 + 策略覆盖加载合并后的 RiskConfig
+    ///
+    /// 1. 加载 portfolio_path 作为基础（文件不存在则用 Default）
+    /// 2. 如果 strategy_path 存在，用其中显式设置的字段覆盖基础值
+    pub fn load_merged(portfolio_path: &Path, strategy_path: &Path) -> Self {
+        let mut base = Self::load(portfolio_path);
+
+        let strategy_raw = match std::fs::read_to_string(strategy_path) {
+            Ok(s) => s,
+            Err(_) => {
+                tracing::info!("no strategy risk.json at {}, using portfolio defaults", strategy_path.display());
+                return base;
+            }
+        };
+
+        let overlay: serde_json::Value = match serde_json::from_str(&strategy_raw) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::warn!("failed to parse strategy risk.json {}: {e}", strategy_path.display());
+                return base;
+            }
+        };
+
+        let obj = match overlay.as_object() {
+            Some(o) => o,
+            None => return base,
+        };
+
+        // 逐字段覆盖：策略 JSON 中存在的字段覆盖组合默认值
+        if let Some(v) = obj.get("name").and_then(|v| v.as_str()) {
+            base.name = v.to_string();
+        }
+        if let Some(v) = obj.get("max_loss_per_trade").and_then(|v| v.as_f64()) {
+            base.max_loss_per_trade = v;
+        }
+        if let Some(v) = obj.get("max_profit_per_trade").and_then(|v| v.as_f64()) {
+            base.max_profit_per_trade = v;
+        }
+        if let Some(v) = obj.get("max_daily_loss").and_then(|v| v.as_f64()) {
+            base.max_daily_loss = v;
+        }
+        if let Some(v) = obj.get("max_drawdown_warning").and_then(|v| v.as_f64()) {
+            base.max_drawdown_warning = v;
+        }
+        if let Some(v) = obj.get("max_drawdown_stop").and_then(|v| v.as_f64()) {
+            base.max_drawdown_stop = v;
+        }
+        if let Some(v) = obj.get("max_position_ratio").and_then(|v| v.as_f64()) {
+            base.max_position_ratio = v;
+        }
+        if let Some(v) = obj.get("min_liquidation_distance").and_then(|v| v.as_f64()) {
+            base.min_liquidation_distance = v;
+        }
+        if let Some(v) = obj.get("max_leverage").and_then(|v| v.as_u64()) {
+            base.max_leverage = v as u32;
+        }
+        if let Some(v) = obj.get("max_concurrent_positions").and_then(|v| v.as_u64()) {
+            base.max_concurrent_positions = v as u32;
+        }
+        if let Some(v) = obj.get("max_hold_time_hours").and_then(|v| v.as_f64()) {
+            base.max_hold_time_hours = v;
+        }
+        if let Some(v) = obj.get("trailing_stop").and_then(|v| v.as_f64()) {
+            base.trailing_stop = v;
+        }
+        if let Some(v) = obj.get("max_portfolio_exposure").and_then(|v| v.as_f64()) {
+            base.max_portfolio_exposure = v;
+        }
+        if obj.contains_key("funding_rate_limit") {
+            base.funding_rate_limit = obj.get("funding_rate_limit").and_then(|v| v.as_f64());
+        }
+        if obj.contains_key("max_unrealized_loss") {
+            base.max_unrealized_loss = obj.get("max_unrealized_loss").and_then(|v| v.as_f64());
+        }
+
+        tracing::info!(
+            "merged risk config: portfolio={} + strategy={}",
+            portfolio_path.display(),
+            strategy_path.display()
+        );
+        base
+    }
 }
 
 // ── 纯函数风控检查 ─────────────────────────────────────────────
@@ -253,6 +336,52 @@ mod tests {
         let config = RiskConfig::default();
         let v = risk_gate(1.0, 200.0, 0.0, 50.0, 200.0, &config);
         assert_eq!(v, RiskVerdict::Pass);
+    }
+
+    #[test]
+    fn risk_config_load_merged_overlay() {
+        let dir = tempfile::tempdir().unwrap();
+
+        // Portfolio defaults
+        let portfolio_path = dir.path().join("portfolio_risk.json");
+        let mut f = std::fs::File::create(&portfolio_path).unwrap();
+        write!(f, r#"{{
+            "max_loss_per_trade": 0.05,
+            "max_daily_loss": 0.15,
+            "max_leverage": 5,
+            "max_portfolio_exposure": 0.80,
+            "funding_rate_limit": 0.001
+        }}"#).unwrap();
+
+        // Strategy override: only change max_leverage and max_daily_loss
+        let strategy_path = dir.path().join("strategy_risk.json");
+        let mut f = std::fs::File::create(&strategy_path).unwrap();
+        write!(f, r#"{{
+            "name": "test-strat",
+            "max_leverage": 10,
+            "max_daily_loss": 0.10
+        }}"#).unwrap();
+
+        let cfg = RiskConfig::load_merged(&portfolio_path, &strategy_path);
+        assert_eq!(cfg.name, "test-strat");
+        assert_eq!(cfg.max_leverage, 10); // overridden
+        assert!((cfg.max_daily_loss - 0.10).abs() < f64::EPSILON); // overridden
+        assert!((cfg.max_loss_per_trade - 0.05).abs() < f64::EPSILON); // from portfolio
+        assert!((cfg.max_portfolio_exposure - 0.80).abs() < f64::EPSILON); // from portfolio
+        assert!((cfg.funding_rate_limit.unwrap() - 0.001).abs() < f64::EPSILON); // from portfolio
+    }
+
+    #[test]
+    fn risk_config_load_merged_no_strategy_file() {
+        let dir = tempfile::tempdir().unwrap();
+
+        let portfolio_path = dir.path().join("portfolio_risk.json");
+        let mut f = std::fs::File::create(&portfolio_path).unwrap();
+        write!(f, r#"{{"max_leverage": 5}}"#).unwrap();
+
+        let strategy_path = dir.path().join("nonexistent.json");
+        let cfg = RiskConfig::load_merged(&portfolio_path, &strategy_path);
+        assert_eq!(cfg.max_leverage, 5);
     }
 
     /// 读取 strategies/ 下所有 risk.json 并验证反序列化 + roundtrip

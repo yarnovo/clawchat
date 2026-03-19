@@ -88,9 +88,11 @@ struct StrategyRuntime {
 
 #[derive(Debug)]
 enum ConfigChange {
-    Strategy(String),  // strategy name
-    Trade(String),     // strategy name
-    Risk(String),      // strategy name
+    Strategy(String),       // strategy name
+    Trade(String),          // strategy name
+    Risk(String),           // strategy name
+    PortfolioTrade,         // portfolio-level trade.json changed
+    PortfolioRisk,          // portfolio-level risk.json changed
 }
 
 // ── Scan approved strategies ───────────────────────────────────
@@ -284,37 +286,51 @@ async fn start_user_data_stream(
                 retry_delay = std::time::Duration::from_secs(1);
                 let uds_timeout = std::time::Duration::from_secs(65 * 60);
                 let (mut write, mut read) = ws.split();
+                let mut ping_interval = tokio::time::interval(std::time::Duration::from_secs(20));
 
                 loop {
-                    match tokio::time::timeout(uds_timeout, read.next()).await {
-                        Ok(Some(msg)) => match msg {
-                            Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
-                                for event in parse_user_data_msg(&text) {
-                                    let _ = user_tx.send(event);
+                    tokio::select! {
+                        msg = tokio::time::timeout(uds_timeout, read.next()) => {
+                            match msg {
+                                Ok(Some(msg)) => match msg {
+                                    Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
+                                        for event in parse_user_data_msg(&text) {
+                                            let _ = user_tx.send(event);
+                                        }
+                                    }
+                                    Ok(tokio_tungstenite::tungstenite::Message::Ping(data)) => {
+                                        let _ = write
+                                            .send(tokio_tungstenite::tungstenite::Message::Pong(data))
+                                            .await;
+                                    }
+                                    Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => {
+                                        warn!("user data stream closed");
+                                        break;
+                                    }
+                                    Err(e) => {
+                                        error!("user data stream error: {e}");
+                                        break;
+                                    }
+                                    _ => {}
+                                },
+                                Ok(None) => {
+                                    warn!("user data stream ended");
+                                    break;
+                                }
+                                Err(_) => {
+                                    warn!("user data stream read timeout, reconnecting");
+                                    break;
                                 }
                             }
-                            Ok(tokio_tungstenite::tungstenite::Message::Ping(data)) => {
-                                let _ = write
-                                    .send(tokio_tungstenite::tungstenite::Message::Pong(data))
-                                    .await;
-                            }
-                            Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => {
-                                warn!("user data stream closed");
-                                break;
-                            }
-                            Err(e) => {
-                                error!("user data stream error: {e}");
-                                break;
-                            }
-                            _ => {}
-                        },
-                        Ok(None) => {
-                            warn!("user data stream ended");
-                            break;
                         }
-                        Err(_) => {
-                            warn!("user data stream read timeout, reconnecting");
-                            break;
+                        _ = ping_interval.tick() => {
+                            if let Err(e) = write
+                                .send(tokio_tungstenite::tungstenite::Message::Ping(vec![].into()))
+                                .await
+                            {
+                                error!("user data stream: failed to send ping: {e}");
+                                break;
+                            }
                         }
                     }
                 }
@@ -431,61 +447,86 @@ fn parse_user_data_msg(raw: &str) -> Vec<UserEvent> {
     events
 }
 
-// ── markPrice feed (per symbol) ────────────────────────────────
+// ── markPrice combined feed ────────────────────────────────────
 
-async fn start_mark_price_feed(symbol: String, user_tx: broadcast::Sender<UserEvent>) {
-    let stream = format!("{}@markPrice@1s", symbol.to_lowercase());
-    let url = format!("{BINANCE_FSTREAM_WS}/stream?streams={stream}");
+async fn start_combined_mark_price_feed(
+    symbols: Vec<String>,
+    user_tx: broadcast::Sender<UserEvent>,
+) {
+    let streams: Vec<String> = symbols
+        .iter()
+        .map(|s| format!("{}@markPrice@1s", s.to_lowercase()))
+        .collect();
+    let url = format!("{BINANCE_FSTREAM_WS}/stream?streams={}", streams.join("/"));
 
     let mut retry_delay = std::time::Duration::from_secs(1);
     let max_delay = std::time::Duration::from_secs(30);
     let read_timeout = std::time::Duration::from_secs(30);
 
     loop {
-        info!(url = %url, "connecting to markPrice ws");
+        info!(url = %url, symbols = symbols.len(), "connecting to combined markPrice ws");
 
         match connect_async(&url).await {
             Ok((ws, _)) => {
-                info!("markPrice ws connected for {symbol}");
+                info!(symbols = symbols.len(), "combined markPrice ws connected");
                 retry_delay = std::time::Duration::from_secs(1);
                 let (mut write, mut read) = ws.split();
+                let mut msg_count: u64 = 0;
+                let mut ping_interval = tokio::time::interval(std::time::Duration::from_secs(20));
 
                 loop {
-                    match tokio::time::timeout(read_timeout, read.next()).await {
-                        Ok(Some(msg)) => match msg {
-                            Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
-                                if let Some(event) = parse_mark_price_msg(&text) {
-                                    let _ = user_tx.send(event);
+                    tokio::select! {
+                        msg = tokio::time::timeout(read_timeout, read.next()) => {
+                            match msg {
+                                Ok(Some(msg)) => match msg {
+                                    Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
+                                        msg_count += 1;
+                                        if let Some(event) = parse_mark_price_msg(&text) {
+                                            let _ = user_tx.send(event);
+                                        }
+                                        if msg_count <= 3 {
+                                            info!(msg_count, "combined markPrice feed received");
+                                        }
+                                    }
+                                    Ok(tokio_tungstenite::tungstenite::Message::Ping(data)) => {
+                                        let _ = write
+                                            .send(tokio_tungstenite::tungstenite::Message::Pong(data))
+                                            .await;
+                                    }
+                                    Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => {
+                                        warn!("combined markPrice ws closed");
+                                        break;
+                                    }
+                                    Err(e) => {
+                                        error!("combined markPrice ws error: {e}");
+                                        break;
+                                    }
+                                    _ => {}
+                                },
+                                Ok(None) => {
+                                    warn!("combined markPrice ws stream ended");
+                                    break;
+                                }
+                                Err(_) => {
+                                    warn!("combined markPrice ws read timeout, reconnecting");
+                                    break;
                                 }
                             }
-                            Ok(tokio_tungstenite::tungstenite::Message::Ping(data)) => {
-                                let _ = write
-                                    .send(tokio_tungstenite::tungstenite::Message::Pong(data))
-                                    .await;
-                            }
-                            Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => {
-                                warn!("markPrice ws closed");
-                                break;
-                            }
-                            Err(e) => {
-                                error!("markPrice ws error: {e}");
-                                break;
-                            }
-                            _ => {}
-                        },
-                        Ok(None) => {
-                            warn!("markPrice ws stream ended");
-                            break;
                         }
-                        Err(_) => {
-                            warn!("markPrice ws read timeout, reconnecting");
-                            break;
+                        _ = ping_interval.tick() => {
+                            if let Err(e) = write
+                                .send(tokio_tungstenite::tungstenite::Message::Ping(vec![].into()))
+                                .await
+                            {
+                                error!("combined markPrice: failed to send ping: {e}");
+                                break;
+                            }
                         }
                     }
                 }
             }
             Err(e) => {
-                error!("markPrice ws connect failed: {e}");
+                error!("combined markPrice ws connect failed: {e}");
             }
         }
 
@@ -493,7 +534,7 @@ async fn start_mark_price_feed(symbol: String, user_tx: broadcast::Sender<UserEv
             return;
         }
 
-        warn!(delay = ?retry_delay, "markPrice ws reconnecting");
+        warn!(delay = ?retry_delay, "combined markPrice ws reconnecting");
         tokio::time::sleep(retry_delay).await;
         retry_delay = (retry_delay * 2).min(max_delay);
     }
@@ -520,10 +561,12 @@ fn parse_mark_price_msg(raw: &str) -> Option<UserEvent> {
 
 fn start_config_watcher(
     strategies_dir: PathBuf,
+    portfolio_dir: PathBuf,
     config_tx: mpsc::Sender<ConfigChange>,
 ) {
     std::thread::spawn(move || {
         let tx = config_tx;
+        let portfolio_dir_clone = portfolio_dir.clone();
         let mut watcher = notify::recommended_watcher(
             move |res: Result<notify::Event, notify::Error>| {
                 let Ok(event) = res else { return };
@@ -536,6 +579,18 @@ fn start_config_watcher(
                         .file_name()
                         .and_then(|n| n.to_str())
                         .unwrap_or("");
+
+                    // Check if this is a portfolio-level config change
+                    if path.parent() == Some(portfolio_dir_clone.as_path()) {
+                        let change = match file_name {
+                            "trade.json" => ConfigChange::PortfolioTrade,
+                            "risk.json" => ConfigChange::PortfolioRisk,
+                            _ => continue,
+                        };
+                        let _ = tx.blocking_send(change);
+                        continue;
+                    }
+
                     // Extract strategy name from parent directory
                     let strategy_name = path
                         .parent()
@@ -562,7 +617,16 @@ fn start_config_watcher(
             .watch(&strategies_dir, RecursiveMode::Recursive)
             .expect("failed to watch strategies directory");
 
-        info!("config watcher started: {}", strategies_dir.display());
+        // Also watch portfolio directory for portfolio-level config changes
+        watcher
+            .watch(&portfolio_dir, RecursiveMode::NonRecursive)
+            .expect("failed to watch portfolio directory");
+
+        info!(
+            "config watcher started: strategies={}, portfolio={}",
+            strategies_dir.display(),
+            portfolio_dir.display()
+        );
         loop {
             std::thread::sleep(std::time::Duration::from_secs(3600));
         }
@@ -1000,12 +1064,34 @@ async fn main() {
             }
             Err(e) => {
                 warn!("failed to load ledger: {e}, creating new");
-                Ledger::new(total_capital)
+                Ledger::new_single(
+                    &account.name,
+                    &account.exchange,
+                    account.total_capital,
+                    &portfolio.name,
+                    portfolio.allocated_capital,
+                    portfolio.reserve.unwrap_or(0.0),
+                )
             }
         }
     } else {
-        Ledger::new(total_capital)
+        Ledger::new_single(
+            &account.name,
+            &account.exchange,
+            account.total_capital,
+            &portfolio.name,
+            portfolio.allocated_capital,
+            portfolio.reserve.unwrap_or(0.0),
+        )
     };
+
+    // Portfolio directory for portfolio-level configs
+    let portfolio_dir = paths::portfolio_dir("binance-main", "main");
+    let portfolio_risk_path = portfolio_dir.join("risk.json");
+    let portfolio_trade_path = portfolio_dir.join("trade.json");
+
+    // Load portfolio-level trade override (highest priority)
+    let mut portfolio_trade_override = TradeOverride::load(&portfolio_trade_path);
 
     // Collect unique symbols and build strategy runtimes
     let mut symbols: Vec<String> = Vec::new();
@@ -1035,12 +1121,12 @@ async fn main() {
             ledger.add_strategy(name, capital);
         }
 
-        // Load risk config
+        // Load risk config: portfolio default + strategy override merge
         let risk_path = strat_dir.join("risk.json");
-        let risk_config = RiskConfig::load(&risk_path);
+        let risk_config = RiskConfig::load_merged(&portfolio_risk_path, &risk_path);
         let risk_guard = EngineRiskGuard::new(risk_config.clone(), capital);
 
-        // Load trade override
+        // Load trade override (strategy-level; portfolio-level checked at decision time)
         let trade_path = strat_dir.join("trade.json");
         let trade_override = TradeOverride::load(&trade_path);
 
@@ -1161,18 +1247,18 @@ async fn main() {
         });
     }
 
-    // Per-symbol markPrice feeds
-    for sym in &symbols {
+    // Combined markPrice feed (one WS for all symbols)
+    {
         let tx = user_tx.clone();
-        let s = sym.clone();
+        let syms = symbols.clone();
         tokio::spawn(async move {
-            start_mark_price_feed(s, tx).await;
+            start_combined_mark_price_feed(syms, tx).await;
         });
     }
 
-    // 13. Start Config Watcher
+    // 13. Start Config Watcher (strategies + portfolio dirs)
     let (config_tx, mut config_rx) = mpsc::channel::<ConfigChange>(256);
-    start_config_watcher(paths::strategies_dir(), config_tx);
+    start_config_watcher(paths::strategies_dir(), portfolio_dir.clone(), config_tx);
 
     // Per-strategy exchange instances (each with correct symbol + order_id_prefix)
     let mut exchanges: HashMap<String, Exchange> = HashMap::new();
@@ -1240,13 +1326,25 @@ async fn main() {
                 log_signal(strategy_name, &worker_signal.signal, worker_signal.current_price,
                     &serde_json::json!({}), false);
 
-                // Decision gate: trade override
+                // Decision gate: portfolio-level trade override (highest priority)
+                if portfolio_trade_override.is_active(rt.last_price) {
+                    if !decision_gate_allows_signal(&portfolio_trade_override) {
+                        tracing::debug!(
+                            strategy = strategy_name,
+                            action = ?portfolio_trade_override.action,
+                            "signal blocked by portfolio trade override"
+                        );
+                        continue;
+                    }
+                }
+
+                // Decision gate: strategy-level trade override
                 if rt.trade_override.is_active(rt.last_price) {
                     if !decision_gate_allows_signal(&rt.trade_override) {
                         tracing::debug!(
                             strategy = strategy_name,
                             action = ?rt.trade_override.action,
-                            "signal blocked by trade override"
+                            "signal blocked by strategy trade override"
                         );
                         continue;
                     }
@@ -1425,13 +1523,44 @@ async fn main() {
                     ConfigChange::Risk(name) => {
                         if let Some(rt) = runtimes.get_mut(&name) {
                             let risk_path = rt.dir.join("risk.json");
-                            let new_risk = RiskConfig::load(&risk_path);
+                            let new_risk = RiskConfig::load_merged(&portfolio_risk_path, &risk_path);
                             info!(
                                 strategy = %name,
                                 max_loss = new_risk.max_loss_per_trade,
                                 max_daily_loss = new_risk.max_daily_loss,
-                                "risk.json reloaded"
+                                "risk.json reloaded (merged with portfolio)"
                             );
+                            rt.risk_guard = EngineRiskGuard::new(new_risk.clone(), rt.capital);
+                            rt.risk_config = new_risk;
+                        }
+                    }
+                    ConfigChange::PortfolioTrade => {
+                        let new_override = TradeOverride::load(&portfolio_trade_path);
+                        info!(
+                            action = ?new_override.action,
+                            note = %new_override.note,
+                            "portfolio trade.json reloaded"
+                        );
+                        portfolio_trade_override = new_override;
+                        // If portfolio-level is pause/stop, it applies globally
+                        // If it's a oneshot action, execute across all strategies
+                        if portfolio_trade_override.needs_execution() {
+                            for (name, exchange) in &exchanges {
+                                let mut po_clone = portfolio_trade_override.clone();
+                                let rt_price = runtimes.get(name).map(|r| r.last_price).unwrap_or(0.0);
+                                execute_trade_override(
+                                    &mut po_clone, &portfolio_trade_path, exchange, name, rt_price,
+                                ).await;
+                            }
+                            // Mark as executed on the original
+                            portfolio_trade_override.mark_executed(&portfolio_trade_path);
+                        }
+                    }
+                    ConfigChange::PortfolioRisk => {
+                        info!("portfolio risk.json changed — reloading all strategy risk configs");
+                        for (_name, rt) in runtimes.iter_mut() {
+                            let risk_path = rt.dir.join("risk.json");
+                            let new_risk = RiskConfig::load_merged(&portfolio_risk_path, &risk_path);
                             rt.risk_guard = EngineRiskGuard::new(new_risk.clone(), rt.capital);
                             rt.risk_config = new_risk;
                         }

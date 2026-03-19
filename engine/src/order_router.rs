@@ -171,7 +171,7 @@ impl OrderRouter {
 
     /// Handle mark price update: propagate to all strategies holding this symbol.
     pub fn handle_mark_price(&mut self, symbol: &str, mark_price: f64) {
-        for alloc in self.ledger.strategies.values_mut() {
+        for alloc in self.ledger.all_strategies_mut() {
             if alloc.positions.contains_key(symbol) {
                 alloc.update_mark_price(symbol, mark_price);
                 alloc.update_hwm();
