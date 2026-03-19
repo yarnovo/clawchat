@@ -16,3 +16,4 @@ reports/
 logs/
 Cargo.lock
 discovered/
+.pid/

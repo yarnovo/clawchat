@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 export BASH_ENV := .env
 
-.PHONY: build hft hft-dry autopilot status watcher report-engine report-daily report-weekly data-engine data-backfill data-status data-validate discover discover-scan discover-status install clean test help
+.PHONY: build hft hft-dry autopilot status watcher report-engine report-daily report-weekly data-engine data-backfill data-status data-validate discover discover-scan discover-status start-data stop-data status-data start-engine stop-engine status-engine start-all stop-all status-all install clean test help
 
 # === Build ===
 
@@ -65,6 +65,93 @@ discover-scan: ## Run discovery scan for specific strategy/symbol
 
 discover-status: ## Show discovery results
 	cargo run --release -p discovery -- status
+
+# === 后台服务管理 ===
+
+start-data: ## Start data engine in background
+	@mkdir -p .pid logs
+	@if [ -f .pid/data-engine.pid ] && kill -0 $$(cat .pid/data-engine.pid) 2>/dev/null; then \
+		echo "数据引擎已在运行 (PID $$(cat .pid/data-engine.pid))"; \
+	else \
+		nohup cargo run --release -p data-engine -- run > logs/data-engine.log 2>&1 & \
+		echo $$! > .pid/data-engine.pid; \
+		echo "数据引擎已启动 (PID $$!)"; \
+		echo "日志: logs/data-engine.log"; \
+	fi
+
+stop-data: ## Stop data engine
+	@if [ -f .pid/data-engine.pid ]; then \
+		PID=$$(cat .pid/data-engine.pid); \
+		if kill -0 $$PID 2>/dev/null; then \
+			kill $$PID && echo "数据引擎已停止 (PID $$PID)"; \
+		else \
+			echo "数据引擎未在运行 (PID $$PID 已退出)"; \
+		fi; \
+		rm -f .pid/data-engine.pid; \
+	else \
+		echo "数据引擎未在运行（无 PID 文件）"; \
+	fi
+
+status-data: ## Check data engine status
+	@if [ -f .pid/data-engine.pid ] && kill -0 $$(cat .pid/data-engine.pid) 2>/dev/null; then \
+		echo "✅ 数据引擎运行中 (PID $$(cat .pid/data-engine.pid))"; \
+		echo "   日志: $$(tail -1 logs/data-engine.log 2>/dev/null || echo '无')"; \
+	else \
+		echo "❌ 数据引擎未运行"; \
+	fi
+
+start-engine: ## Start trading engine in background (dry-run default, use MODE=live for real trading)
+	@mkdir -p .pid logs
+	@if [ -f .pid/engine.pid ] && kill -0 $$(cat .pid/engine.pid) 2>/dev/null; then \
+		echo "交易引擎已在运行 (PID $$(cat .pid/engine.pid))"; \
+	else \
+		if [ "$(MODE)" = "live" ]; then \
+			echo "⚠️  正式模式启动..."; \
+			nohup cargo run --release -p hft-engine > logs/engine.log 2>&1 & \
+		else \
+			echo "🔒 dry-run 模式启动（不下单）..."; \
+			nohup cargo run --release -p hft-engine -- --dry-run > logs/engine.log 2>&1 & \
+		fi; \
+		echo $$! > .pid/engine.pid; \
+		echo "交易引擎已启动 (PID $$!)"; \
+		echo "日志: logs/engine.log"; \
+	fi
+
+stop-engine: ## Stop trading engine
+	@if [ -f .pid/engine.pid ]; then \
+		PID=$$(cat .pid/engine.pid); \
+		if kill -0 $$PID 2>/dev/null; then \
+			kill $$PID && echo "交易引擎已停止 (PID $$PID)"; \
+		else \
+			echo "交易引擎未在运行 (PID $$PID 已退出)"; \
+		fi; \
+		rm -f .pid/engine.pid; \
+	else \
+		echo "交易引擎未在运行（无 PID 文件）"; \
+	fi
+
+status-engine: ## Check trading engine status
+	@if [ -f .pid/engine.pid ] && kill -0 $$(cat .pid/engine.pid) 2>/dev/null; then \
+		echo "✅ 交易引擎运行中 (PID $$(cat .pid/engine.pid))"; \
+		echo "   日志: $$(tail -1 logs/engine.log 2>/dev/null || echo '无')"; \
+	else \
+		echo "❌ 交易引擎未运行"; \
+	fi
+
+# === Phase 3: 一键管理 ===
+
+start-all: ## Start all services (data + engine dry-run)
+	@$(MAKE) start-data
+	@sleep 2
+	@$(MAKE) start-engine
+
+stop-all: ## Stop all services
+	@$(MAKE) stop-engine
+	@$(MAKE) stop-data
+
+status-all: ## Check all services status
+	@$(MAKE) status-data
+	@$(MAKE) status-engine
 
 # === Deps ===
 
