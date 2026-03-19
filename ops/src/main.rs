@@ -170,6 +170,23 @@ enum Command {
         min_vol: f64,
     },
 
+    // ── 组合管理 ──
+    /// 创建新投资组合
+    CreatePortfolio {
+        /// 账户名
+        #[arg(long, default_value = "binance-main")]
+        account: String,
+        /// 组合名
+        #[arg(long)]
+        name: String,
+        /// 分配资金
+        #[arg(long)]
+        capital: f64,
+        /// 最大回撤 %
+        #[arg(long, default_value_t = 20.0)]
+        max_drawdown: f64,
+    },
+
     // ── 币种扩展 ──
     /// 扫描 Binance 候选币种（纯输出 JSON，不写文件）
     ScanSymbols {
@@ -476,6 +493,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Command::Scan { top, min_vol } => {
             cmd::watch::scan(&ctx.exchange, top, min_vol).await?;
+        }
+
+        // ── 组合管理 ────────────────────────────
+        Command::CreatePortfolio { account, name, capital, max_drawdown } => {
+            cmd::create_portfolio::run(&ctx, &account, &name, capital, max_drawdown)?;
         }
 
         // ── 币种扩展 ────────────────────────────

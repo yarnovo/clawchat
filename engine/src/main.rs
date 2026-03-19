@@ -94,6 +94,7 @@ enum ConfigChange {
     Risk(String),           // strategy name
     PortfolioTrade,         // portfolio-level trade.json changed
     PortfolioRisk,          // portfolio-level risk.json changed
+    NewPortfolio(String),   // new portfolio directory detected under portfolios/
 }
 
 // ── Scan approved strategies ───────────────────────────────────
@@ -655,12 +656,14 @@ fn parse_mark_price_msg(raw: &str) -> Option<UserEvent> {
 // ── Config watcher ─────────────────────────────────────────────
 
 fn start_config_watcher(
+    portfolios_base: PathBuf,
     portfolio_dirs: Vec<PathBuf>,
     config_tx: mpsc::Sender<ConfigChange>,
 ) {
     std::thread::spawn(move || {
         let tx = config_tx;
         let portfolio_dirs_clone = portfolio_dirs.clone();
+        let portfolios_base_clone = portfolios_base.clone();
         let mut watcher = notify::recommended_watcher(
             move |res: Result<notify::Event, notify::Error>| {
                 let Ok(event) = res else { return };
@@ -670,6 +673,16 @@ fn start_config_watcher(
                     _ => return,
                 }
                 for path in &event.paths {
+                    // Detect new portfolio directory under portfolios/
+                    if is_create && path.parent() == Some(portfolios_base_clone.as_path()) {
+                        if path.is_dir() {
+                            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
+                                let _ = tx.blocking_send(ConfigChange::NewPortfolio(name.to_string()));
+                            }
+                        }
+                        continue;
+                    }
+
                     let file_name = path
                         .file_name()
                         .and_then(|n| n.to_str())
@@ -713,6 +726,11 @@ fn start_config_watcher(
         )
         .expect("failed to create config watcher");
 
+        // Watch portfolios/ parent for new portfolio directories
+        watcher
+            .watch(&portfolios_base, RecursiveMode::NonRecursive)
+            .unwrap_or_else(|e| warn!("failed to watch portfolios dir {}: {e}", portfolios_base.display()));
+
         for pdir in &portfolio_dirs {
             let strats_dir = pdir.join("strategies");
             if strats_dir.is_dir() {
@@ -727,7 +745,7 @@ fn start_config_watcher(
         }
 
         info!(
-            "config watcher started: watching {} portfolio directories",
+            "config watcher started: watching {} portfolio directories + portfolios/ parent",
             portfolio_dirs.len()
         );
         loop {
@@ -1535,13 +1553,13 @@ async fn main() {
         });
     }
 
-    // 13. Start Config Watcher (all portfolio dirs)
+    // 13. Start Config Watcher (all portfolio dirs + portfolios/ parent)
     let (config_tx, mut config_rx) = mpsc::channel::<ConfigChange>(256);
     let config_tx_main = config_tx.clone(); // for main loop to re-inject NewStrategy
     let watch_dirs: Vec<PathBuf> = portfolio_configs.keys()
         .map(|pname| paths::portfolio_dir(account_name, pname))
         .collect();
-    start_config_watcher(watch_dirs, config_tx);
+    start_config_watcher(paths::portfolios_dir(account_name), watch_dirs, config_tx);
 
     // 14. Order record channel + writer task
     let (order_tx, order_rx) = mpsc::channel::<Order>(4096);
@@ -2163,6 +2181,71 @@ async fn main() {
                                 GlobalRiskConfig::default()
                             };
                             portfolio_risk_guards.insert(pname.clone(), GlobalRiskGuard::new(grc, pc.allocated_capital));
+                        }
+                    }
+                    ConfigChange::NewPortfolio(pname) => {
+                        // New portfolio directory detected — register it
+                        let pdir = paths::portfolio_dir(account_name, &pname);
+                        let ppath = pdir.join("portfolio.json");
+                        if !ppath.exists() {
+                            info!(portfolio = %pname, "new portfolio dir detected but no portfolio.json yet");
+                        } else {
+                            match PortfolioConfig::load(&ppath) {
+                                Ok(pc) => {
+                                    if portfolio_configs.contains_key(&pname) {
+                                        info!(portfolio = %pname, "portfolio already registered");
+                                    } else {
+                                        info!(
+                                            portfolio = %pname,
+                                            capital = pc.allocated_capital,
+                                            "new portfolio registered"
+                                        );
+
+                                        // Register risk/trade paths
+                                        portfolio_risk_paths.insert(pname.clone(), pdir.join("risk.json"));
+                                        portfolio_trade_paths.insert(pname.clone(), pdir.join("trade.json"));
+                                        portfolio_trade_overrides.insert(
+                                            pname.clone(),
+                                            TradeOverride::load(&pdir.join("trade.json")),
+                                        );
+
+                                        // Create GlobalRiskGuard for this portfolio
+                                        let grc = if let Some(ref pr) = pc.risk {
+                                            GlobalRiskConfig {
+                                                max_drawdown_pct: pr.max_drawdown_pct.unwrap_or(10.0),
+                                                max_daily_loss_pct: pr.max_daily_loss_pct.unwrap_or(5.0),
+                                                max_total_exposure: pr.max_total_exposure.unwrap_or(2.0),
+                                                max_per_coin_exposure_pct: pr.max_per_coin_exposure_pct.unwrap_or(50.0),
+                                            }
+                                        } else {
+                                            GlobalRiskConfig::default()
+                                        };
+                                        portfolio_risk_guards.insert(
+                                            pname.clone(),
+                                            GlobalRiskGuard::new(grc, pc.allocated_capital),
+                                        );
+
+                                        // Add portfolio to ledger
+                                        order_router.ledger_mut().add_portfolio(
+                                            account_name,
+                                            &pname,
+                                            pc.allocated_capital,
+                                            pc.reserve.unwrap_or(0.0),
+                                        );
+
+                                        // Save updated portfolio config
+                                        portfolio_configs.insert(pname.clone(), pc);
+
+                                        // Save ledger
+                                        let _ = order_router.ledger().save(&ledger_path);
+
+                                        info!(portfolio = %pname, "portfolio fully registered, watching for strategies");
+                                    }
+                                }
+                                Err(e) => {
+                                    warn!(portfolio = %pname, "failed to load portfolio.json: {e}");
+                                }
+                            }
                         }
                     }
                 }

@@ -1,6 +1,7 @@
 pub mod backtest;
 pub mod compare;
 pub mod correlation;
+pub mod create_portfolio;
 pub mod data_status;
 pub mod emergency;
 pub mod evaluate;
