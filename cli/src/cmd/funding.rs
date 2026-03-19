@@ -1,11 +1,11 @@
 use colored::Colorize;
 use chrono::{Utc, TimeZone};
-use clawchat_shared::exchange::Exchange;
-use clawchat_shared::paths::strategies_dir;
+use crate::Ctx;
+use std::path::Path;
 
-fn get_strategy_symbols() -> Vec<String> {
+fn get_strategy_symbols(strategies_dir: &Path) -> Vec<String> {
     let mut symbols = std::collections::BTreeSet::new();
-    let sdir = strategies_dir();
+    let sdir = strategies_dir;
     if !sdir.exists() { return Vec::new(); }
     if let Ok(entries) = std::fs::read_dir(&sdir) {
         for entry in entries.flatten() {
@@ -60,9 +60,10 @@ fn format_timestamp(ts: Option<&serde_json::Value>) -> String {
 
 /// 资金费率查看 — 当前费率 + 历史趋势
 pub async fn funding(
-    exchange: &Exchange,
+    ctx: &Ctx,
     symbol: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let exchange = &ctx.exchange;
     let symbols: Vec<String> = if let Some(sym) = symbol {
         let mut s = sym.to_uppercase().replace("-", "").replace("/", "");
         if !s.ends_with("USDT") {
@@ -70,13 +71,25 @@ pub async fn funding(
         }
         vec![s]
     } else {
-        let syms = get_strategy_symbols();
+        let syms = get_strategy_symbols(&ctx.strategies_dir);
         if syms.is_empty() {
             println!("\n  无策略，请指定币种：clawchat funding NTRN/USDT");
             return Ok(());
         }
         syms
     };
+
+    if ctx.json {
+        let mut results = Vec::new();
+        for sym in &symbols {
+            match exchange.fetch_premium_index(Some(sym)).await {
+                Ok(info) => results.push(info),
+                Err(_) => {}
+            }
+        }
+        println!("{}", serde_json::to_string_pretty(&results)?);
+        return Ok(());
+    }
 
     println!("\n  {}", "当前资金费率".bold());
     println!("  {}", "=".repeat(60));

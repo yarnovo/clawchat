@@ -1,14 +1,15 @@
 use colored::Colorize;
-use clawchat_shared::paths::{strategies_dir, records_dir};
+use crate::Ctx;
 use std::collections::HashMap;
+use std::path::Path;
 
 fn parse_num(v: Option<&serde_json::Value>) -> f64 {
     v.and_then(|v| v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
         .unwrap_or(0.0)
 }
 
-fn load_trades(strategy_name: &str) -> Vec<serde_json::Value> {
-    let path = records_dir().join("trades.jsonl");
+fn load_trades(records_dir: &Path, strategy_name: &str) -> Vec<serde_json::Value> {
+    let path = records_dir.join("trades.jsonl");
     if !path.exists() {
         return Vec::new();
     }
@@ -29,8 +30,8 @@ fn load_trades(strategy_name: &str) -> Vec<serde_json::Value> {
         .collect()
 }
 
-fn load_backtest(strategy_name: &str) -> Option<serde_json::Value> {
-    let path = strategies_dir().join(strategy_name).join("signal.json");
+fn load_backtest(strategies_dir: &Path, strategy_name: &str) -> Option<serde_json::Value> {
+    let path = strategies_dir.join(strategy_name).join("signal.json");
     if !path.exists() {
         return None;
     }
@@ -49,7 +50,7 @@ struct LiveStats {
     max_drawdown_pct: f64,
 }
 
-fn compute_live_stats(trades: &[serde_json::Value], strategy_name: &str) -> LiveStats {
+fn compute_live_stats(trades: &[serde_json::Value], strategies_dir: &Path, strategy_name: &str) -> LiveStats {
     let mut by_symbol: HashMap<String, Vec<&serde_json::Value>> = HashMap::new();
     for t in trades {
         let sym = t.get("symbol").and_then(|v| v.as_str()).unwrap_or("?").to_string();
@@ -127,7 +128,7 @@ fn compute_live_stats(trades: &[serde_json::Value], strategy_name: &str) -> Live
 
     // Read capital from signal.json
     let mut capital = 200.0f64;
-    let strategy_json = strategies_dir().join(strategy_name).join("signal.json");
+    let strategy_json = strategies_dir.join(strategy_name).join("signal.json");
     if strategy_json.exists() {
         if let Ok(content) = std::fs::read_to_string(&strategy_json) {
             if let Ok(cfg) = serde_json::from_str::<serde_json::Value>(&content) {
@@ -190,22 +191,22 @@ fn compare_metric(name: &str, live_val: f64, bt_val: f64, higher_is_better: bool
 }
 
 /// 实盘 vs 回测对比 — 检查策略表现偏差
-pub fn compare(strategy: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn compare(ctx: &Ctx, strategy: Option<String>) -> Result<(), Box<dyn std::error::Error>> {
     let strategy_name = match strategy {
         Some(s) => s,
         None => {
-            println!("\n  用法: clawchat compare <strategy-name>");
+            println!("\n  用法: clawchat compare --strategy <name>");
             return Ok(());
         }
     };
 
-    let strategy_dir = strategies_dir().join(&strategy_name);
+    let strategy_dir = ctx.strategies_dir.join(&strategy_name);
     if !strategy_dir.exists() {
         println!("\n  {}", format!("错误: 策略目录不存在 strategies/{strategy_name}/").red());
         return Ok(());
     }
 
-    let backtest = match load_backtest(&strategy_name) {
+    let backtest = match load_backtest(&ctx.strategies_dir, &strategy_name) {
         Some(bt) => bt,
         None => {
             println!("\n  {}", "错误: signal.json 无 backtest 字段".red());
@@ -213,7 +214,7 @@ pub fn compare(strategy: Option<String>) -> Result<(), Box<dyn std::error::Error
         }
     };
 
-    let trades = load_trades(&strategy_name);
+    let trades = load_trades(&ctx.records_dir, &strategy_name);
     if trades.is_empty() {
         println!("\n  {}", format!("警告: 无实盘交易记录 (records/trades.jsonl 中无 strategy={strategy_name})").yellow());
         println!("\n  回测指标（仅供参考）:");
@@ -226,13 +227,38 @@ pub fn compare(strategy: Option<String>) -> Result<(), Box<dyn std::error::Error
         return Ok(());
     }
 
-    let live = compute_live_stats(&trades, &strategy_name);
+    let live = compute_live_stats(&trades, &ctx.strategies_dir, &strategy_name);
 
     let bt_return = parse_num(backtest.get("return_pct"));
     let bt_win_rate = parse_num(backtest.get("win_rate")) * 100.0;
     let bt_profit_factor = parse_num(backtest.get("profit_factor"));
     let bt_max_dd = parse_num(backtest.get("max_drawdown_pct"));
     let bt_trades = backtest.get("trades").and_then(|v| v.as_u64()).unwrap_or(0);
+
+    if ctx.json {
+        let pf = if live.profit_factor.is_infinite() { serde_json::Value::String("inf".to_string()) } else { serde_json::json!(live.profit_factor) };
+        let result = serde_json::json!({
+            "strategy": strategy_name,
+            "live": {
+                "return_pct": live.return_pct,
+                "win_rate": live.win_rate * 100.0,
+                "profit_factor": pf,
+                "max_drawdown_pct": live.max_drawdown_pct,
+                "total_pnl": live.total_pnl,
+                "trades": live.trades,
+                "round_trips": live.round_trips,
+            },
+            "backtest": {
+                "return_pct": bt_return,
+                "win_rate": bt_win_rate,
+                "profit_factor": bt_profit_factor,
+                "max_drawdown_pct": bt_max_dd,
+                "trades": bt_trades,
+            },
+        });
+        println!("{}", serde_json::to_string_pretty(&result)?);
+        return Ok(());
+    }
 
     println!("\n  {}", "=".repeat(62));
     println!("  {} {strategy_name}", "实盘 vs 回测对比:".bold());

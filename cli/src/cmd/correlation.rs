@@ -1,7 +1,8 @@
 use colored::Colorize;
 use clawchat_shared::indicators::pearson_correlation;
-use clawchat_shared::paths::records_dir;
+use crate::Ctx;
 use std::collections::HashMap;
+use std::path::Path;
 
 const WARN_THRESHOLD: f64 = 0.7;
 
@@ -10,8 +11,8 @@ fn parse_num(v: Option<&serde_json::Value>) -> f64 {
         .unwrap_or(0.0)
 }
 
-fn load_trades() -> Vec<serde_json::Value> {
-    let path = records_dir().join("trades.jsonl");
+fn load_trades(records_dir: &Path) -> Vec<serde_json::Value> {
+    let path = records_dir.join("trades.jsonl");
     if !path.exists() { return Vec::new(); }
     let content = match std::fs::read_to_string(&path) { Ok(c) => c, Err(_) => return Vec::new() };
     content.lines().filter(|l| !l.is_empty())
@@ -78,8 +79,8 @@ fn trades_to_daily_pnl(trades: &[serde_json::Value]) -> HashMap<String, HashMap<
 }
 
 /// 策略相关性矩阵 — 分析策略间收益相关度
-pub fn correlation(_days: u32) -> Result<(), Box<dyn std::error::Error>> {
-    let trades = load_trades();
+pub fn correlation(ctx: &Ctx, _days: u32) -> Result<(), Box<dyn std::error::Error>> {
+    let trades = load_trades(&ctx.records_dir);
     if trades.is_empty() {
         println!("\n  (无交易记录，records/trades.jsonl 为空或不存在)");
         return Ok(());
@@ -131,6 +132,19 @@ pub fn correlation(_days: u32) -> Result<(), Box<dyn std::error::Error>> {
             let y: Vec<f64> = common_dates.iter().map(|d| daily_pnl[s2][*d]).collect();
             matrix.insert((i, j), pearson_correlation(&x, &y));
         }
+    }
+
+    if ctx.json {
+        let mut json_matrix: HashMap<String, HashMap<String, Option<f64>>> = HashMap::new();
+        for (i, s1) in strategies.iter().enumerate() {
+            let mut row = HashMap::new();
+            for (j, s2) in strategies.iter().enumerate() {
+                row.insert(s2.clone(), matrix.get(&(i, j)).copied().flatten());
+            }
+            json_matrix.insert(s1.clone(), row);
+        }
+        println!("{}", serde_json::to_string_pretty(&json_matrix)?);
+        return Ok(());
     }
 
     println!("\n  {}", "=".repeat(60));

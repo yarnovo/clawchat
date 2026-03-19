@@ -1,13 +1,15 @@
 use colored::Colorize;
 use chrono::{Utc, Duration};
-use clawchat_shared::paths::records_dir;
+use crate::Ctx;
 use std::collections::HashMap;
+use std::path::Path;
 
 fn load_events(
+    records_dir: &Path,
     strategy: Option<&str>,
     days: Option<u32>,
 ) -> Vec<serde_json::Value> {
-    let path = records_dir().join("risk_events.jsonl");
+    let path = records_dir.join("risk_events.jsonl");
     if !path.exists() {
         return Vec::new();
     }
@@ -68,12 +70,18 @@ fn format_event(rec: &serde_json::Value) -> String {
 
 /// 风控事件查询 — 查看触发的风控规则日志
 pub fn risk_log(
+    ctx: &Ctx,
     strategy: Option<String>,
     days: u32,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let strat_ref = strategy.as_deref();
     let days_opt = if days > 0 { Some(days) } else { None };
-    let events = load_events(strat_ref, days_opt);
+    let events = load_events(&ctx.records_dir, strat_ref, days_opt);
+
+    if ctx.json {
+        println!("{}", serde_json::to_string_pretty(&events)?);
+        return Ok(());
+    }
 
     let mut title = "风控事件".to_string();
     if let Some(s) = &strategy {

@@ -5,164 +5,135 @@ mod util;
 
 use clap::{Parser, Subcommand};
 use clawchat_shared::exchange::Exchange;
+use std::path::PathBuf;
 
 // ── CLI 定义 ────────────────────────────────────────────────
 
 #[derive(Parser)]
-#[command(name = "clawchat", about = "ClawChat 量化交易工作站")]
+#[command(name = "clawchat", about = "ClawChat 量化工具集")]
 struct Cli {
     #[command(subcommand)]
     command: Command,
+
+    /// 策略目录（默认从 shared::paths 获取）
+    #[arg(long, global = true)]
+    strategies_dir: Option<PathBuf>,
+
+    /// 记录目录（默认从 shared::paths 获取）
+    #[arg(long, global = true)]
+    records_dir: Option<PathBuf>,
+
+    /// JSON 格式输出
+    #[arg(long, global = true)]
+    json: bool,
+}
+
+pub struct Ctx {
+    pub exchange: Exchange,
+    pub strategies_dir: PathBuf,
+    pub records_dir: PathBuf,
+    pub json: bool,
 }
 
 #[derive(Subcommand)]
 enum Command {
-    /// 行情监控
-    Watch {
-        /// 自选列表（可选，空则使用默认）
-        symbols: Vec<String>,
+    // ── 查询 ──
+    /// 总览面板（账户+策略+风控）
+    Status {
+        #[arg(long)]
+        strategy: Option<String>,
     },
-    /// 账户余额
-    Account,
-    /// 扫描高波动币种
-    Scan {
-        /// 返回前 N 个
-        #[arg(long, default_value_t = 20)]
-        top: usize,
-        /// 最小 24h 成交量（USDT）
-        #[arg(long, default_value_t = 10_000_000.0)]
-        min_vol: f64,
+    /// 虚拟账户详情
+    Ledger {
+        #[arg(long)]
+        strategy: Option<String>,
     },
-    /// 单策略回测
-    Backtest {
-        /// 交易对，如 BTCUSDT
-        #[arg(long)]
-        symbol: String,
-        /// 策略名
-        #[arg(long)]
-        strategy: String,
-        /// 回测天数
-        #[arg(long, default_value_t = 14)]
-        days: u32,
-        /// K 线周期
-        #[arg(long, default_value = "1h")]
-        timeframe: String,
-        /// 杠杆倍数
-        #[arg(long, default_value_t = 1)]
-        leverage: u32,
-        /// 起始资金
-        #[arg(long, default_value_t = 200.0)]
-        capital: f64,
-        /// 仓位比例 (0.0-1.0)
-        #[arg(long, default_value_t = 0.5)]
-        position_size: f64,
-        /// 策略参数 JSON
-        #[arg(long)]
-        params: Option<String>,
-    },
-    /// 批量回测
-    BatchBacktest {
-        /// 回测天数
-        #[arg(long, default_value_t = 14)]
-        days: u32,
-        /// K 线周期
-        #[arg(long, default_value = "5m")]
-        timeframe: String,
-        /// 取前 N 个高波动币种
-        #[arg(long, default_value_t = 15)]
-        top_symbols: usize,
-    },
-    /// 参数网格搜索
-    GridSearch {
-        /// 交易对
-        #[arg(long)]
-        symbol: String,
-        /// 策略名
-        #[arg(long)]
-        strategy: String,
-        /// 回测天数
-        #[arg(long, default_value_t = 7)]
-        days: u32,
-        /// K 线周期
-        #[arg(long, default_value = "15m")]
-        timeframe: String,
-    },
-    /// 资金划转
-    Transfer {
-        /// 方向: spot-to-futures 或 futures-to-spot
-        #[arg(long)]
-        direction: String,
-        /// 金额
-        #[arg(long)]
-        amount: f64,
-        /// 资产类型
-        #[arg(long, default_value = "USDT")]
-        asset: String,
-    },
-    /// P&L 查询
+    /// 盈亏查询
     Pnl {
-        /// 币种（可选）
+        #[arg(long)]
+        strategy: Option<String>,
         #[arg(long)]
         symbol: Option<String>,
-        /// 回溯小时数
-        #[arg(long, default_value_t = 24)]
-        hours: u32,
-    },
-    /// 风控检查
-    Check {
-        /// 策略名（可选，空则检查全部）
-        #[arg(long)]
-        strategy: Option<String>,
-    },
-    /// 策略监听器守护进程
-    Watcher,
-    /// 全局状态面板
-    Status,
-    /// 按策略 P&L
-    StrategyPnl {
-        /// 统计天数
         #[arg(long, default_value_t = 7)]
         days: u32,
     },
-    /// 实盘 vs 回测对比
-    Compare {
-        /// 策略名（可选）
-        #[arg(long)]
-        strategy: Option<String>,
-    },
-    /// 策略实盘评估
-    Review {
-        /// 策略名（可选）
-        #[arg(long)]
-        strategy: Option<String>,
-        /// 自动评估模式
-        #[arg(long)]
-        auto: bool,
-    },
-    /// 策略相关性矩阵
-    Correlation {
-        /// 统计天数
-        #[arg(long, default_value_t = 30)]
-        days: u32,
-    },
-    /// 资金费率
-    Funding {
-        /// 币种（可选）
+    /// 当前持仓
+    Positions {
         #[arg(long)]
         symbol: Option<String>,
     },
     /// 风控事件日志
     RiskLog {
-        /// 策略名（可选）
         #[arg(long)]
         strategy: Option<String>,
-        /// 回溯天数
         #[arg(long, default_value_t = 7)]
         days: u32,
     },
+    /// 资金费率
+    Funding {
+        #[arg(long)]
+        symbol: Option<String>,
+    },
+    /// 数据引擎状态
+    DataStatus,
+
+    // ── 分析 ──
+    /// 单策略回测
+    Backtest {
+        #[arg(long)]
+        symbol: String,
+        #[arg(long)]
+        strategy: String,
+        #[arg(long, default_value_t = 14)]
+        days: u32,
+        #[arg(long, default_value = "1h")]
+        timeframe: String,
+        #[arg(long, default_value_t = 1)]
+        leverage: u32,
+        #[arg(long, default_value_t = 200.0)]
+        capital: f64,
+        #[arg(long, default_value_t = 0.5)]
+        position_size: f64,
+        #[arg(long)]
+        params: Option<String>,
+    },
+    /// 实盘 vs 回测对比
+    Compare {
+        #[arg(long)]
+        strategy: Option<String>,
+    },
+    /// 策略相关性矩阵
+    Correlation {
+        #[arg(long, default_value_t = 30)]
+        days: u32,
+    },
+    /// 策略健康评估（纯计算输出，不写文件）
+    Evaluate {
+        #[arg(long)]
+        strategy: Option<String>,
+    },
+
+    // ── 操作 ──
+    /// 写 trade.json 控制引擎
+    Trade {
+        /// pause / resume / stop / close_all / close_long / close_short
+        action: String,
+        #[arg(long)]
+        strategy: String,
+        #[arg(long)]
+        note: Option<String>,
+    },
+    /// 资金划转
+    Transfer {
+        #[arg(long)]
+        direction: String,
+        #[arg(long)]
+        amount: f64,
+        #[arg(long, default_value = "USDT")]
+        asset: String,
+    },
     /// 紧急全平
-    EmergencyClose {
-        /// 策略名（可选，空则全部平仓）
+    Emergency {
         #[arg(long)]
         strategy: Option<String>,
     },
@@ -170,6 +141,33 @@ enum Command {
     Exchange {
         #[command(subcommand)]
         action: ExchangeAction,
+    },
+
+    // ── 通知 ──
+    /// 发送邮件通知
+    Notify {
+        /// 邮件主题
+        #[arg(long)]
+        subject: String,
+        /// 邮件正文
+        #[arg(long, default_value = "")]
+        body: String,
+        /// 从文件读取正文
+        #[arg(long)]
+        body_file: Option<String>,
+    },
+
+    // ── 市场 ──
+    /// 行情监控
+    Watch {
+        symbols: Vec<String>,
+    },
+    /// 扫描高波动币种
+    Scan {
+        #[arg(long, default_value_t = 20)]
+        top: usize,
+        #[arg(long, default_value_t = 10_000_000.0)]
+        min_vol: f64,
     },
 }
 
@@ -296,24 +294,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let cli = Cli::parse();
 
+    let ctx = Ctx {
+        exchange,
+        strategies_dir: cli
+            .strategies_dir
+            .unwrap_or_else(|| clawchat_shared::paths::strategies_dir()),
+        records_dir: cli
+            .records_dir
+            .unwrap_or_else(|| clawchat_shared::paths::records_dir()),
+        json: cli.json,
+    };
+
     match cli.command {
-        // ── 行情 ────────────────────────────────
-        Command::Watch { symbols } => {
-            let syms = if symbols.is_empty() {
-                None
-            } else {
-                Some(symbols)
-            };
-            cmd::watch::watch(&exchange, syms).await?;
+        // ── 查询 ──────────────────────────────────
+        Command::Status { strategy } => {
+            cmd::status::status(&ctx, strategy).await?;
         }
-        Command::Account => {
-            cmd::watch::account(&exchange).await?;
+        Command::Ledger { strategy } => {
+            cmd::ledger::run(&ctx, strategy)?;
         }
-        Command::Scan { top, min_vol } => {
-            cmd::watch::scan(&exchange, top, min_vol).await?;
+        Command::Pnl {
+            strategy,
+            symbol,
+            days,
+        } => {
+            cmd::pnl::pnl(&ctx, strategy, symbol, days).await?;
+        }
+        Command::Positions { symbol } => {
+            cmd::exchange_cmd::positions(&ctx.exchange, symbol).await?;
+        }
+        Command::RiskLog { strategy, days } => {
+            cmd::risk_log::risk_log(&ctx, strategy, days)?;
+        }
+        Command::Funding { symbol } => {
+            cmd::funding::funding(&ctx, symbol).await?;
+        }
+        Command::DataStatus => {
+            cmd::data_status::run(&ctx)?;
         }
 
-        // ── 回测 ────────────────────────────────
+        // ── 分析 ──────────────────────────────────
         Command::Backtest {
             symbol,
             strategy,
@@ -325,7 +345,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             params,
         } => {
             cmd::backtest::backtest(
-                &exchange,
+                &ctx.exchange,
                 &symbol,
                 &strategy,
                 days,
@@ -337,73 +357,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
             .await?;
         }
-        Command::BatchBacktest {
-            days,
-            timeframe,
-            top_symbols,
-        } => {
-            cmd::batch_backtest::batch_backtest(&exchange, days, &timeframe, top_symbols).await?;
+        Command::Compare { strategy } => {
+            cmd::compare::compare(&ctx, strategy)?;
         }
-        Command::GridSearch {
-            symbol,
-            strategy,
-            days,
-            timeframe,
-        } => {
-            cmd::grid_search::grid_search(&exchange, &symbol, &strategy, days, &timeframe).await?;
+        Command::Correlation { days } => {
+            cmd::correlation::correlation(&ctx, days)?;
+        }
+        Command::Evaluate { strategy } => {
+            cmd::evaluate::run(&ctx, strategy)?;
         }
 
-        // ── 交易 ────────────────────────────────
+        // ── 操作 ──────────────────────────────────
+        Command::Trade {
+            action,
+            strategy,
+            note,
+        } => {
+            cmd::trade_cmd::run(&ctx, &action, &strategy, note.as_deref())?;
+        }
         Command::Transfer {
             direction,
             amount,
             asset,
         } => {
-            cmd::transfer::transfer(&exchange, &direction, amount, &asset).await?;
+            cmd::transfer::transfer(&ctx.exchange, &direction, amount, &asset).await?;
         }
-        Command::Pnl { symbol, hours } => {
-            cmd::pnl::pnl(&exchange, symbol, hours).await?;
-        }
-        Command::Check { strategy } => {
-            cmd::check::check(&exchange, strategy).await?;
-        }
-        Command::Watcher => {
-            cmd::watcher::watcher().await?;
-        }
-        Command::Status => {
-            cmd::status::status(&exchange).await?;
-        }
-        Command::StrategyPnl { days } => {
-            cmd::strategy_pnl::strategy_pnl(days)?;
-        }
-        Command::Compare { strategy } => {
-            cmd::compare::compare(strategy)?;
+        Command::Emergency { strategy } => {
+            cmd::emergency::emergency_close(&ctx, strategy).await?;
         }
 
-        // ── 评估 ────────────────────────────────
-        Command::Review { strategy, auto } => {
-            cmd::review::review(strategy, auto)?;
-        }
-
-        // ── 分析 ────────────────────────────────
-        Command::Correlation { days } => {
-            cmd::correlation::correlation(days)?;
-        }
-        Command::Funding { symbol } => {
-            cmd::funding::funding(&exchange, symbol).await?;
-        }
-
-        // ── 风控 ────────────────────────────────
-        Command::RiskLog { strategy, days } => {
-            cmd::risk_log::risk_log(strategy, days)?;
-        }
-
-        // ── 紧急操作 ────────────────────────────
-        Command::EmergencyClose { strategy } => {
-            cmd::emergency::emergency_close(&exchange, strategy).await?;
-        }
-
-        // ── 交易所直接操作 ──────────────────────
+        // ── 交易所直接操作 ────────────────────────
         Command::Exchange { action } => match action {
             ExchangeAction::Long {
                 symbol,
@@ -411,7 +394,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 price,
                 leverage,
             } => {
-                cmd::exchange_cmd::long(&exchange, &symbol, amount, price, leverage).await?;
+                cmd::exchange_cmd::long(&ctx.exchange, &symbol, amount, price, leverage).await?;
             }
             ExchangeAction::Short {
                 symbol,
@@ -419,43 +402,61 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 price,
                 leverage,
             } => {
-                cmd::exchange_cmd::short(&exchange, &symbol, amount, price, leverage).await?;
+                cmd::exchange_cmd::short(&ctx.exchange, &symbol, amount, price, leverage).await?;
             }
             ExchangeAction::CloseLong {
                 symbol,
                 amount,
                 price,
             } => {
-                cmd::exchange_cmd::close_long(&exchange, &symbol, amount, price).await?;
+                cmd::exchange_cmd::close_long(&ctx.exchange, &symbol, amount, price).await?;
             }
             ExchangeAction::CloseShort {
                 symbol,
                 amount,
                 price,
             } => {
-                cmd::exchange_cmd::close_short(&exchange, &symbol, amount, price).await?;
+                cmd::exchange_cmd::close_short(&ctx.exchange, &symbol, amount, price).await?;
             }
             ExchangeAction::Leverage { symbol, leverage } => {
-                cmd::exchange_cmd::leverage(&exchange, &symbol, leverage).await?;
+                cmd::exchange_cmd::leverage(&ctx.exchange, &symbol, leverage).await?;
             }
             ExchangeAction::StopLoss {
                 symbol,
                 side,
                 price,
             } => {
-                cmd::exchange_cmd::stop_loss(&exchange, &symbol, &side, price).await?;
+                cmd::exchange_cmd::stop_loss(&ctx.exchange, &symbol, &side, price).await?;
             }
             ExchangeAction::TakeProfit {
                 symbol,
                 side,
                 price,
             } => {
-                cmd::exchange_cmd::take_profit(&exchange, &symbol, &side, price).await?;
+                cmd::exchange_cmd::take_profit(&ctx.exchange, &symbol, &side, price).await?;
             }
             ExchangeAction::Positions { symbol } => {
-                cmd::exchange_cmd::positions(&exchange, symbol).await?;
+                cmd::exchange_cmd::positions(&ctx.exchange, symbol).await?;
             }
         },
+
+        // ── 通知 ──────────────────────────────────
+        Command::Notify { subject, body, body_file } => {
+            cmd::notify::notify(&ctx, &subject, &body, body_file.as_deref()).await?;
+        }
+
+        // ── 市场 ──────────────────────────────────
+        Command::Watch { symbols } => {
+            let syms = if symbols.is_empty() {
+                None
+            } else {
+                Some(symbols)
+            };
+            cmd::watch::watch(&ctx.exchange, syms).await?;
+        }
+        Command::Scan { top, min_vol } => {
+            cmd::watch::scan(&ctx.exchange, top, min_vol).await?;
+        }
     }
 
     Ok(())

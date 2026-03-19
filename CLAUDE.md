@@ -6,20 +6,46 @@
 
 ## 工具
 
-**交易引擎**（Rust 单进程 Gateway）：加载所有 approved 策略，接收行情、计算信号、执行交易。
-**数据引擎**（Rust）：采集存储 K 线行情数据。
-**策略发现引擎**（Rust）：自动搜索参数空间，发现新策略。
-**自动调控引擎** autopilot（Rust）：监控策略状态，自动暂停/缩仓/停机。
+**CLI 工具集** `cli/`：Agent 和人共用的命令行工具，回测、状态查询、风控检查等。
+```bash
+cargo run -p clawchat -- --help
+```
+
+**交易引擎** `engine/`：配置驱动的执行引擎，加载 approved 策略，收行情、算信号、过风控、下单。
+**数据引擎** `data-engine/`：采集存储 K 线行情数据。
+**策略发现引擎** `discovery/`：自动搜索参数空间，发现新策略。
+**报告引擎** `report-engine/`：从 records/ 生成日报周报到 reports/。
+**自动调控引擎** `autopilot/`：监控策略状态，通过写 trade.json 自动暂停/缩仓/停机。
 **Makefile**：运维命令入口，`make help` 查看完整列表。
 
 ## 配置
 
-每个策略目录下三个 JSON 配置，格式规范用技能查看：
-- `signal.json` — 信号参数（什么时候买卖）→ `/strategy-config`
-- `risk.json` — 风控规则（亏了怎么办）→ `/risk-config`
-- `trade.json` — 执行控制（暂停/恢复/手动指令）→ `/trade-config`
+`accounts/` 目录是引擎的对外接口，所有配置规范见 → `/ref-engine-config`
 
 策略目录位置：`accounts/binance-main/portfolios/main/strategies/`
+
+## 信息载体
+
+整个系统的通信协议是文件。引擎读文件做事写文件，Agent 读文件判断写文件。
+
+**issues/** — 问题上报。loop 进程在运行中发现的问题自动写入。
+- 格式：`issues/{日期}-{简述}.md`
+- 来源：`/loop-patrol` 发现风控异常、`/loop-health-check` 发现引擎挂了、`/loop-evaluate` 发现策略衰减等
+- 不是待办清单，是问题现场记录
+
+**notes/** — 经验记录。已发生的事实、踩过的坑、API 用法、调试经验等，供未来参考。
+- 格式：`notes/{日期}-{主题}.md`
+- 内容：经验、发现、观察（不是待办，待办放 issues/）
+- 例：`notes/2026-03-19-agentmail-api.md` — AgentMail 发送 endpoint 和参数格式
+
+**requirements/** — 需求文档。loop 进程发现需要新功能时写入，或用 `/requirement` 技能创建。
+- 格式：`requirements/{日期}-{功能名}.md`
+- 来源：loop 进程发现能力缺失时自动创建、用户提出新需求时创建
+
+**discovered/** — 待审批策略（发现引擎产出）
+**records/** — 交易/风控/PnL 记录（引擎写入）
+**reports/** — 日报/周报（报告引擎生成）
+**logs/** — 运行日志（tracing 自动写）
 
 ## KPI
 
@@ -34,7 +60,7 @@
 ## 规则
 
 - **架构设计见 ARCHITECTURE.md**，改架构前先读
-- **配置/标准只在一处定义，其他地方引用，不重复写。** 准入标准源头：`shared/src/criteria.rs`，配置规范见 skill（`/strategy-config` `/trade-config` `/risk-config`）
+- **配置/标准只在一处定义，其他地方引用，不重复写。** 准入标准源头：`shared/src/criteria.rs`，配置规范见 `/ref-engine-config`
 - **TODO.md 只有 team-lead 维护**，成员不能修改
 - **git commit 只有 team-lead 做**，成员完成后汇报等验收
 - **策略 status 只有 team-lead 能改为 approved**，成员产出写 `status=pending`

@@ -1,15 +1,15 @@
 use chrono::Utc;
 use clawchat_shared::config_util::normalize_symbol;
-use clawchat_shared::exchange::Exchange;
-use clawchat_shared::paths::{strategies_dir, records_dir};
+use crate::Ctx;
+use std::path::Path;
 
-fn load_strategy_symbols() -> std::collections::HashMap<String, String> {
+fn load_strategy_symbols(strategies_dir: &Path) -> std::collections::HashMap<String, String> {
     let mut mapping = std::collections::HashMap::new();
-    let sdir = strategies_dir();
+    let sdir = strategies_dir;
     if !sdir.exists() {
         return mapping;
     }
-    if let Ok(entries) = std::fs::read_dir(&sdir) {
+    if let Ok(entries) = std::fs::read_dir(sdir) {
         for entry in entries.flatten() {
             let cfg_path = entry.path().join("signal.json");
             if !cfg_path.exists() {
@@ -33,7 +33,7 @@ fn load_strategy_symbols() -> std::collections::HashMap<String, String> {
     mapping
 }
 
-fn log_risk_event(strategy: &str, symbol: &str, detail: &str) {
+fn log_risk_event(records_dir: &Path, strategy: &str, symbol: &str, detail: &str) {
     let ts = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
     let record = serde_json::json!({
         "ts": ts,
@@ -44,8 +44,8 @@ fn log_risk_event(strategy: &str, symbol: &str, detail: &str) {
         "verdict": "emergency_close",
         "detail": detail,
     });
-    let rdir = records_dir();
-    let _ = std::fs::create_dir_all(&rdir);
+    let rdir = records_dir;
+    let _ = std::fs::create_dir_all(rdir);
     let log_path = rdir.join("risk_events.jsonl");
     if let Ok(mut f) = std::fs::OpenOptions::new()
         .create(true)
@@ -59,9 +59,10 @@ fn log_risk_event(strategy: &str, symbol: &str, detail: &str) {
 
 /// 紧急全平 — 关闭所有或指定策略的持仓
 pub async fn emergency_close(
-    exchange: &Exchange,
+    ctx: &Ctx,
     strategy: Option<String>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let exchange = &ctx.exchange;
     let positions = exchange.get_positions().await?;
 
     if positions.is_empty() {
@@ -71,7 +72,7 @@ pub async fn emergency_close(
 
     // Filter by strategy if specified
     let target_symbols: Option<std::collections::HashSet<String>> = strategy.as_ref().map(|s| {
-        let mapping = load_strategy_symbols();
+        let mapping = load_strategy_symbols(&ctx.strategies_dir);
         if let Some(sym) = mapping.get(s) {
             let mut set = std::collections::HashSet::new();
             set.insert(sym.clone());
@@ -141,7 +142,7 @@ pub async fn emergency_close(
                 results.push((sym.to_string(), side_str.to_string(), status.clone()));
 
                 let strat = strategy.as_deref().unwrap_or("all");
-                log_risk_event(
+                log_risk_event(&ctx.records_dir,
                     strat,
                     &normalized,
                     &format!(
