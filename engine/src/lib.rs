@@ -8,6 +8,7 @@ pub mod order_router;
 pub mod risk;
 pub mod state;
 pub mod strategy;
+pub mod symbol_manager;
 pub mod trade;
 pub mod types;
 pub mod worker;

@@ -1,4 +1,5 @@
 {
   "discover": { "interval_min": 1440, "member": "quant", "description": "策略发现+自动上线" },
-  "evaluate": { "interval_min": 1440, "member": "analyst", "description": "策略评估+日报" }
+  "evaluate": { "interval_min": 1440, "member": "analyst", "description": "策略评估+日报" },
+  "symbol_scan": { "interval_min": 10080, "member": "quant", "description": "币种扫描+扩展（每周一次）" }
 }

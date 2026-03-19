@@ -26,7 +26,7 @@
   },
   "position_size": 0.3,
   "status": "approved",
-  "mode": "dry-run",
+  "mode": "live",
   "symbol": "LYNUSDT",
   "timeframe": "15m",
   "timeframe_ms": 900000

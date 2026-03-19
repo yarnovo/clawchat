@@ -10,9 +10,10 @@ use tracing::info;
 use clawchat_shared::config_util::timeframe_to_ms;
 use clawchat_shared::data::DataStore;
 use clawchat_shared::exchange::Exchange;
-use clawchat_shared::paths::project_root;
+use clawchat_shared::paths;
+use clawchat_shared::symbols::SymbolRegistry;
 
-const DEFAULT_SYMBOLS: &[&str] = &[
+const FALLBACK_SYMBOLS: &[&str] = &[
     "BARDUSDT", "NTRNUSDT", "FETUSDT", "SUIUSDT", "LYNUSDT",
 ];
 
@@ -66,12 +67,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let cli = Cli::parse();
 
-    let data_dir = cli.data_dir.unwrap_or_else(|| project_root().join("data"));
+    let data_dir = cli.data_dir.unwrap_or_else(|| paths::project_root().join("data"));
     std::fs::create_dir_all(&data_dir)?;
 
-    let symbols: Vec<String> = cli
-        .symbols
-        .unwrap_or_else(|| DEFAULT_SYMBOLS.iter().map(|s| s.to_string()).collect());
+    let symbols: Vec<String> = cli.symbols.unwrap_or_else(|| {
+        // 优先从 symbols.json 读取
+        let symbols_path = paths::default_symbols_json();
+        if symbols_path.exists() {
+            match SymbolRegistry::load(&symbols_path) {
+                Ok(reg) => {
+                    let syms = reg.data_symbols();
+                    if !syms.is_empty() {
+                        info!(count = syms.len(), "loaded symbols from symbols.json");
+                        return syms;
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("failed to load symbols.json: {e}, using fallback");
+                }
+            }
+        }
+        // 回退到硬编码
+        FALLBACK_SYMBOLS.iter().map(|s| s.to_string()).collect()
+    });
 
     let store = DataStore::new(&data_dir);
 

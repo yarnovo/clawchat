@@ -10,5 +10,6 @@ pub mod paths;
 pub mod risk;
 pub mod state;
 pub mod strategy;
+pub mod symbols;
 pub mod trade;
 pub mod types;

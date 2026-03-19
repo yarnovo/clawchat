@@ -78,3 +78,13 @@ pub fn discovered_dir() -> PathBuf {
 pub fn engine_bin() -> PathBuf {
     project_root().join("engine/target/release/hft-engine")
 }
+
+/// 币种注册表: accounts/binance-main/symbols.json
+pub fn symbols_json(account: &str) -> PathBuf {
+    account_dir(account).join("symbols.json")
+}
+
+/// 默认账户的 symbols.json
+pub fn default_symbols_json() -> PathBuf {
+    symbols_json("binance-main")
+}

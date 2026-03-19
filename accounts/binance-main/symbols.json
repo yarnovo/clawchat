@@ -1,0 +1,25 @@
+{
+  "symbols": {
+    "BARDUSDT": {
+      "status": "active",
+      "added_at": "2026-03-19T00:00:00Z"
+    },
+    "NTRNUSDT": {
+      "status": "active",
+      "added_at": "2026-03-19T00:00:00Z"
+    },
+    "FETUSDT": {
+      "status": "active",
+      "added_at": "2026-03-19T00:00:00Z"
+    },
+    "SUIUSDT": {
+      "status": "active",
+      "added_at": "2026-03-19T00:00:00Z"
+    },
+    "LYNUSDT": {
+      "status": "active",
+      "added_at": "2026-03-19T00:00:00Z"
+    }
+  },
+  "blacklist": []
+}

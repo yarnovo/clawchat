@@ -169,6 +169,26 @@ enum Command {
         #[arg(long, default_value_t = 10_000_000.0)]
         min_vol: f64,
     },
+
+    // ── 币种扩展 ──
+    /// 扫描 Binance 候选币种，更新 symbols.json
+    ScanSymbols {
+        /// 最低 24h 成交额 (USDT)
+        #[arg(long, default_value_t = 5_000_000.0)]
+        min_volume: f64,
+        /// 最多返回数量
+        #[arg(long, default_value_t = 10)]
+        top: usize,
+    },
+    /// 单币种全链路扩展（回填→发现）
+    ExpandSymbol {
+        /// 交易对（如 WLDUSDT）
+        #[arg(long)]
+        symbol: String,
+        /// 回填天数
+        #[arg(long, default_value_t = 180)]
+        days: u32,
+    },
 }
 
 #[derive(Subcommand)]
@@ -456,6 +476,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Command::Scan { top, min_vol } => {
             cmd::watch::scan(&ctx.exchange, top, min_vol).await?;
+        }
+
+        // ── 币种扩展 ────────────────────────────
+        Command::ScanSymbols { min_volume, top } => {
+            cmd::scan_symbols::run(&ctx, min_volume, top).await?;
+        }
+        Command::ExpandSymbol { symbol, days } => {
+            cmd::expand_symbol::run(&ctx, &symbol, days).await?;
         }
     }
 

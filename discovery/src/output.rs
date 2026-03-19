@@ -1,10 +1,10 @@
 use crate::selector::CandidateResult;
 use clawchat_shared::config_util::timeframe_to_ms;
-use clawchat_shared::risk::risk_template_for_strategy;
+use clawchat_shared::risk::{risk_template_for_strategy, RiskConfig};
 use serde_json::json;
 use std::path::Path;
 
-/// 为每个候选生成 signal.json 文件
+/// 为每个候选生成 signal.json + risk.json 文件
 /// 返回成功创建的策略名称列表
 pub fn write_strategy_files(
     candidates: &[CandidateResult],
@@ -28,8 +28,8 @@ pub fn write_strategy_files(
         std::fs::create_dir_all(&dir)?;
         std::fs::write(dir.join("signal.json"), json_str)?;
 
-        // 根据策略类型生成 risk.json
-        let risk = risk_template_for_strategy(&candidate.strategy_type);
+        // 从回测参数提取风控参数，生成数据驱动的 risk.json
+        let risk = build_risk_config(candidate);
         let risk_str = serde_json::to_string_pretty(&risk)?;
         std::fs::write(dir.join("risk.json"), risk_str)?;
 
@@ -119,6 +119,40 @@ fn format_strategy_name(c: &CandidateResult) -> String {
     } else {
         format!("{sym}-{stype}-{suffix}-{}", c.timeframe)
     }
+}
+
+/// 从回测参数 + 训练指标生成数据驱动的 risk.json
+///
+/// 提取逻辑：
+/// - atr_sl_mult → max_loss_per_trade 参考（ATR 倍数 × 基础波动率估算）
+/// - atr_tp_mult → max_profit_per_trade 参考
+/// - train_metrics.max_drawdown_pct × 1.5 → max_drawdown_stop（留余量）
+/// - 其余值从策略类型模板继承
+fn build_risk_config(c: &CandidateResult) -> RiskConfig {
+    let mut risk = risk_template_for_strategy(&c.strategy_type);
+
+    // 从 atr_sl_mult 推导 max_loss_per_trade
+    // ATR 倍数越大 → 允许更大单笔亏损。典型换算：sl_mult * 0.02（假设 ATR 约 2% 波动）
+    if let Some(&sl_mult) = c.params.get("atr_sl_mult") {
+        let derived = (sl_mult * 0.02).min(0.15); // 上限 15%
+        risk.max_loss_per_trade = round2(derived);
+    }
+
+    // 从 atr_tp_mult 推导 max_profit_per_trade
+    if let Some(&tp_mult) = c.params.get("atr_tp_mult") {
+        let derived = (tp_mult * 0.02).min(0.50); // 上限 50%
+        risk.max_profit_per_trade = round2(derived);
+    }
+
+    // 从回测最大回撤推导 max_drawdown_stop（回撤 × 1.5 留余量）
+    let bt_dd = c.train_metrics.max_drawdown_pct / 100.0; // 百分比转比例
+    let derived_dd = (bt_dd * 1.5).min(0.40); // 上限 40%
+    risk.max_drawdown_stop = round2(derived_dd);
+
+    // max_drawdown_warning 设为 max_drawdown_stop 的 70%
+    risk.max_drawdown_warning = round2(risk.max_drawdown_stop * 0.7);
+
+    risk
 }
 
 fn build_strategy_json(c: &CandidateResult, name: &str) -> serde_json::Value {
@@ -274,12 +308,21 @@ mod tests {
         assert_eq!(parsed["name"], "ntrn-trend-ema1852-5m");
         assert_eq!(parsed["status"], "pending");
 
-        // risk.json also generated with trend template (engine_strategy=default)
+        // risk.json — 数据驱动的风控参数
+        // sample: atr_sl_mult=2.0, atr_tp_mult=3.0, max_drawdown_pct=12.1
         let risk_file = tmp.path().join("ntrn-trend-ema1852-5m/risk.json");
         assert!(risk_file.exists());
         let risk: clawchat_shared::risk::RiskConfig =
             serde_json::from_str(&std::fs::read_to_string(&risk_file).unwrap()).unwrap();
-        assert!((risk.max_profit_per_trade - 0.35).abs() < f64::EPSILON);
+        // atr_sl_mult=2.0 → 2.0*0.02 = 0.04
+        assert!((risk.max_loss_per_trade - 0.04).abs() < 0.001);
+        // atr_tp_mult=3.0 → 3.0*0.02 = 0.06
+        assert!((risk.max_profit_per_trade - 0.06).abs() < 0.001);
+        // max_drawdown_pct=12.1 → 0.121*1.5 = 0.1815 → round2 = 0.18
+        assert!((risk.max_drawdown_stop - 0.18).abs() < 0.001);
+        // max_drawdown_warning = 0.18*0.7 = 0.126 → round2 = 0.13
+        assert!((risk.max_drawdown_warning - 0.13).abs() < 0.001);
+        // 继承模板值
         assert_eq!(risk.max_leverage, 5);
     }
 

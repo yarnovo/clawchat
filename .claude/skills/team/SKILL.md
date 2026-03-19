@@ -188,8 +188,11 @@ prompt:
    - patrol → SendMessage monitor: "执行巡逻"
    - discover → 并行创建 N 个 quant（team-lead 先分析再派活）
    - evaluate → SendMessage analyst: "执行策略评估"
-   - fix_issues → SendMessage engineer: "修复 issues"
-   - impl_requirements → SendMessage engineer: "实现需求"
+   - fix_issues → 多个 issue 时并行创建多个 engineer 修复（同 impl_requirements）
+   - impl_requirements → 多个需求时并行创建多个 engineer（eng2, eng3...），team-lead 调度：
+     - 拆分任务确保不改同一文件
+     - 有依赖的排序（先基础后上层）
+     - 每个完成后 review + 集成提交
 
 5. 更新 records/schedule_state.json 的 last_run
 
