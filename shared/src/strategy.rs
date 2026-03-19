@@ -34,6 +34,11 @@ pub struct StrategyFile {
     pub status: Option<String>,
     /// 运行模式: "dry-run" (默认) | "live"
     pub mode: Option<String>,
+    /// 是否启用参数自适应（基于市场体制自动调整参数，默认 false）
+    #[serde(default)]
+    pub adaptive: Option<bool>,
+    /// 体制检测回溯周期（K 线根数，默认 100）
+    pub regime_lookback: Option<u32>,
     #[serde(default)]
     pub backtest: Option<BacktestData>,
     #[serde(default)]
@@ -94,6 +99,16 @@ impl StrategyFile {
     /// 是否为 dry-run 模式（默认 true）
     pub fn is_dry_run(&self) -> bool {
         self.mode.as_deref().unwrap_or("dry-run") != "live"
+    }
+
+    /// 是否启用自适应参数
+    pub fn is_adaptive(&self) -> bool {
+        self.adaptive.unwrap_or(false)
+    }
+
+    /// 体制检测回溯周期（K 线根数）
+    pub fn regime_lookback_bars(&self) -> usize {
+        self.regime_lookback.unwrap_or(100) as usize
     }
 
     /// 获取交易方向

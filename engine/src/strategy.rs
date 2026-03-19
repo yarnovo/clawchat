@@ -8,6 +8,9 @@ pub use clawchat_shared::candle::Candle;
 // Import indicator functions from shared
 use clawchat_shared::indicators::{atr_from_slices, ema_from_slice, rsi_from_slice};
 
+// Import regime detection from shared
+use clawchat_shared::regime::{detect_regime, regime_scaling, MarketRegime};
+
 // ── 信号 ──────────────────────────────────────────────────────
 
 /// 策略输出信号
@@ -1848,6 +1851,149 @@ impl Strategy for GridStrategy {
     }
 }
 
+// ══════════════════════════════════════════════════════════════
+// RegimeAwareWrapper — 市场体制自适应包装器
+// ══════════════════════════════════════════════════════════════
+
+/// 包装任意策略，根据市场体制自动调整信号行为：
+/// - Trending → 保持正常参数
+/// - Ranging → 缩小 position_size 50%（通过缩减 order_qty 实现）
+/// - Choppy → 暂停信号（返回 Signal::None）
+pub struct RegimeAwareWrapper {
+    inner: Box<dyn Strategy + Send>,
+    regime_lookback: usize,
+    check_interval: usize,
+    candle_count: usize,
+    current_regime: MarketRegime,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
+    closes: Vec<f64>,
+}
+
+impl RegimeAwareWrapper {
+    /// 创建自适应包装器
+    ///
+    /// - `inner`: 被包装的策略
+    /// - `regime_lookback`: 体制检测回溯 K 线数（默认 100）
+    /// - `check_interval`: 每 N 根 K 线重新检测体制（默认 10）
+    pub fn new(inner: Box<dyn Strategy + Send>, regime_lookback: usize, check_interval: usize) -> Self {
+        Self {
+            inner,
+            regime_lookback,
+            check_interval,
+            candle_count: 0,
+            current_regime: MarketRegime::Trending, // 初始假设趋势
+            highs: Vec::new(),
+            lows: Vec::new(),
+            closes: Vec::new(),
+        }
+    }
+}
+
+impl Strategy for RegimeAwareWrapper {
+    fn on_candle(&mut self, candle: &Candle) -> Option<Signal> {
+        self.candle_count += 1;
+        self.highs.push(candle.high);
+        self.lows.push(candle.low);
+        self.closes.push(candle.close);
+
+        // 限制历史数据窗口大小（2x lookback 足够）
+        let max_len = self.regime_lookback * 2;
+        if self.closes.len() > max_len {
+            let drain = self.closes.len() - max_len;
+            self.highs.drain(..drain);
+            self.lows.drain(..drain);
+            self.closes.drain(..drain);
+        }
+
+        // 每 check_interval 根 K 线重新检测体制
+        if self.candle_count % self.check_interval == 0 && self.closes.len() >= self.regime_lookback {
+            if let Some(regime) = detect_regime(&self.highs, &self.lows, &self.closes, 14) {
+                if regime != self.current_regime {
+                    tracing::info!(
+                        strategy = %self.inner.name(),
+                        old = %self.current_regime,
+                        new = %regime,
+                        "market regime changed"
+                    );
+                    self.current_regime = regime;
+                }
+            }
+        }
+
+        // Choppy 体制 → 暂停信号
+        if self.current_regime == MarketRegime::Choppy {
+            // 仍然让内部策略更新状态（保持指标连续），但丢弃信号
+            let _ = self.inner.on_candle(candle);
+            return Some(Signal::None);
+        }
+
+        // 正常调用内部策略
+        let signal = self.inner.on_candle(candle)?;
+
+        // Ranging 体制 → 缩小仓位 50%（修改 order qty）
+        if self.current_regime == MarketRegime::Ranging {
+            let (_, _, pos_scale) = regime_scaling(MarketRegime::Ranging);
+            if let Signal::Order(mut req) = signal {
+                req.qty *= pos_scale;
+                return Some(Signal::Order(req));
+            }
+        }
+
+        Some(signal)
+    }
+
+    fn on_tick(&mut self, tick: &TickData) -> Option<Signal> {
+        self.inner.on_tick(tick)
+    }
+
+    fn on_depth(&mut self, depth: &DepthData) -> Option<Signal> {
+        self.inner.on_depth(depth)
+    }
+
+    fn on_event(&mut self, event: &MarketEvent) -> Option<Signal> {
+        self.inner.on_event(event)
+    }
+
+    fn name(&self) -> &str {
+        self.inner.name()
+    }
+
+    fn export_state(&self) -> serde_json::Value {
+        serde_json::json!({
+            "inner": self.inner.export_state(),
+            "regime": format!("{}", self.current_regime),
+            "candle_count": self.candle_count,
+            "highs_len": self.highs.len(),
+            "lows_len": self.lows.len(),
+            "closes_len": self.closes.len(),
+        })
+    }
+
+    fn restore_state(&mut self, state: &serde_json::Value) {
+        if let Some(inner_state) = state.get("inner") {
+            self.inner.restore_state(inner_state);
+        }
+        if let Some(regime_str) = state.get("regime").and_then(|v| v.as_str()) {
+            self.current_regime = match regime_str {
+                "Trending" => MarketRegime::Trending,
+                "Ranging" => MarketRegime::Ranging,
+                "Choppy" => MarketRegime::Choppy,
+                _ => MarketRegime::Trending,
+            };
+        }
+        if let Some(c) = state.get("candle_count").and_then(|v| v.as_u64()) {
+            self.candle_count = c as usize;
+        }
+        tracing::info!(
+            strategy = %self.inner.name(),
+            regime = %self.current_regime,
+            candle_count = self.candle_count,
+            "RegimeAwareWrapper state restored"
+        );
+    }
+}
+
 /// 计算止损/止盈价格
 pub fn calc_sl_tp(entry: f64, atr: f64, is_long: bool, sl_mult: f64, tp_mult: f64) -> (f64, f64) {
     if is_long {
@@ -2075,5 +2221,129 @@ mod tests {
         grid2.restore_state(&exported);
         assert_eq!(grid2.closes.len(), 15);
         assert!(grid2.lines.is_some());
+    }
+
+    // ── RegimeAwareWrapper tests ──
+
+    #[test]
+    fn regime_wrapper_passes_signal_during_trending() {
+        // 持续上涨的趋势数据 → Trending → 正常传递信号
+        let inner = Box::new(TrendFollower::new("BTCUSDT", 1.0));
+        let mut wrapper = RegimeAwareWrapper::new(inner, 50, 10);
+
+        // 喂入趋势数据使 wrapper 检测到 Trending
+        for i in 0..60 {
+            let price = 100.0 + i as f64 * 2.0;
+            wrapper.on_candle(&Candle {
+                open: price - 0.5,
+                high: price + 1.0,
+                low: price - 0.5,
+                close: price,
+                volume: 100.0,
+                timestamp: i * 300_000,
+            });
+        }
+
+        // 验证 wrapper 名称委托正确
+        assert_eq!(wrapper.name(), "TrendFollower");
+    }
+
+    #[test]
+    fn regime_wrapper_blocks_signal_during_choppy() {
+        // 创建一个始终产生买入信号的策略
+        struct AlwaysBuy;
+        impl Strategy for AlwaysBuy {
+            fn on_candle(&mut self, _: &Candle) -> Option<Signal> {
+                Some(Signal::Order(OrderRequest {
+                    symbol: "BTCUSDT".to_string(),
+                    side: Side::Buy,
+                    order_type: OrderType::Market,
+                    qty: 1.0,
+                    price: None,
+                }))
+            }
+            fn name(&self) -> &str { "AlwaysBuy" }
+        }
+
+        let inner = Box::new(AlwaysBuy);
+        let mut wrapper = RegimeAwareWrapper::new(inner, 50, 10);
+
+        // 喂入大幅震荡数据使其检测到 Choppy
+        for i in 0..60 {
+            let swing = if i % 2 == 0 { 5.0 } else { -5.0 };
+            let price = 100.0 + swing;
+            wrapper.on_candle(&Candle {
+                open: price,
+                high: price + 3.0,
+                low: price - 3.0,
+                close: price,
+                volume: 100.0,
+                timestamp: i * 300_000,
+            });
+        }
+
+        // 如果当前处于 Choppy 体制，信号应被屏蔽
+        if wrapper.current_regime == MarketRegime::Choppy {
+            let sig = wrapper.on_candle(&sample_candle(100.0, 60 * 300_000));
+            assert_eq!(sig, Some(Signal::None), "Choppy regime should block signals");
+        }
+    }
+
+    #[test]
+    fn regime_wrapper_scales_qty_during_ranging() {
+        struct FixedBuy;
+        impl Strategy for FixedBuy {
+            fn on_candle(&mut self, _: &Candle) -> Option<Signal> {
+                Some(Signal::Order(OrderRequest {
+                    symbol: "BTCUSDT".to_string(),
+                    side: Side::Buy,
+                    order_type: OrderType::Market,
+                    qty: 2.0,
+                    price: None,
+                }))
+            }
+            fn name(&self) -> &str { "FixedBuy" }
+        }
+
+        let inner = Box::new(FixedBuy);
+        let mut wrapper = RegimeAwareWrapper::new(inner, 50, 10);
+
+        // 手动设置 Ranging 体制
+        wrapper.current_regime = MarketRegime::Ranging;
+
+        let sig = wrapper.on_candle(&sample_candle(100.0, 0));
+        match sig {
+            Some(Signal::Order(req)) => {
+                // Ranging 体制下 position_scale = 1.0（需求说 Ranging 仓位不变，Choppy 缩半）
+                // 但 team-lead 指令说 Ranging → 缩小 position_size 50%
+                assert!(
+                    (req.qty - 1.0).abs() < 1e-9,
+                    "Ranging should halve qty, got {}",
+                    req.qty
+                );
+            }
+            _ => panic!("expected Order signal in Ranging regime"),
+        }
+    }
+
+    #[test]
+    fn regime_wrapper_export_restore_roundtrip() {
+        let inner = Box::new(TrendFollower::new("BTCUSDT", 1.0));
+        let mut wrapper = RegimeAwareWrapper::new(inner, 50, 10);
+
+        for i in 0..30 {
+            wrapper.on_candle(&sample_candle(100.0 + i as f64, i * 300_000));
+        }
+
+        let exported = wrapper.export_state();
+        assert!(exported.get("inner").is_some());
+        assert!(exported.get("regime").is_some());
+        assert!(exported.get("candle_count").is_some());
+
+        let inner2 = Box::new(TrendFollower::new("BTCUSDT", 1.0));
+        let mut wrapper2 = RegimeAwareWrapper::new(inner2, 50, 10);
+        wrapper2.restore_state(&exported);
+
+        assert_eq!(wrapper2.candle_count, 30);
     }
 }

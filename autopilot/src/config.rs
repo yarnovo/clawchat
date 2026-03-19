@@ -55,3 +55,12 @@ pub const FUNDING_PERIODS_PER_YEAR: f64 = 1095.0;
 pub const CAPACITY_SCALE_DOWN_PCT: f64 = 1.20;
 /// 缩仓目标利用率
 pub const CAPACITY_TARGET_PCT: f64 = 0.80;
+
+// ── 策略生命周期评估 ────────────────────────────────────────
+
+/// dry-run 最少观察天数（达到后才评估是否切 live）
+pub const LIFECYCLE_DRYRUN_DAYS: u64 = 3;
+/// dry-run 切 live 的最低 Sharpe 要求
+pub const LIFECYCLE_PROMOTE_SHARPE: f64 = 2.0;
+/// live 策略连续亏损天数 → 建议下线
+pub const LIFECYCLE_DEMOTE_DAYS: u64 = 14;

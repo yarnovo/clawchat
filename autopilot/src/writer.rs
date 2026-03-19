@@ -69,6 +69,72 @@ pub fn update_trailing_stop(strategy_dir: &Path, new_value: f64) -> Result<(), S
     Ok(())
 }
 
+/// 写 requirements/pending/ 文件（建议切 live）
+pub fn write_requirement_pending(strategy_name: &str, reason: &str) -> Result<(), String> {
+    let dir = clawchat_shared::paths::project_root()
+        .join("requirements")
+        .join("pending");
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("create dir {}: {e}", dir.display()))?;
+
+    let date = chrono::Utc::now().format("%Y-%m-%d");
+    let filename = format!("{date}-promote-{strategy_name}.md");
+    let path = dir.join(&filename);
+
+    // 避免重复写入
+    if path.exists() {
+        tracing::debug!(path = %path.display(), "requirement already exists, skipping");
+        return Ok(());
+    }
+
+    let content = format!(
+        "# 建议 {strategy_name} 切换为 live\n\n\
+         **来源**: autopilot 生命周期评估\n\n\
+         ## 原因\n\n\
+         {reason}\n\n\
+         ## 建议操作\n\n\
+         将 signal.json 的 mode 从 dry-run 改为 live\n"
+    );
+
+    std::fs::write(&path, &content)
+        .map_err(|e| format!("write {}: {e}", path.display()))?;
+    tracing::info!(path = %path.display(), "wrote lifecycle requirement");
+    Ok(())
+}
+
+/// 写 issues/pending/ 文件（建议下线）
+pub fn write_issue_pending(strategy_name: &str, reason: &str) -> Result<(), String> {
+    let dir = clawchat_shared::paths::project_root()
+        .join("issues")
+        .join("pending");
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("create dir {}: {e}", dir.display()))?;
+
+    let date = chrono::Utc::now().format("%Y-%m-%d");
+    let filename = format!("{date}-demote-{strategy_name}.md");
+    let path = dir.join(&filename);
+
+    // 避免重复写入
+    if path.exists() {
+        tracing::debug!(path = %path.display(), "issue already exists, skipping");
+        return Ok(());
+    }
+
+    let content = format!(
+        "# 建议下线 {strategy_name}\n\n\
+         **来源**: autopilot 生命周期评估\n\n\
+         ## 原因\n\n\
+         {reason}\n\n\
+         ## 建议操作\n\n\
+         将 signal.json 的 status 改为 suspended\n"
+    );
+
+    std::fs::write(&path, &content)
+        .map_err(|e| format!("write {}: {e}", path.display()))?;
+    tracing::info!(path = %path.display(), "wrote lifecycle issue");
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

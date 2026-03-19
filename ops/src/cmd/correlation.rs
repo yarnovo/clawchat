@@ -1,10 +1,12 @@
 use colored::Colorize;
-use clawchat_shared::indicators::pearson_correlation;
+use clawchat_shared::correlation::{align_daily_pnl, check_correlation_exposure, compute_correlation_matrix};
+use clawchat_shared::strategy::StrategyFile;
 use crate::Ctx;
 use std::collections::HashMap;
 use std::path::Path;
 
 const WARN_THRESHOLD: f64 = 0.7;
+const EXPOSURE_LIMIT: f64 = 0.40;
 
 fn parse_num(v: Option<&serde_json::Value>) -> f64 {
     v.and_then(|v| v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse().ok())))
@@ -22,7 +24,6 @@ fn load_trades(records_dir: &Path) -> Vec<serde_json::Value> {
 
 fn extract_date(ts_str: &str) -> String {
     if ts_str.is_empty() { return "unknown".to_string(); }
-    // Take first 10 chars as YYYY-MM-DD
     if ts_str.len() >= 10 {
         ts_str[..10].to_string()
     } else {
@@ -78,7 +79,28 @@ fn trades_to_daily_pnl(trades: &[serde_json::Value]) -> HashMap<String, HashMap<
     result
 }
 
-/// 策略相关性矩阵 — 分析策略间收益相关度
+/// 从 strategies 目录读取各策略的 capital 配置
+fn load_strategy_exposures(strategies_dir: &Path) -> HashMap<String, f64> {
+    let mut exposures = HashMap::new();
+    if let Ok(entries) = std::fs::read_dir(strategies_dir) {
+        for entry in entries.flatten() {
+            let signal_path = entry.path().join("signal.json");
+            if !signal_path.exists() { continue; }
+            if let Ok(sf) = StrategyFile::load(&signal_path) {
+                let name = sf.name.unwrap_or_else(|| {
+                    entry.file_name().to_string_lossy().to_string()
+                });
+                let capital = sf.capital.unwrap_or(0.0);
+                if capital > 0.0 {
+                    exposures.insert(name, capital);
+                }
+            }
+        }
+    }
+    exposures
+}
+
+/// 策略相关性矩阵 — 分析策略间收益相关度 + 敞口风险
 pub fn correlation(ctx: &Ctx, _days: u32) -> Result<(), Box<dyn std::error::Error>> {
     let trades = load_trades(&ctx.records_dir);
     if trades.is_empty() {
@@ -92,60 +114,24 @@ pub fn correlation(ctx: &Ctx, _days: u32) -> Result<(), Box<dyn std::error::Erro
         return Ok(());
     }
 
-    let mut strategies: Vec<String> = daily_pnl.keys().cloned().collect();
-    strategies.sort();
-
-    // Collect all dates
-    let mut all_dates: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
-    for pnl_map in daily_pnl.values() {
-        for d in pnl_map.keys() {
-            if d != "unknown" {
-                all_dates.insert(d.clone());
-            }
-        }
-    }
-    let sorted_dates: Vec<String> = all_dates.into_iter().collect();
-
-    // Build correlation matrix
-    let mut matrix: HashMap<(usize, usize), Option<f64>> = HashMap::new();
-    for i in 0..strategies.len() {
-        for j in 0..strategies.len() {
-            if i == j {
-                matrix.insert((i, j), Some(1.0));
-                continue;
-            }
-            if j < i {
-                matrix.insert((i, j), matrix.get(&(j, i)).copied().flatten());
-                continue;
-            }
-            let s1 = &strategies[i];
-            let s2 = &strategies[j];
-            let common_dates: Vec<&String> = sorted_dates
-                .iter()
-                .filter(|d| daily_pnl[s1].contains_key(*d) && daily_pnl[s2].contains_key(*d))
-                .collect();
-            if common_dates.len() < 3 {
-                matrix.insert((i, j), None);
-                continue;
-            }
-            let x: Vec<f64> = common_dates.iter().map(|d| daily_pnl[s1][*d]).collect();
-            let y: Vec<f64> = common_dates.iter().map(|d| daily_pnl[s2][*d]).collect();
-            matrix.insert((i, j), pearson_correlation(&x, &y));
-        }
-    }
+    // 用 shared::correlation 计算矩阵
+    let aligned = align_daily_pnl(&daily_pnl);
+    let corr_matrix = compute_correlation_matrix(&aligned);
 
     if ctx.json {
         let mut json_matrix: HashMap<String, HashMap<String, Option<f64>>> = HashMap::new();
-        for (i, s1) in strategies.iter().enumerate() {
+        for (i, s1) in corr_matrix.strategies.iter().enumerate() {
             let mut row = HashMap::new();
-            for (j, s2) in strategies.iter().enumerate() {
-                row.insert(s2.clone(), matrix.get(&(i, j)).copied().flatten());
+            for (j, s2) in corr_matrix.strategies.iter().enumerate() {
+                row.insert(s2.clone(), corr_matrix.matrix[i][j]);
             }
             json_matrix.insert(s1.clone(), row);
         }
         println!("{}", serde_json::to_string_pretty(&json_matrix)?);
         return Ok(());
     }
+
+    let strategies = &corr_matrix.strategies;
 
     println!("\n  {}", "=".repeat(60));
     println!("  {}", "策略相关性矩阵 (Pearson)".bold());
@@ -172,7 +158,7 @@ pub fn correlation(ctx: &Ctx, _days: u32) -> Result<(), Box<dyn std::error::Erro
     for (i, _s1) in strategies.iter().enumerate() {
         print!("  {:>width$}", names[i], width = col_w);
         for (j, _s2) in strategies.iter().enumerate() {
-            let val = matrix.get(&(i, j)).copied().flatten();
+            let val = corr_matrix.matrix[i][j];
             match val {
                 None => print!("  {:>width$}", "N/A".dimmed(), width = col_w),
                 Some(_v) if i == j => print!("  {:>width$}", "1.00".dimmed(), width = col_w),
@@ -186,26 +172,52 @@ pub fn correlation(ctx: &Ctx, _days: u32) -> Result<(), Box<dyn std::error::Erro
     }
 
     // High correlation warnings
-    let mut high_warnings: Vec<(String, String, f64)> = Vec::new();
-    for i in 0..strategies.len() {
-        for j in (i + 1)..strategies.len() {
-            if let Some(Some(val)) = matrix.get(&(i, j)) {
-                if val.abs() >= WARN_THRESHOLD {
-                    high_warnings.push((strategies[i].clone(), strategies[j].clone(), *val));
-                }
-            }
-        }
-    }
+    let high_pairs = corr_matrix.high_correlation_pairs(WARN_THRESHOLD);
 
-    if !high_warnings.is_empty() {
-        high_warnings.sort_by(|a, b| b.2.abs().partial_cmp(&a.2.abs()).unwrap_or(std::cmp::Ordering::Equal));
+    if !high_pairs.is_empty() {
         println!("\n  {}", "高相关性警告:".red().bold());
-        for (s1, s2, val) in &high_warnings {
-            println!("  {}", format!("  {s1} <-> {s2}: {val:+.2}").red());
+        for pair in &high_pairs {
+            println!("  {}", format!("  {} <-> {}: {:+.2}", pair.strategy_a, pair.strategy_b, pair.correlation).red());
         }
-        println!("\n  高相关策略同涨同跌，建议降低其中一个的仓位或替换");
     } else {
         println!("\n  各策略相关性均 < {WARN_THRESHOLD}，分散度良好");
+    }
+
+    // ── 敞口风险分析 ──────────────────────────────────────────
+    let exposures = load_strategy_exposures(&ctx.strategies_dir);
+    let total_portfolio: f64 = exposures.values().sum();
+
+    if total_portfolio > 0.0 && !high_pairs.is_empty() {
+        let exposure_warnings = check_correlation_exposure(
+            &corr_matrix,
+            &exposures,
+            total_portfolio,
+            WARN_THRESHOLD,
+        );
+
+        if !exposure_warnings.is_empty() {
+            println!("\n  {}", "敞口风险分析:".yellow().bold());
+            println!("  {:>20}  {:>10}  {:>12}  {:>8}", "策略组", "相关系数", "合计敞口", "状态");
+            println!("  {}", "─".repeat(54));
+
+            for (strats, corr, exp) in &exposure_warnings {
+                let group = strats.join(" + ");
+                let display_group = if group.len() > 20 { format!("{}…", &group[..19]) } else { group };
+                let status = if *exp > EXPOSURE_LIMIT {
+                    "超限".red().bold().to_string()
+                } else {
+                    "正常".green().to_string()
+                };
+                println!(
+                    "  {:>20}  {:>+10.2}  {:>11.1}%  {:>8}",
+                    display_group,
+                    corr,
+                    exp * 100.0,
+                    status,
+                );
+            }
+            println!("\n  敞口限制: 高相关策略组合计不超过 {:.0}% portfolio", EXPOSURE_LIMIT * 100.0);
+        }
     }
 
     println!();

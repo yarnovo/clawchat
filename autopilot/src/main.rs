@@ -317,6 +317,12 @@ fn process_strategy(
         ledger_strat,
     );
 
+    // 解析 lifecycle.approved_at 为 unix 秒
+    let approved_at = strategy.lifecycle.as_ref()
+        .and_then(|lc| lc.approved_at.as_ref())
+        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+        .map(|dt| dt.timestamp());
+
     // 构建快照
     let snapshot = StrategySnapshot {
         name: strategy_name.clone(),
@@ -326,6 +332,9 @@ fn process_strategy(
         position_side,
         adv_24h: None,
         leverage: strategy.leverage.map(|l| l as f64),
+        mode: strategy.mode.clone(),
+        backtest_sharpe: strategy.backtest.as_ref().and_then(|b| b.sharpe),
+        approved_at,
     };
 
     // 评估规则
@@ -344,6 +353,13 @@ fn process_strategy(
             decisions.insert(0, d);
         }
         // 去掉 NoAction（如果有的话）
+        decisions.retain(|d| !matches!(d, Decision::NoAction));
+    }
+
+    // 策略生命周期评估
+    let lifecycle_decisions = engine::evaluate_lifecycle(&snapshot, &ctx.tracked, ledger_strat);
+    if !lifecycle_decisions.is_empty() {
+        decisions.extend(lifecycle_decisions);
         decisions.retain(|d| !matches!(d, Decision::NoAction));
     }
 
@@ -426,6 +442,20 @@ fn process_strategy(
                     tracing::error!(strategy = %strategy_name, "update trailing_stop: {e}");
                 } else {
                     tracing::info!(strategy = %strategy_name, reason, "adjusted trailing_stop");
+                }
+            }
+            Decision::SuggestPromote { reason } => {
+                if let Err(e) = writer::write_requirement_pending(&strategy_name, reason) {
+                    tracing::error!(strategy = %strategy_name, "write requirement: {e}");
+                } else {
+                    tracing::info!(strategy = %strategy_name, reason, "lifecycle: suggest promote to live");
+                }
+            }
+            Decision::SuggestDemote { reason } => {
+                if let Err(e) = writer::write_issue_pending(&strategy_name, reason) {
+                    tracing::error!(strategy = %strategy_name, "write issue: {e}");
+                } else {
+                    tracing::warn!(strategy = %strategy_name, reason, "lifecycle: suggest demote");
                 }
             }
             Decision::NoAction => {}

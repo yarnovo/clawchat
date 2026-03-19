@@ -21,6 +21,10 @@ pub enum Decision {
     Suspend { reason: String },
     /// 调节 trailing_stop（改 risk.json）
     AdjustTrailingStop { new_value: f64, reason: String },
+    /// 建议 dry-run 策略切 live（写 requirements/pending/）
+    SuggestPromote { reason: String },
+    /// 建议 live 策略下线（写 issues/pending/）
+    SuggestDemote { reason: String },
     /// 无操作
     NoAction,
 }
@@ -39,6 +43,12 @@ pub struct StrategySnapshot {
     pub adv_24h: Option<f64>,
     /// 策略杠杆倍数
     pub leverage: Option<f64>,
+    /// 运行模式: "dry-run" | "live"
+    pub mode: Option<String>,
+    /// 回测 Sharpe（来自 signal.json backtest.sharpe）
+    pub backtest_sharpe: Option<f64>,
+    /// 策略上线时间（unix 秒），来自 lifecycle.approved_at
+    pub approved_at: Option<i64>,
 }
 
 /// autopilot 对单个策略的跟踪状态
@@ -407,6 +417,79 @@ pub fn evaluate_capacity(snapshot: &StrategySnapshot, ledger: Option<&LedgerStra
     decisions
 }
 
+/// 评估策略生命周期，产出决策
+///
+/// 规则：
+/// - dry-run 策略运行 >= N 天且回测 Sharpe > 阈值 → 建议切 live（写 requirements/pending/）
+/// - live 策略连续 14 天负收益 → 建议下线（写 issues/pending/）
+/// - live 策略回撤超配额 25% → 自动暂停（写 trade.json pause）
+pub fn evaluate_lifecycle(
+    snapshot: &StrategySnapshot,
+    tracked: &TrackedState,
+    ledger: Option<&LedgerStrategy>,
+) -> Vec<Decision> {
+    let mut decisions = Vec::new();
+    let now = chrono::Utc::now().timestamp();
+
+    let mode = snapshot.mode.as_deref().unwrap_or("dry-run");
+
+    match mode {
+        "dry-run" => {
+            // dry-run 策略：运行 >= N 天且 Sharpe > 阈值 → 建议切 live
+            if let Some(approved_at) = snapshot.approved_at {
+                let running_days = (now - approved_at) as u64 / 86400;
+                if running_days >= config::LIFECYCLE_DRYRUN_DAYS {
+                    let sharpe = snapshot.backtest_sharpe.unwrap_or(0.0);
+                    if sharpe >= config::LIFECYCLE_PROMOTE_SHARPE {
+                        decisions.push(Decision::SuggestPromote {
+                            reason: format!(
+                                "dry-run 运行 {} 天 >= {} 天, Sharpe {:.2} >= {:.1}, 建议切 live",
+                                running_days,
+                                config::LIFECYCLE_DRYRUN_DAYS,
+                                sharpe,
+                                config::LIFECYCLE_PROMOTE_SHARPE,
+                            ),
+                        });
+                    }
+                }
+            }
+        }
+        "live" => {
+            // live 策略回撤超配额 25% → 自动暂停
+            if let Some(ls) = ledger {
+                let dd = ls.drawdown_pct();
+                if dd >= config::DRAWDOWN_STOP_PCT {
+                    decisions.push(Decision::Pause {
+                        reason: format!(
+                            "[lifecycle] live 策略回撤 {:.1}% >= {:.1}%, 自动暂停",
+                            dd * 100.0,
+                            config::DRAWDOWN_STOP_PCT * 100.0,
+                        ),
+                    });
+                    return decisions;
+                }
+            }
+
+            // live 策略连续 14 天负收益 → 建议下线
+            if let Some(since) = tracked.negative_pnl_since {
+                let negative_days = (now - since) as u64 / 86400;
+                if negative_days >= config::LIFECYCLE_DEMOTE_DAYS {
+                    decisions.push(Decision::SuggestDemote {
+                        reason: format!(
+                            "live 策略连续 {} 天负收益 >= {} 天, 建议下线",
+                            negative_days,
+                            config::LIFECYCLE_DEMOTE_DAYS,
+                        ),
+                    });
+                }
+            }
+        }
+        _ => {}
+    }
+
+    decisions
+}
+
 /// 检查全局回撤是否接近红线
 pub fn check_global_drawdown(total_equity: f64, total_allocated: f64) -> Option<String> {
     if total_allocated > 0.0 && total_equity < total_allocated {
@@ -451,6 +534,14 @@ pub fn emit_decision_alert(
             AlertLevel::Info,
             format!("调节 trailing_stop → {new_value:.3}: {reason}"),
         ),
+        Decision::SuggestPromote { reason } => (
+            AlertLevel::Info,
+            format!("建议切 live: {reason}"),
+        ),
+        Decision::SuggestDemote { reason } => (
+            AlertLevel::Yellow,
+            format!("建议下线: {reason}"),
+        ),
         Decision::NoAction => return,
     };
 
@@ -463,6 +554,55 @@ pub fn emit_decision_alert(
             message,
         ),
     );
+}
+
+/// 评估跨策略相关性风险
+///
+/// 当两个策略收益相关性 > 0.8 且合计敞口超过限制时发出 ScaleDown 建议。
+/// `correlation_pairs`: 来自 `shared::correlation::check_correlation_exposure` 的结果
+/// `max_correlation_exposure`: 高相关策略组合计敞口限制（如 0.4 = 40%）
+///
+/// 返回 Vec<(策略名, Decision)>
+pub fn evaluate_correlation_risk(
+    correlation_pairs: &[(Vec<String>, f64, f64)],
+    max_correlation_exposure: f64,
+) -> Vec<(String, Decision)> {
+    let mut decisions = Vec::new();
+
+    for (strategies, corr, combined_exposure) in correlation_pairs {
+        if *combined_exposure > max_correlation_exposure {
+            let group_name = strategies.join(" + ");
+            let reason = format!(
+                "高相关性策略组 [{}] 相关系数={:.2}, 合计敞口={:.1}% > 限制={:.1}%",
+                group_name,
+                corr,
+                combined_exposure * 100.0,
+                max_correlation_exposure * 100.0,
+            );
+            tracing::warn!(%reason, "correlation exposure exceeded");
+
+            // 建议缩仓策略组中的后一个策略
+            if let Some(target) = strategies.last() {
+                decisions.push((
+                    target.clone(),
+                    Decision::ScaleDown {
+                        new_position_size: 0.15,
+                        reason,
+                    },
+                ));
+            }
+        } else if corr.abs() > 0.8 {
+            let group_name = strategies.join(" + ");
+            tracing::warn!(
+                strategies = %group_name,
+                correlation = %format!("{:.2}", corr),
+                combined_exposure = %format!("{:.1}%", combined_exposure * 100.0),
+                "高相关性策略组（敞口未超限）"
+            );
+        }
+    }
+
+    decisions
 }
 
 /// 为全局回撤发出告警
@@ -492,6 +632,9 @@ mod tests {
             position_side: None,
             adv_24h: None,
             leverage: None,
+            mode: None,
+            backtest_sharpe: None,
+            approved_at: None,
         }
     }
 
@@ -847,5 +990,173 @@ mod tests {
         let ledger = default_ledger(200.0, 0.0);
         let decisions = evaluate_capacity(&snap, Some(&ledger));
         assert!(decisions.is_empty());
+    }
+
+    // ── 相关性风控测试 ──────────────────────────────────────────
+
+    #[test]
+    fn correlation_risk_triggers_scale_down_when_over_limit() {
+        let pairs = vec![
+            (vec!["s1".to_string(), "s2".to_string()], 0.85, 0.50),
+        ];
+        let decisions = evaluate_correlation_risk(&pairs, 0.40);
+        assert_eq!(decisions.len(), 1);
+        assert_eq!(decisions[0].0, "s2");
+        assert!(matches!(decisions[0].1, Decision::ScaleDown { .. }));
+    }
+
+    #[test]
+    fn correlation_risk_no_action_when_under_limit() {
+        let pairs = vec![
+            (vec!["s1".to_string(), "s2".to_string()], 0.85, 0.30),
+        ];
+        let decisions = evaluate_correlation_risk(&pairs, 0.40);
+        // 敞口未超限，只 warn 不产生 decision
+        assert!(decisions.is_empty());
+    }
+
+    #[test]
+    fn correlation_risk_empty_pairs() {
+        let pairs: Vec<(Vec<String>, f64, f64)> = Vec::new();
+        let decisions = evaluate_correlation_risk(&pairs, 0.40);
+        assert!(decisions.is_empty());
+    }
+
+    #[test]
+    fn correlation_risk_multiple_pairs() {
+        let pairs = vec![
+            (vec!["s1".to_string(), "s2".to_string()], 0.90, 0.50),
+            (vec!["s3".to_string(), "s4".to_string()], 0.82, 0.45),
+        ];
+        let decisions = evaluate_correlation_risk(&pairs, 0.40);
+        assert_eq!(decisions.len(), 2);
+    }
+
+    // ── 策略生命周期评估测试 ────────────────────────────────────
+
+    #[test]
+    fn lifecycle_dryrun_promote_when_ready() {
+        let now = chrono::Utc::now().timestamp();
+        let snap = StrategySnapshot {
+            mode: Some("dry-run".to_string()),
+            backtest_sharpe: Some(3.0),
+            approved_at: Some(now - 4 * 86400), // 4 天前
+            ..default_snapshot()
+        };
+        let tracked = TrackedState::default();
+        let decisions = evaluate_lifecycle(&snap, &tracked, None);
+        assert!(
+            decisions.iter().any(|d| matches!(d, Decision::SuggestPromote { .. })),
+            "should suggest promote: {decisions:?}"
+        );
+    }
+
+    #[test]
+    fn lifecycle_dryrun_no_promote_too_early() {
+        let now = chrono::Utc::now().timestamp();
+        let snap = StrategySnapshot {
+            mode: Some("dry-run".to_string()),
+            backtest_sharpe: Some(3.0),
+            approved_at: Some(now - 2 * 86400), // 2 天前，不够 3 天
+            ..default_snapshot()
+        };
+        let tracked = TrackedState::default();
+        let decisions = evaluate_lifecycle(&snap, &tracked, None);
+        assert!(
+            decisions.is_empty(),
+            "should not promote too early: {decisions:?}"
+        );
+    }
+
+    #[test]
+    fn lifecycle_dryrun_no_promote_low_sharpe() {
+        let now = chrono::Utc::now().timestamp();
+        let snap = StrategySnapshot {
+            mode: Some("dry-run".to_string()),
+            backtest_sharpe: Some(1.5), // 低于 2.0
+            approved_at: Some(now - 5 * 86400),
+            ..default_snapshot()
+        };
+        let tracked = TrackedState::default();
+        let decisions = evaluate_lifecycle(&snap, &tracked, None);
+        assert!(
+            decisions.is_empty(),
+            "should not promote with low sharpe: {decisions:?}"
+        );
+    }
+
+    #[test]
+    fn lifecycle_live_demote_after_negative_days() {
+        let now = chrono::Utc::now().timestamp();
+        let snap = StrategySnapshot {
+            mode: Some("live".to_string()),
+            ..default_snapshot()
+        };
+        let tracked = TrackedState {
+            negative_pnl_since: Some(now - 15 * 86400), // 15 天负收益
+            ..Default::default()
+        };
+        let decisions = evaluate_lifecycle(&snap, &tracked, None);
+        assert!(
+            decisions.iter().any(|d| matches!(d, Decision::SuggestDemote { .. })),
+            "should suggest demote: {decisions:?}"
+        );
+    }
+
+    #[test]
+    fn lifecycle_live_no_demote_short_negative() {
+        let now = chrono::Utc::now().timestamp();
+        let snap = StrategySnapshot {
+            mode: Some("live".to_string()),
+            ..default_snapshot()
+        };
+        let tracked = TrackedState {
+            negative_pnl_since: Some(now - 10 * 86400), // 10 天，不够 14 天
+            ..Default::default()
+        };
+        let decisions = evaluate_lifecycle(&snap, &tracked, None);
+        assert!(
+            !decisions.iter().any(|d| matches!(d, Decision::SuggestDemote { .. })),
+            "should not demote yet: {decisions:?}"
+        );
+    }
+
+    #[test]
+    fn lifecycle_live_pause_on_drawdown() {
+        let snap = StrategySnapshot {
+            mode: Some("live".to_string()),
+            ..default_snapshot()
+        };
+        let tracked = TrackedState::default();
+        // 25% drawdown: peak=200, realized=-50 → equity=150, dd=25%
+        let ledger = LedgerStrategy {
+            strategy_name: "test".into(),
+            allocated_capital: 200.0,
+            realized_pnl: -50.0,
+            unrealized_pnl: 0.0,
+            fees_paid: 0.0,
+            funding_paid: 0.0,
+            peak_equity: 200.0,
+        };
+        let decisions = evaluate_lifecycle(&snap, &tracked, Some(&ledger));
+        assert!(
+            decisions.iter().any(|d| matches!(d, Decision::Pause { .. })),
+            "should pause on drawdown: {decisions:?}"
+        );
+    }
+
+    #[test]
+    fn lifecycle_live_no_action_healthy() {
+        let snap = StrategySnapshot {
+            mode: Some("live".to_string()),
+            ..default_snapshot()
+        };
+        let tracked = TrackedState::default();
+        let ledger = default_ledger(200.0, 10.0);
+        let decisions = evaluate_lifecycle(&snap, &tracked, Some(&ledger));
+        assert!(
+            decisions.is_empty(),
+            "should have no action when healthy: {decisions:?}"
+        );
     }
 }
