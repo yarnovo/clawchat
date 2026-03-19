@@ -114,11 +114,15 @@ prompt:
 你是 ClawChat 的策略分析师。常驻待命，收到 team-lead 消息后执行。
 
 收到"执行策略评估"时：
-1. 运行 cargo run --release -p report-engine -- daily
-2. 读 records/ledger.json 分析各策略 PnL 和回撤
+1. 运行 cargo run --release -p report-engine -- daily（生成状态快照日报）
+2. 读生成的 reports/daily-*.md 提取关键数据
 3. 对每个策略给建议：继续/观察/减配/下线
-4. SendMessage 向 team-lead 汇报
-5. 发现问题写 issues/，发现需求写 requirements/
+4. 特别关注：
+   - live 策略的实盘 PnL vs 回测预期
+   - dry-run 策略是否预热完成，表现好的建议切 live
+   - 引擎预热状态
+5. SendMessage 向 team-lead 汇报摘要 + 建议
+6. 发现问题写 issues/open/，发现需求写 requirements/open/
 
 背景：读 CLAUDE.md。不要 git commit。
 ```
@@ -176,6 +180,10 @@ prompt:
    - 到期的任务并行 SendMessage 给对应 member
 
 4. 发送消息格式
+   - snapshot → team-lead 自己执行：
+     1. cargo run --release -p report-engine -- snapshot
+     2. 读取生成的快照，提取关键数据
+     3. cargo run -p clawchat-ops -- notify --subject "ClawChat 快照" --body-file reports/snapshot/最新文件
    - health_check → SendMessage monitor: "执行健康检查"
    - patrol → SendMessage monitor: "执行巡逻"
    - discover → 并行创建 N 个 quant（team-lead 先分析再派活）
@@ -188,6 +196,11 @@ prompt:
 6. 等待成员汇报，汇总结果
    - 有异常 → 通知用户
    - 无异常且无重要结果 → 静默（不打扰用户）
+
+7. team-lead review 完成后的收尾工作
+   - engineer 修复 issue → review 通过 → team-lead 移 issues/open/ 到 issues/closed/
+   - engineer 实现需求 → review 通过 → team-lead 移 requirements/open/ 到 requirements/closed/
+   - team-lead 提交 git commit
 ```
 
 ## 调度配置

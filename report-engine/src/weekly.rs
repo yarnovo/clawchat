@@ -51,7 +51,7 @@ pub fn generate(date: NaiveDate) -> String {
     let week_pnl: f64 = pnl_records.iter().map(|r| r.net_pnl).sum();
 
     if let Some(ref l) = ledger {
-        let total_equity: f64 = l.strategies.values().map(|a| a.virtual_equity()).sum();
+        let total_equity = l.total_equity();
         let start_equity = total_equity - week_pnl;
         let week_return_pct = if start_equity > 0.0 {
             week_pnl / start_equity * 100.0
@@ -66,7 +66,6 @@ pub fn generate(date: NaiveDate) -> String {
             week_pnl, week_return_pct
         );
 
-        // Max drawdown across strategies
         let max_dd = l
             .strategies
             .values()
@@ -83,7 +82,6 @@ pub fn generate(date: NaiveDate) -> String {
     // ── 策略周表现 ────────────────────────────────────────────────
     let _ = writeln!(out, "## 策略周表现\n");
 
-    // Aggregate by strategy
     struct StratWeekStats {
         pnl: f64,
         trades: u32,
@@ -126,7 +124,6 @@ pub fn generate(date: NaiveDate) -> String {
                 0.0
             };
 
-            // Simple recommendation logic
             let suggestion = if stats.pnl > 0.0 && win_rate >= 50.0 {
                 "继续"
             } else if stats.pnl < 0.0 && stats.trades >= 3 {
@@ -166,11 +163,11 @@ pub fn generate(date: NaiveDate) -> String {
             let equity = alloc.virtual_equity();
             let dd = alloc.drawdown_pct();
             let status = if dd >= 25.0 {
-                "🔴 暂停"
+                "RED"
             } else if dd >= 15.0 {
-                "⚠️ 黄灯"
+                "YELLOW"
             } else {
-                "✅"
+                "OK"
             };
             let _ = writeln!(
                 out,
@@ -206,7 +203,6 @@ pub fn generate(date: NaiveDate) -> String {
 
     let mut has_suggestion = false;
 
-    // Strategies with good performance
     let good: Vec<_> = strat_stats
         .iter()
         .filter(|(_, s)| s.pnl > 1.0 && s.trades >= 2)
@@ -222,7 +218,6 @@ pub fn generate(date: NaiveDate) -> String {
         }
     }
 
-    // Strategies with poor performance
     let bad: Vec<_> = strat_stats
         .iter()
         .filter(|(_, s)| s.pnl < -1.0 && s.trades >= 2)
@@ -248,11 +243,11 @@ pub fn generate(date: NaiveDate) -> String {
 
 pub fn write_report(date: NaiveDate) -> std::io::Result<std::path::PathBuf> {
     let report = generate(date);
-    let reports_dir = paths::reports_dir();
-    std::fs::create_dir_all(&reports_dir)?;
+    let dir = paths::reports_dir().join("weekly");
+    std::fs::create_dir_all(&dir)?;
     let monday = week_monday(date);
-    let filename = format!("weekly-{monday}.md");
-    let path = reports_dir.join(&filename);
+    let filename = format!("{monday}.md");
+    let path = dir.join(&filename);
     std::fs::write(&path, &report)?;
     Ok(path)
 }

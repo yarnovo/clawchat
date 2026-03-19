@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 export BASH_ENV := .env
 
-.PHONY: build hft autopilot status watcher report-engine report-daily report-weekly data-engine data-backfill data-status data-validate discover discover-scan discover-status start-data stop-data status-data start-engine stop-engine status-engine start-autopilot stop-autopilot status-autopilot start-all stop-all status-all install clean test help
+.PHONY: build hft autopilot status watcher report-engine report-daily report-weekly snapshot data-engine data-backfill data-status data-validate discover discover-scan discover-status start-data stop-data status-data start-engine stop-engine status-engine start-autopilot stop-autopilot status-autopilot start-all stop-all status-all install clean test help
 
 # === Build ===
 
@@ -36,6 +36,9 @@ report-daily: ## Generate daily report
 
 report-weekly: ## Generate weekly report
 	cargo run --release -p report-engine -- weekly
+
+snapshot: ## Generate status snapshot (real-time overview)
+	cargo run --release -p report-engine -- snapshot
 
 # === Data Engine ===
 

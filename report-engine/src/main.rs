@@ -1,5 +1,6 @@
 mod daily;
 mod data;
+mod snapshot;
 mod weekly;
 
 use chrono::NaiveDate;
@@ -26,6 +27,8 @@ enum Command {
         #[arg(long)]
         date: Option<String>,
     },
+    /// 生成状态快照（实时全景，输出 reports/snapshot-{时间戳}.md）
+    Snapshot,
 }
 
 fn parse_date(s: Option<&str>) -> NaiveDate {
@@ -39,7 +42,8 @@ fn parse_date(s: Option<&str>) -> NaiveDate {
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let _ = dotenvy::dotenv();
 
     tracing_subscriber::fmt()
@@ -72,6 +76,17 @@ fn main() {
                 }
                 Err(e) => {
                     eprintln!("生成周报失败: {e}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        Command::Snapshot => {
+            match snapshot::write_snapshot().await {
+                Ok(path) => {
+                    println!("快照已生成: {}", path.display());
+                }
+                Err(e) => {
+                    eprintln!("生成快照失败: {e}");
                     std::process::exit(1);
                 }
             }

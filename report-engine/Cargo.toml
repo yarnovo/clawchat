@@ -16,3 +16,5 @@ clap = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 dotenvy = { workspace = true }
+tokio = { workspace = true }
+libc = "0.2"

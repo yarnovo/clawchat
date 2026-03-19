@@ -9,16 +9,8 @@ pub fn generate(date: NaiveDate) -> String {
     let records_dir = paths::records_dir();
     let strategies_dir = paths::strategies_dir();
 
-    let from = date
-        .and_hms_opt(0, 0, 0)
-        .unwrap()
-        .and_utc();
-    let to = date
-        .succ_opt()
-        .unwrap_or(date)
-        .and_hms_opt(0, 0, 0)
-        .unwrap()
-        .and_utc();
+    let from = date.and_hms_opt(0, 0, 0).unwrap().and_utc();
+    let to = date.succ_opt().unwrap_or(date).and_hms_opt(0, 0, 0).unwrap().and_utc();
 
     let trades = data::read_trades(&records_dir, from, to);
     let pnl_records = data::read_pnl(&records_dir, from, to);
@@ -48,39 +40,24 @@ pub fn generate(date: NaiveDate) -> String {
     // ── 总览 ──────────────────────────────────────────────────────
     let _ = writeln!(out, "## 总览\n");
 
-    // Total asset from ledger
     if let Some(ref l) = ledger {
-        let total_equity: f64 = l
-            .strategies
-            .values()
-            .map(|a| a.virtual_equity())
-            .sum();
+        let total_equity: f64 = l.strategies.values().map(|a| a.virtual_equity()).sum();
         let _ = writeln!(out, "- 总资产: ${total_equity:.2}");
     } else {
         let _ = writeln!(out, "- 总资产: N/A（无 ledger 数据）");
     }
 
-    // Daily PnL
     let daily_pnl: f64 = pnl_records.iter().map(|r| r.net_pnl).sum();
     let total_equity_for_pct = ledger
         .as_ref()
-        .map(|l| {
-            l.strategies
-                .values()
-                .map(|a| a.virtual_equity())
-                .sum::<f64>()
-        })
+        .map(|l| l.strategies.values().map(|a| a.virtual_equity()).sum::<f64>())
         .unwrap_or(0.0);
     let pnl_pct = if total_equity_for_pct > 0.0 {
         daily_pnl / total_equity_for_pct * 100.0
     } else {
         0.0
     };
-    let _ = writeln!(
-        out,
-        "- 当日盈亏: {:+.2} ({:+.2}%)",
-        daily_pnl, pnl_pct
-    );
+    let _ = writeln!(out, "- 当日盈亏: {:+.2} ({:+.2}%)", daily_pnl, pnl_pct);
     let _ = writeln!(out, "- 活跃策略: {} 个", strategy_configs.len());
     let _ = writeln!(out, "- 当日交易: {} 笔", trades.len());
     let _ = writeln!(out, "- 当日信号: {} 个\n", signals.len());
@@ -88,8 +65,7 @@ pub fn generate(date: NaiveDate) -> String {
     // ── 策略 PnL 排行 ────────────────────────────────────────────
     let _ = writeln!(out, "## 策略 PnL 排行\n");
 
-    // Aggregate PnL by strategy
-    let mut strat_pnl: HashMap<String, (f64, f64, u32, u32)> = HashMap::new(); // (daily_net, cumulative, trades, wins)
+    let mut strat_pnl: HashMap<String, (f64, f64, u32, u32)> = HashMap::new();
     for r in &pnl_records {
         let entry = strat_pnl.entry(r.strategy.clone()).or_default();
         entry.0 += r.net_pnl;
@@ -99,7 +75,6 @@ pub fn generate(date: NaiveDate) -> String {
         }
     }
 
-    // Cumulative PnL from ledger
     if let Some(ref l) = ledger {
         for (name, alloc) in &l.strategies {
             if let Some(entry) = strat_pnl.get_mut(name) {
@@ -111,14 +86,8 @@ pub fn generate(date: NaiveDate) -> String {
     if strat_pnl.is_empty() {
         let _ = writeln!(out, "（今日无策略 PnL 数据）\n");
     } else {
-        let _ = writeln!(
-            out,
-            "| 策略 | 当日 PnL | 累计 PnL | 交易次数 | 胜率 |"
-        );
-        let _ = writeln!(
-            out,
-            "|------|----------|----------|---------|------|"
-        );
+        let _ = writeln!(out, "| 策略 | 当日 PnL | 累计 PnL | 交易次数 | 胜率 |");
+        let _ = writeln!(out, "|------|----------|----------|---------|------|");
 
         let mut sorted: Vec<_> = strat_pnl.iter().collect();
         sorted.sort_by(|a, b| b.1 .0.partial_cmp(&a.1 .0).unwrap_or(std::cmp::Ordering::Equal));
@@ -142,14 +111,8 @@ pub fn generate(date: NaiveDate) -> String {
     let _ = writeln!(out, "## 风控状态\n");
 
     if let Some(ref l) = ledger {
-        let _ = writeln!(
-            out,
-            "| 策略 | 虚拟权益 | 配额 | 回撤 | 状态 |"
-        );
-        let _ = writeln!(
-            out,
-            "|------|---------|------|------|------|"
-        );
+        let _ = writeln!(out, "| 策略 | 虚拟权益 | 配额 | 回撤 | 状态 |");
+        let _ = writeln!(out, "|------|---------|------|------|------|");
 
         let mut allocs: Vec<_> = l.strategies.values().collect();
         allocs.sort_by(|a, b| a.strategy_name.cmp(&b.strategy_name));
@@ -158,20 +121,16 @@ pub fn generate(date: NaiveDate) -> String {
             let equity = alloc.virtual_equity();
             let dd = alloc.drawdown_pct();
             let status = if dd >= 25.0 {
-                "🔴 暂停"
+                "RED"
             } else if dd >= 15.0 {
-                "⚠️ 黄灯"
+                "YELLOW"
             } else {
-                "✅"
+                "OK"
             };
             let _ = writeln!(
                 out,
                 "| {} | ${:.2} | ${:.0} | {:.1}% | {} |",
-                alloc.strategy_name,
-                equity,
-                alloc.allocated_capital,
-                dd,
-                status,
+                alloc.strategy_name, equity, alloc.allocated_capital, dd, status,
             );
         }
         let _ = writeln!(out);
@@ -185,20 +144,10 @@ pub fn generate(date: NaiveDate) -> String {
     if trades.is_empty() {
         let _ = writeln!(out, "（今日无交易）\n");
     } else {
-        let _ = writeln!(
-            out,
-            "| 时间 | 策略 | 币种 | 方向 | 数量 | 价格 | 状态 |"
-        );
-        let _ = writeln!(
-            out,
-            "|------|------|------|------|------|------|------|"
-        );
+        let _ = writeln!(out, "| 时间 | 策略 | 币种 | 方向 | 数量 | 价格 | 状态 |");
+        let _ = writeln!(out, "|------|------|------|------|------|------|------|");
         for t in &trades {
-            let time = if t.ts.len() >= 19 {
-                &t.ts[11..19]
-            } else {
-                &t.ts
-            };
+            let time = if t.ts.len() >= 19 { &t.ts[11..19] } else { &t.ts };
             let _ = writeln!(
                 out,
                 "| {} | {} | {} | {} | {} | {} | {} |",
@@ -217,11 +166,7 @@ pub fn generate(date: NaiveDate) -> String {
         let _ = writeln!(out, "| 时间 | 策略 | 规则 | 判定 | 详情 |");
         let _ = writeln!(out, "|------|------|------|------|------|");
         for e in &risk_events {
-            let time = if e.ts.len() >= 19 {
-                &e.ts[11..19]
-            } else {
-                &e.ts
-            };
+            let time = if e.ts.len() >= 19 { &e.ts[11..19] } else { &e.ts };
             let _ = writeln!(
                 out,
                 "| {} | {} | {} | {} | {} |",
@@ -254,10 +199,10 @@ fn write_strategy_list(out: &mut String, configs: &[data::StrategyInfo]) {
 
 pub fn write_report(date: NaiveDate) -> std::io::Result<std::path::PathBuf> {
     let report = generate(date);
-    let reports_dir = paths::reports_dir();
-    std::fs::create_dir_all(&reports_dir)?;
-    let filename = format!("daily-{date}.md");
-    let path = reports_dir.join(&filename);
+    let dir = paths::reports_dir().join("daily");
+    std::fs::create_dir_all(&dir)?;
+    let filename = format!("{date}.md");
+    let path = dir.join(&filename);
     std::fs::write(&path, &report)?;
     Ok(path)
 }
