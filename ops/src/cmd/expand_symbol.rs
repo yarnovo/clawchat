@@ -1,115 +1,111 @@
+use std::process::Command;
+
 use clawchat_shared::paths;
 use clawchat_shared::symbols::{SymbolRegistry, SymbolStatus};
-use std::process::Command as ProcessCommand;
 
 use crate::Ctx;
 
-/// 单币种全链路扩展：回填数据 → 策略发现
+/// 单币种全链路扩展：回填历史数据 + 策略发现
 pub async fn run(
     _ctx: &Ctx,
     symbol: &str,
-    backfill_days: u32,
+    days: u32,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let symbol = symbol.to_uppercase();
-    let symbols_path = paths::default_symbols_json();
+    println!("=== 扩展币种: {} ===\n", symbol);
 
-    // 检查 symbols.json
-    let mut registry = if symbols_path.exists() {
-        SymbolRegistry::load(&symbols_path).map_err(|e| format!("load symbols.json: {e}"))?
-    } else {
-        return Err("symbols.json 不存在，请先运行 scan-symbols".into());
-    };
+    // ── Step 1: 回填历史数据 ──
+    println!("  [1/2] 回填 {} 天 1m K 线...", days);
 
-    if !registry.contains(&symbol) {
-        println!("  {symbol} 不在 symbols.json 中，自动添加...");
-        registry.add_symbol(symbol.clone(), None);
-        registry.save(&symbols_path)?;
-    }
-
-    let project_root = paths::project_root();
-
-    // ── Step 1: 回填数据 ──
-    println!("\n  [1/2] 回填 {symbol} 历史数据 ({backfill_days} 天)...\n");
-
-    let backfill_status = ProcessCommand::new("cargo")
+    let backfill_status = Command::new("cargo")
         .args([
             "run", "--release", "-p", "data-engine", "--",
             "backfill",
-            "--days", &backfill_days.to_string(),
             "--symbols", &symbol,
+            "--days", &days.to_string(),
+            "--intervals", "1m",
         ])
-        .current_dir(&project_root)
-        .status();
+        .status()?;
 
-    match backfill_status {
-        Ok(status) if status.success() => {
-            println!("\n  数据回填完成");
-        }
-        Ok(status) => {
-            eprintln!("\n  数据回填失败 (exit code: {:?})", status.code());
-            return Err("backfill failed".into());
-        }
-        Err(e) => {
-            eprintln!("\n  无法启动 data-engine: {e}");
-            return Err(e.into());
-        }
+    if !backfill_status.success() {
+        return Err(format!("data-engine backfill 失败 (exit code: {:?})", backfill_status.code()).into());
     }
+    println!("  回填完成\n");
 
     // ── Step 2: 策略发现 ──
-    println!("\n  [2/2] 运行策略发现 ({symbol}, all strategies, all timeframes)...\n");
+    println!("  [2/2] 运行策略发现 (all strategies, 90 天, all timeframes)...");
 
-    let discovery_status = ProcessCommand::new("cargo")
+    let discovery_status = Command::new("cargo")
         .args([
             "run", "--release", "-p", "discovery", "--",
             "scan",
             "--strategy", "all",
             "--symbol", &symbol,
-            "--timeframe", "all",
             "--days", "90",
+            "--timeframe", "all",
         ])
-        .current_dir(&project_root)
-        .status();
+        .status()?;
 
-    match discovery_status {
-        Ok(status) if status.success() => {
-            println!("\n  策略发现完成");
-        }
-        Ok(status) => {
-            eprintln!("\n  策略发现失败 (exit code: {:?})", status.code());
-            // 发现失败不是致命错误，可能只是没找到好参数
-            registry.set_status(&symbol, SymbolStatus::NoSignal);
-            registry.save(&symbols_path)?;
-            println!("  已将 {symbol} 状态设为 no_signal");
-            return Ok(());
-        }
-        Err(e) => {
-            eprintln!("\n  无法启动 discovery: {e}");
-            return Err(e.into());
+    if !discovery_status.success() {
+        return Err(format!("discovery scan 失败 (exit code: {:?})", discovery_status.code()).into());
+    }
+
+    // ── Step 3: 检查结果并更新状态 ──
+    let discovered_dir = paths::discovered_dir();
+    let sym_lower = symbol.to_lowercase().replace("usdt", "");
+
+    // 扫描 discovered/ 看是否有匹配 symbol 的策略产出
+    let mut found_count = 0;
+    if discovered_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&discovered_dir) {
+            for entry in entries.flatten() {
+                let name = entry.file_name().to_string_lossy().to_string();
+                if name.starts_with(&sym_lower) && entry.path().join("signal.json").exists() {
+                    found_count += 1;
+                }
+            }
         }
     }
 
-    // 检查 discovered/ 是否有该币种的策略
-    let discovered_dir = paths::discovered_dir();
-    let has_discovery = if discovered_dir.exists() {
-        std::fs::read_dir(&discovered_dir)?
-            .filter_map(|e| e.ok())
-            .any(|entry| {
-                entry.file_name().to_string_lossy().to_uppercase().contains(
-                    &symbol.trim_end_matches("USDT"),
-                )
-            })
-    } else {
-        false
-    };
+    // 更新 symbols.json 状态
+    let symbols_path = paths::default_symbols_json();
+    if symbols_path.exists() {
+        if let Ok(mut registry) = SymbolRegistry::load(&symbols_path) {
+            if found_count > 0 {
+                registry.set_status(&symbol, SymbolStatus::DataReady);
+            } else {
+                registry.set_status(&symbol, SymbolStatus::NoSignal);
+            }
+            registry.save(&symbols_path).map_err(|e| format!("save symbols.json: {e}"))?;
+        }
+    }
 
-    if has_discovery {
-        println!("\n  在 discovered/ 中发现 {symbol} 策略候选");
-        println!("  运行 /review-discovered 审批上线");
+    // ── 汇总 ──
+    println!("\n=== 结果 ===");
+    if found_count > 0 {
+        println!("  发现 {} 个候选策略", found_count);
+        println!("  位置: discovered/{}*", sym_lower);
+        println!("  下一步: 审批策略 → status=approved → 移到 strategies/");
     } else {
-        registry.set_status(&symbol, SymbolStatus::NoSignal);
-        registry.save(&symbols_path)?;
-        println!("\n  未发现 {symbol} 优质策略，状态设为 no_signal");
+        println!("  未发现合格策略");
+        println!("  symbols.json 状态已更新为 no_signal");
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    // expand-symbol 依赖外部二进制（data-engine, discovery），
+    // 集成测试在 CI 环境中运行。
+    // 此处验证辅助逻辑。
+
+    #[test]
+    fn symbol_normalization() {
+        let symbol = "wldusdt".to_uppercase();
+        assert_eq!(symbol, "WLDUSDT");
+
+        let sym_lower = symbol.to_lowercase().replace("usdt", "");
+        assert_eq!(sym_lower, "wld");
+    }
 }

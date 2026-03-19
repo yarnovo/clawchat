@@ -180,9 +180,9 @@ enum Command {
         #[arg(long, default_value_t = 10)]
         top: usize,
     },
-    /// 单币种全链路扩展（回填→发现）
+    /// 单币种全链路扩展（回填数据 + 策略发现）
     ExpandSymbol {
-        /// 交易对（如 WLDUSDT）
+        /// 交易对 (如 WLDUSDT)
         #[arg(long)]
         symbol: String,
         /// 回填天数

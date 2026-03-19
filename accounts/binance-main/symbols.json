@@ -1,18 +1,68 @@
 {
   "symbols": {
-    "BARDUSDT": {
-      "status": "active",
-      "added_at": "2026-03-19T00:00:00Z"
+    "XRPUSDT": {
+      "status": "data_ready",
+      "added_at": "2026-03-19T09:22:16.094028+00:00",
+      "volume_24h": 1027350693.2348
+    },
+    "ALPACAUSDT": {
+      "status": "data_ready",
+      "added_at": "2026-03-19T09:22:16.094021+00:00",
+      "volume_24h": 2911352253.74508
     },
     "NTRNUSDT": {
       "status": "active",
       "added_at": "2026-03-19T00:00:00Z"
     },
+    "BTCUSDT": {
+      "status": "data_ready",
+      "added_at": "2026-03-19T09:22:16.093979+00:00",
+      "volume_24h": 18808001138.55
+    },
+    "SUIUSDT": {
+      "status": "active",
+      "added_at": "2026-03-19T00:00:00Z"
+    },
+    "SOLUSDT": {
+      "status": "data_ready",
+      "added_at": "2026-03-19T09:22:16.094027+00:00",
+      "volume_24h": 2622473058.1876
+    },
+    "ETHUSDT": {
+      "status": "data_ready",
+      "added_at": "2026-03-19T09:22:16.094019+00:00",
+      "volume_24h": 17627589506.77
+    },
+    "DOGEUSDT": {
+      "status": "data_ready",
+      "added_at": "2026-03-19T09:22:16.094032+00:00",
+      "volume_24h": 673831111.77824
+    },
+    "BNXUSDT": {
+      "status": "data_ready",
+      "added_at": "2026-03-19T09:22:16.094035+00:00",
+      "volume_24h": 492004952.04499
+    },
+    "HYPEUSDT": {
+      "status": "data_ready",
+      "added_at": "2026-03-19T09:22:16.094029+00:00",
+      "volume_24h": 966285580.45924
+    },
+    "SIRENUSDT": {
+      "status": "data_ready",
+      "added_at": "2026-03-19T09:22:16.094033+00:00",
+      "volume_24h": 538917847.62946
+    },
+    "ZECUSDT": {
+      "status": "data_ready",
+      "added_at": "2026-03-19T09:22:16.094031+00:00",
+      "volume_24h": 743273762.17
+    },
     "FETUSDT": {
       "status": "active",
       "added_at": "2026-03-19T00:00:00Z"
     },
-    "SUIUSDT": {
+    "BARDUSDT": {
       "status": "active",
       "added_at": "2026-03-19T00:00:00Z"
     },
