@@ -1,0 +1,11 @@
+{
+  "name": "new-coins",
+  "allocated_capital": 19,
+  "reserve": 0,
+  "risk": {
+    "max_drawdown_pct": 30,
+    "max_daily_loss_pct": 15,
+    "max_total_exposure": 3.0,
+    "max_per_coin_exposure_pct": 80
+  }
+}
