@@ -1,5 +1,6 @@
 {
   "health_check": { "interval_min": 60, "member": "monitor", "description": "引擎健康检查" },
   "patrol": { "interval_min": 240, "member": "monitor", "description": "深度巡逻（风控+策略状态）" },
-  "fix_issues": { "interval_min": 120, "member": "engineer", "description": "扫描 issues/ 并修复" }
+  "fix_issues": { "interval_min": 120, "member": "engineer", "description": "扫描 issues/open/ 并修复" },
+  "impl_requirements": { "interval_min": 360, "member": "engineer", "description": "扫描 requirements/ 实现需求" }
 }
