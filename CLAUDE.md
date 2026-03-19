@@ -28,10 +28,12 @@ cargo run -p clawchat-ops -- --help
 
 整个系统的通信协议是文件。引擎读文件做事写文件，Agent 读文件判断写文件。
 
-**issues/** — 问题上报。loop 进程在运行中发现的问题自动写入。
-- 格式：`issues/{日期}-{简述}.md`
-- 来源：`/loop-patrol` 发现风控异常、`/loop-health-check` 发现引擎挂了、`/loop-evaluate` 发现策略衰减等
-- 不是待办清单，是问题现场记录
+**issues/** — 问题上报，用文件夹管理状态。
+- `issues/open/` — 未解决的问题
+- `issues/closed/` — 已解决的问题
+- 格式：`{日期}-{简述}.md`
+- 新问题写到 `open/`，解决后移到 `closed/`
+- 来源：patrol/health-check/evaluate 发现异常时写入，engineer 定时扫描修复
 
 **notes/** — 经验记录。已发生的事实、踩过的坑、API 用法、调试经验等，供未来参考。
 - 格式：`notes/{日期}-{主题}.md`

@@ -88,7 +88,8 @@ struct StrategyRuntime {
 
 #[derive(Debug)]
 enum ConfigChange {
-    Strategy(String),       // strategy name
+    Strategy(String),       // strategy name — existing strategy signal.json changed
+    NewStrategy(String),    // strategy dir name — new signal.json created
     Trade(String),          // strategy name
     Risk(String),           // strategy name
     PortfolioTrade,         // portfolio-level trade.json changed
@@ -570,6 +571,7 @@ fn start_config_watcher(
         let mut watcher = notify::recommended_watcher(
             move |res: Result<notify::Event, notify::Error>| {
                 let Ok(event) = res else { return };
+                let is_create = matches!(event.kind, EventKind::Create(_));
                 match event.kind {
                     EventKind::Modify(_) | EventKind::Create(_) => {}
                     _ => return,
@@ -602,6 +604,8 @@ fn start_config_watcher(
                         continue;
                     }
                     let change = match file_name {
+                        // New signal.json = new strategy directory detected
+                        "signal.json" if is_create => ConfigChange::NewStrategy(strategy_name),
                         "signal.json" => ConfigChange::Strategy(strategy_name),
                         "trade.json" => ConfigChange::Trade(strategy_name),
                         "risk.json" => ConfigChange::Risk(strategy_name),
@@ -1339,6 +1343,7 @@ async fn main() {
 
     // 13. Start Config Watcher (strategies + portfolio dirs)
     let (config_tx, mut config_rx) = mpsc::channel::<ConfigChange>(256);
+    let config_tx_main = config_tx.clone(); // for main loop to re-inject NewStrategy
     start_config_watcher(paths::strategies_dir(), portfolio_dir.clone(), config_tx);
 
     // 14. Order record channel + writer task
@@ -1669,7 +1674,162 @@ async fn main() {
             Some(change) = config_rx.recv() => {
                 match change {
                     ConfigChange::Strategy(name) => {
-                        info!(strategy = %name, "signal.json changed — note: worker restart not yet implemented, will apply on next engine restart");
+                        if runtimes.contains_key(&name) {
+                            info!(strategy = %name, "signal.json changed — note: worker restart not yet implemented, will apply on next engine restart");
+                        } else {
+                            // Existing strategy modified but not in runtimes — might have
+                            // been changed to approved. Treat like NewStrategy.
+                            info!(strategy = %name, "signal.json changed for unknown strategy, checking if newly approved");
+                            let _ = config_tx_main.try_send(ConfigChange::NewStrategy(name));
+                        }
+                    }
+                    ConfigChange::NewStrategy(dir_name) => {
+                        // New signal.json detected — check if approved and spin up worker
+                        let strat_dir = paths::strategy_dir(&dir_name);
+                        let signal_path = strat_dir.join("signal.json");
+                        if !signal_path.exists() {
+                            info!(dir = %dir_name, "new strategy dir detected but no signal.json yet");
+                        } else {
+                            match StrategyFile::load(&signal_path) {
+                                Ok(sf) => {
+                                    let status = sf.status.as_deref().unwrap_or("pending");
+                                    let name = sf.name.clone().unwrap_or_else(|| dir_name.clone());
+
+                                    if status != "approved" {
+                                        info!(strategy = %name, status, "new strategy detected but not approved, ignoring");
+                                    } else if runtimes.contains_key(&name) {
+                                        info!(strategy = %name, "new strategy detected but already running");
+                                    } else {
+                                        // Load strategy config
+                                        let symbol = match sf.normalized_symbol() {
+                                            Some(s) => s.to_uppercase(),
+                                            None => {
+                                                warn!(strategy = %name, "new strategy has no symbol, skipping");
+                                                continue;
+                                            }
+                                        };
+
+                                        let capital = sf.capital.unwrap_or(total_capital / (runtimes.len() + 1) as f64);
+                                        let leverage = sf.leverage.unwrap_or(10);
+                                        let engine_strategy = sf.engine_strategy.clone().unwrap_or_else(|| "default".to_string());
+                                        let params = sf.numeric_params();
+
+                                        // Add to ledger
+                                        if order_router.ledger().get(&name).is_none() {
+                                            order_router.ledger_mut().add_strategy(&name, capital);
+                                        }
+
+                                        // Load risk config
+                                        let risk_path = strat_dir.join("risk.json");
+                                        let risk_config = RiskConfig::load_merged(&portfolio_risk_path, &risk_path);
+                                        let risk_guard = EngineRiskGuard::new(risk_config.clone(), capital);
+
+                                        // Add to order router
+                                        order_router.add_strategy_guard(&name, EngineRiskGuard::new(risk_config.clone(), capital));
+
+                                        // Load trade override
+                                        let trade_path = strat_dir.join("trade.json");
+                                        let trade_override = TradeOverride::load(&trade_path);
+
+                                        let sizing_mode_str = sf.sizing_mode.as_deref().unwrap_or("percent");
+                                        let sizing_mode = if sizing_mode_str == "fixed" { SizingMode::Fixed } else { SizingMode::Percent };
+
+                                        // Create exchange instance
+                                        let ex = Exchange::new(
+                                            api_key.clone(),
+                                            api_secret.clone(),
+                                            base_url.clone(),
+                                            dry_run,
+                                        )
+                                        .with_symbol(&symbol)
+                                        .with_order_id_prefix(&format!("{}-{}", name, symbol));
+
+                                        // Set leverage
+                                        {
+                                            let ex_lev = Exchange::new(
+                                                api_key.clone(),
+                                                api_secret.clone(),
+                                                base_url.clone(),
+                                                dry_run,
+                                            )
+                                            .with_symbol(&symbol);
+                                            let name_c = name.clone();
+                                            tokio::spawn(async move {
+                                                if let Err(e) = ex_lev.set_leverage(leverage).await {
+                                                    warn!(strategy = %name_c, "failed to set leverage: {e}");
+                                                }
+                                            });
+                                        }
+
+                                        exchanges.insert(name.clone(), ex);
+
+                                        // Check if this symbol already has a market channel
+                                        // If not, we can't spawn a worker for it (would need gateway restart)
+                                        let has_market_channel = gateway.subscribe_market(&symbol).is_some();
+
+                                        if has_market_channel {
+                                            // Build and spawn worker
+                                            let trade_dir = sf.trade_direction();
+                                            let cooldown = sf.cooldown_bars.unwrap_or(0);
+                                            let min_vol = sf.min_volume.unwrap_or(0.0);
+                                            let min_spread = sf.min_spread_bps.unwrap_or(0.0);
+                                            let min_depth = sf.min_depth_usd.unwrap_or(0.0);
+                                            let filter = SignalFilter::new(trade_dir, cooldown, min_vol, min_spread, min_depth);
+
+                                            if let Some(worker_config) = build_worker_config(&name, &sf, filter) {
+                                                let market_rx = gateway.subscribe_market(&symbol).unwrap();
+                                                let handle = worker::spawn_worker(worker_config, market_rx, signal_tx.clone());
+                                                worker_handles.push(handle);
+                                                info!(strategy = %name, symbol = %symbol, "new strategy worker spawned");
+                                            }
+                                        } else {
+                                            warn!(
+                                                strategy = %name, symbol = %symbol,
+                                                "new strategy detected but no market channel for symbol — \
+                                                 worker cannot be started without gateway restart. \
+                                                 Strategy added to ledger; restart engine to activate."
+                                            );
+                                        }
+
+                                        // Insert runtime
+                                        runtimes.insert(
+                                            name.clone(),
+                                            StrategyRuntime {
+                                                name: name.clone(),
+                                                symbol: symbol.clone(),
+                                                dir: strat_dir,
+                                                leverage,
+                                                capital,
+                                                position_size: sf.position_size,
+                                                sizing_mode,
+                                                order_qty: sf.order_qty,
+                                                engine_strategy,
+                                                params,
+                                                trade_override,
+                                                risk_config,
+                                                risk_guard,
+                                                trade_stats: TradeStats::default(),
+                                                last_price: 0.0,
+                                                last_funding_rate: 0.0,
+                                                last_funding_log_nft: 0,
+                                            },
+                                        );
+
+                                        // Save ledger
+                                        let _ = order_router.ledger().save(&ledger_path);
+
+                                        info!(
+                                            strategy = %name, symbol = %symbol,
+                                            capital, leverage,
+                                            "new strategy fully loaded"
+                                        );
+                                    }
+                                }
+                                Err(e) => {
+                                    warn!(dir = %dir_name, "failed to load signal.json for new strategy: {e}");
+                                }
+                            }
+                        }
                     }
                     ConfigChange::Trade(name) => {
                         if let Some(rt) = runtimes.get_mut(&name) {
