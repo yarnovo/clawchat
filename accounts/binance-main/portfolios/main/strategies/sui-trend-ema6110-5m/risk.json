@@ -1,0 +1,7 @@
+{
+    "max_loss_per_trade": 0.05,
+    "max_daily_loss": 0.15,
+    "max_leverage": 5,
+    "hwm_drawdown_limit": 0.25,
+    "funding_rate_limit": 0.001
+}

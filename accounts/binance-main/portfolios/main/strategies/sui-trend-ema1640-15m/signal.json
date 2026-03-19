@@ -1,0 +1,30 @@
+{
+  "backtest": {
+    "max_drawdown_pct": 6.65,
+    "profit_factor": 2.91,
+    "return_pct": 25.07,
+    "sharpe": 9.46,
+    "trades": 20,
+    "win_rate": 70.0
+  },
+  "capital": 15,
+  "engine_strategy": "default",
+  "leverage": 3,
+  "lifecycle": {
+    "discovered_at": "2026-03-19",
+    "discovery_engine": "v1"
+  },
+  "name": "sui-trend-ema1640-15m",
+  "params": {
+    "atr_period": 20,
+    "atr_sl_mult": 2.5,
+    "atr_tp_mult": 3,
+    "ema_fast": 16,
+    "ema_slow": 40
+  },
+  "position_size": 0.3,
+  "status": "approved",
+  "symbol": "SUIUSDT",
+  "timeframe": "15m",
+  "timeframe_ms": 900000
+}

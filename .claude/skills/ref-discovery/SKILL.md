@@ -8,12 +8,13 @@ description: 策略发现引擎使用指南 — 搜索配置、CLI 参数、sear
 ## CLI 命令速查
 
 ```bash
-# 传统方式（CLI 参数）
+# 基础用法
 discovery scan --strategy trend --symbol NTRNUSDT --days 90 --timeframe 5m
 discovery scan --strategy all --symbol all --timeframe all
 
-# 配置文件方式（--config 与 --strategy/--symbol/--timeframe 互斥）
-discovery scan --config search.json
+# 自定义参数范围（JSON 字符串，覆盖默认搜索空间）
+discovery scan --strategy trend --symbol FETUSDT --days 90 --timeframe 15m \
+  --params '{"ema_fast":{"min":10,"max":30,"step":5},"ema_slow":{"min":40,"max":80,"step":10}}'
 
 # 查看发现结果
 discovery status
@@ -23,11 +24,21 @@ discovery status
 
 | 参数 | 说明 | 默认值 |
 |------|------|--------|
-| `--config` | 搜索配置文件路径（与其他参数互斥） | — |
-| `--strategy` | 策略类型: `trend`, `breakout`, `rsi`, `all` | 必填（无 config 时） |
-| `--symbol` | 交易对: `NTRNUSDT`, `all` | 必填（无 config 时） |
+| `--strategy` | 策略类型: `trend`, `breakout`, `rsi`, `all` | 必填 |
+| `--symbol` | 交易对: `NTRNUSDT`, `all` | 必填 |
 | `--days` | 回测天数 | 90 |
 | `--timeframe` | K 线周期: `5m`, `15m`, `all` | 5m |
+| `--params` | 参数空间 JSON 字符串（覆盖默认范围） | — |
+
+### --params JSON 格式
+
+每个参数指定 min/max/step，只覆盖指定的参数，其余用默认值：
+
+```json
+{"ema_fast":{"min":10,"max":30,"step":5},"ema_slow":{"min":40,"max":80,"step":10}}
+```
+
+参数验证：min > max 或 step <= 0 会报错退出。
 
 ## search.json 格式
 

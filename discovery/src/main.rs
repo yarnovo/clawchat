@@ -2,8 +2,7 @@ use clap::{Parser, Subcommand};
 use clawchat_shared::config_util::timeframe_to_ms;
 use clawchat_shared::data::DataStore;
 use discovery::evaluator::{backtest_batch_optimized, BacktestConfig};
-use discovery::generator::{ParamGenerator, SearchConfig, StrategyType};
-use std::path::PathBuf;
+use discovery::generator::{ParamGenerator, StrategyType};
 
 #[derive(Parser)]
 #[command(name = "discovery", about = "策略发现引擎 — 参数搜索与自动筛选")]
@@ -16,17 +15,13 @@ struct Cli {
 enum Commands {
     /// 扫描参数空间，发现优秀策略
     Scan {
-        /// 搜索配置文件（与 --strategy/--symbol/--timeframe 互斥）
-        #[arg(long, conflicts_with_all = ["strategy", "symbol", "timeframe"])]
-        config: Option<PathBuf>,
-
         /// 策略类型: trend, breakout, rsi, all
-        #[arg(long, required_unless_present = "config")]
-        strategy: Option<String>,
+        #[arg(long)]
+        strategy: String,
 
         /// 交易对: NTRNUSDT, all（扫描所有有数据的币种）
-        #[arg(long, required_unless_present = "config")]
-        symbol: Option<String>,
+        #[arg(long)]
+        symbol: String,
 
         /// 回测天数
         #[arg(long, default_value = "90")]
@@ -35,6 +30,11 @@ enum Commands {
         /// K 线时间周期: 5m, 15m, all
         #[arg(long, default_value = "5m")]
         timeframe: String,
+
+        /// 参数空间 JSON 字符串（覆盖默认范围）
+        /// 例: --params '{"ema_fast":{"min":5,"max":50,"step":2},"ema_slow":{"min":30,"max":200,"step":5}}'
+        #[arg(long)]
+        params: Option<String>,
     },
     /// 显示发现结果
     Status,
@@ -88,45 +88,28 @@ async fn main() {
 
     match cli.command {
         Commands::Scan {
-            config: config_path,
             strategy,
             symbol,
             days,
             timeframe,
+            params,
         } => {
-            // 解析搜索配置：--config 或 CLI 参数
-            let search_config = if let Some(path) = config_path {
-                let content = std::fs::read_to_string(&path).unwrap_or_else(|e| {
-                    eprintln!("读取配置文件失败 {}: {e}", path.display());
-                    std::process::exit(1);
+            // 解析 --params JSON 字符串为 ParamRange map
+            let param_overrides: Option<std::collections::HashMap<String, discovery::generator::ParamRange>> =
+                params.as_ref().map(|json_str| {
+                    serde_json::from_str(json_str).unwrap_or_else(|e| {
+                        eprintln!("--params JSON 解析失败: {e}");
+                        std::process::exit(1);
+                    })
                 });
-                let cfg: SearchConfig = serde_json::from_str(&content).unwrap_or_else(|e| {
-                    eprintln!("解析配置文件失败: {e}");
-                    std::process::exit(1);
-                });
-                Some(cfg)
-            } else {
-                None
-            };
 
-            let (strategies, symbols, timeframes_owned, scan_days) = if let Some(ref cfg) = search_config {
-                let strats = resolve_strategies(&cfg.strategy);
-                let syms = if cfg.symbols.iter().any(|s| s == "all") {
-                    store.list_symbols()
-                } else {
-                    cfg.symbols.iter().map(|s| s.to_uppercase()).collect()
-                };
-                let tfs: Vec<String> = cfg.timeframes.clone();
-                (strats, syms, tfs, cfg.days)
-            } else {
-                let strats = resolve_strategies(strategy.as_deref().unwrap());
-                let syms = resolve_symbols(symbol.as_deref().unwrap(), &store);
-                let tfs: Vec<String> = resolve_timeframes(&timeframe)
-                    .into_iter()
-                    .map(|s| s.to_string())
-                    .collect();
-                (strats, syms, tfs, days)
-            };
+            let strategies = resolve_strategies(&strategy);
+            let symbols = resolve_symbols(&symbol, &store);
+            let timeframes_owned: Vec<String> = resolve_timeframes(&timeframe)
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect();
+            let scan_days = days;
 
             if symbols.is_empty() {
                 eprintln!("没有可用数据，请先用 data-engine 下载行情数据");
@@ -139,9 +122,10 @@ async fn main() {
             let mut all_results = Vec::new();
 
             for st in &strategies {
-                let pg = match &search_config {
-                    Some(cfg) => ParamGenerator::from_config(*st, cfg),
-                    None => ParamGenerator::new(*st),
+                let pg = ParamGenerator::new(*st);
+                let pg = match &param_overrides {
+                    Some(overrides) => pg.with_param_overrides(overrides),
+                    None => pg,
                 };
                 let combos = pg.generate();
                 println!(

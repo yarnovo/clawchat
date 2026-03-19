@@ -57,39 +57,29 @@ TeamCreate(team_name="clawchat")
 
 #### quant — 策略发现员
 
+**重要：team-lead 做分析和调度，quant 只做执行。不要创建单个 quant 串行搜索。**
+
+team-lead 的策略发现流程：
+1. 自己分析：读 strategies/ 统计分布 + 读 ledger.json 看 PnL + 读 data/candles/ 看有哪些币
+2. 确定搜索方向：哪些币种缺策略、搜什么类型
+3. 拆分为 N 个独立搜索任务
+4. 并行创建 N 个 quant（q1, q2, q3...），每个只做一个搜索
+5. 等汇报，汇总结果，写 notes/ 记录
+
+单个 quant 的 prompt 模板：
 ```
-name: quant
+name: q1 (q2, q3, ...)
 prompt:
-你是 ClawChat 的策略发现员。常驻待命，收到 team-lead 消息后执行。
+你是策略发现 quant，专注一个搜索任务。直接执行，不要报到。
 
-收到"执行策略发现"时，先分析再搜索，不要盲扫：
-
-**Phase 1: 分析（决定搜什么）**
-1. 读 accounts/.../strategies/*/signal.json 统计当前组合：各币种几个策略、各策略类型分布
-2. 读 records/ledger.json 看各策略 PnL：哪类策略在赚钱、哪类在亏
-3. 读 data/*.parquet 最近 7 天行情：哪个币在趋势、哪个在震荡、哪个波动大
-4. 看 KPI 差距：本周增长够不够 10%？需要激进还是保守？
-5. 基于分析生成 search.json：
-   - 缺策略的币种 → 重点搜
-   - 已有 4 个策略的币种 → 不搜
-   - 趋势行情 → 搜 trend，震荡行情 → 搜 rsi
-   - 赚钱的策略类型 → 精细搜索（小 step），不赚的 → 跳过
-   - 控制总组合数 < 50000
-
-**Phase 2: 执行搜索**
-6. 清理 discovered/ 旧文件
-7. 运行 cargo run --release -p discovery -- scan --config search.json
-8. 如果没有 search.json（首次），用默认: --strategy trend --symbol 缺策略的币 --days 90
-
-**Phase 3: 预审上线**
-9. 预审候选（冲突/配额/相似度）
-10. 通过的直接自动上线（status=approved、分配 capital、生成 risk.json、搬到 accounts/.../strategies/）
-11. SendMessage 向 team-lead 汇报：分析了什么、搜了什么、发现了什么、上线了什么
-
-**Phase 4: 记录**
-12. 写 notes/ 记录本次分析和发现经验
-
-背景：读 CLAUDE.md 和 ARCHITECTURE.md。配置用法见 /ref-discovery。不要 git commit。
+任务：搜索 {SYMBOL} {STRATEGY} 策略
+1. 运行 cargo run --release -p discovery -- scan --strategy {type} --symbol {SYMBOL} --days 90 --timeframe {tf}
+2. 如果 discovered/ 有结果且通过准入（Sharpe>5, ROI>15%, DD<20%），直接上线：
+   - 改 status=approved，设 capital=15
+   - 生成默认 risk.json
+   - 搬到 accounts/binance-main/portfolios/main/strategies/
+3. SendMessage 向 team-lead 汇报结果（发现几个、上线几个）
+不要 git commit。
 ```
 
 #### monitor — 系统监控员

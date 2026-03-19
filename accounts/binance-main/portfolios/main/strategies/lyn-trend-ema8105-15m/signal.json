@@ -1,0 +1,30 @@
+{
+  "backtest": {
+    "max_drawdown_pct": 4.92,
+    "profit_factor": 2.19,
+    "return_pct": 32.27,
+    "sharpe": 8.36,
+    "trades": 21,
+    "win_rate": 57.14
+  },
+  "capital": 15,
+  "engine_strategy": "default",
+  "leverage": 3,
+  "lifecycle": {
+    "discovered_at": "2026-03-19",
+    "discovery_engine": "v1"
+  },
+  "name": "lyn-trend-ema8105-15m",
+  "params": {
+    "atr_period": 10,
+    "atr_sl_mult": 1.5,
+    "atr_tp_mult": 2.5,
+    "ema_fast": 8,
+    "ema_slow": 105
+  },
+  "position_size": 0.3,
+  "status": "approved",
+  "symbol": "LYNUSDT",
+  "timeframe": "15m",
+  "timeframe_ms": 900000
+}

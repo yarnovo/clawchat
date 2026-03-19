@@ -1,0 +1,30 @@
+{
+  "backtest": {
+    "max_drawdown_pct": 5.93,
+    "profit_factor": 2.15,
+    "return_pct": 24.26,
+    "sharpe": 8.71,
+    "trades": 27,
+    "win_rate": 59.26
+  },
+  "capital": 15,
+  "engine_strategy": "default",
+  "leverage": 3,
+  "lifecycle": {
+    "discovered_at": "2026-03-19",
+    "discovery_engine": "v1"
+  },
+  "name": "fet-trend-ema835-15m",
+  "params": {
+    "atr_period": 15,
+    "atr_sl_mult": 2.5,
+    "atr_tp_mult": 3.5,
+    "ema_fast": 8,
+    "ema_slow": 35
+  },
+  "position_size": 0.3,
+  "status": "approved",
+  "symbol": "FETUSDT",
+  "timeframe": "15m",
+  "timeframe_ms": 900000
+}

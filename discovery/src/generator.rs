@@ -173,6 +173,26 @@ impl ParamGenerator {
         }
     }
 
+    /// 用 ParamRange map 覆盖默认参数空间
+    pub fn with_param_overrides(mut self, overrides: &HashMap<String, ParamRange>) -> Self {
+        for spec in &mut self.specs {
+            if let Some(range) = overrides.get(&spec.name) {
+                if range.min > range.max {
+                    eprintln!("参数 {} 范围无效: min({}) > max({})", spec.name, range.min, range.max);
+                    std::process::exit(1);
+                }
+                if range.step <= 0.0 {
+                    eprintln!("参数 {} step 无效: {} <= 0", spec.name, range.step);
+                    std::process::exit(1);
+                }
+                spec.min = range.min;
+                spec.max = range.max;
+                spec.step = range.step;
+            }
+        }
+        self
+    }
+
     /// 返回总组合数（过滤前）
     pub fn total_combinations(&self) -> usize {
         self.specs.iter().map(|s| s.count()).product()
