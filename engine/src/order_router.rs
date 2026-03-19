@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use crate::global_risk::{GlobalRiskGuard, GlobalRiskVerdict};
 use crate::ledger::{CapitalMode, Ledger};
 use crate::risk::EngineRiskGuard;
-use clawchat_shared::exchange::Exchange;
+use clawchat_shared::exchange::ExchangeClient;
 use clawchat_shared::risk::RiskConfig;
 use clawchat_shared::volatility::vol_leverage_multiplier;
 
@@ -81,7 +81,7 @@ impl OrderRouter {
     pub async fn handle_signal(
         &mut self,
         signal: &StrategySignal,
-        exchange: &Exchange,
+        exchange: &dyn ExchangeClient,
     ) -> Result<bool, String> {
         let strategy_name = &signal.strategy_name;
 
@@ -121,17 +121,22 @@ impl OrderRouter {
             return Err("虚拟账户余额不足".into());
         }
 
-        // 3. Global risk check
+        // 3. Global risk check (graded drawdown defense)
+        let mut leverage_reduction = 1.0_f64;
         match self.global_risk.check(&self.ledger) {
             GlobalRiskVerdict::Pass => {}
+            GlobalRiskVerdict::ReduceLeverage(reason) => {
+                tracing::warn!(strategy = strategy_name, %reason, "global risk: reduce leverage (黄灯)");
+                leverage_reduction = 0.5;
+            }
             GlobalRiskVerdict::Block(reason) => return Err(reason),
             GlobalRiskVerdict::CloseAll(reason) => {
                 return Err(format!("全局风控触发: {reason}"));
             }
         }
 
-        // 4. Compute effective leverage (volatility-aware)
-        let mut effective_leverage = signal.leverage as f64;
+        // 4. Compute effective leverage (volatility-aware + drawdown grading)
+        let mut effective_leverage = signal.leverage as f64 * leverage_reduction;
         if let Some(risk_cfg) = self.risk_configs.get(strategy_name) {
             if risk_cfg.dynamic_leverage {
                 if let Some(pct) = signal.vol_percentile {
@@ -162,18 +167,9 @@ impl OrderRouter {
         }
 
         // 6. Place order on exchange
-        let side_enum = if is_long {
-            clawchat_shared::types::Side::Buy
-        } else {
-            clawchat_shared::types::Side::Sell
-        };
-        let pos_side = if is_long {
-            clawchat_shared::types::PositionSide::Long
-        } else {
-            clawchat_shared::types::PositionSide::Short
-        };
+        let side_str = if is_long { "BUY" } else { "SELL" };
 
-        let result = exchange.market_order(side_enum, pos_side, qty).await;
+        let result = exchange.market_order(&signal.symbol, side_str, qty).await;
 
         match result {
             Ok(_resp) => {

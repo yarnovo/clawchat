@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use hmac::{Hmac, Mac};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -5,6 +6,26 @@ use sha2::Sha256;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::types::{OrderType, PositionSide, Side};
+
+// ── ExchangeClient trait ──────────────────────────────────────
+
+/// Abstract interface for exchange operations. All exchange implementations
+/// (Binance, OKX, etc.) must implement this trait.
+#[async_trait]
+pub trait ExchangeClient: Send + Sync {
+    /// Place a market order. Returns raw JSON response.
+    async fn market_order(&self, symbol: &str, side: &str, qty: f64) -> Result<serde_json::Value, ExchangeError>;
+    /// Get wallet balance (USDT).
+    async fn get_balance(&self) -> Result<f64, ExchangeError>;
+    /// Get position risk for a symbol (or all if None). Only non-zero positions.
+    async fn get_position_risk(&self, symbol: Option<&str>) -> Result<Vec<PositionRisk>, ExchangeError>;
+    /// Set leverage for a symbol.
+    async fn set_leverage(&self, symbol: &str, leverage: u32) -> Result<(), ExchangeError>;
+    /// Cancel all open orders for a symbol.
+    async fn cancel_all_open_orders(&self, symbol: &str) -> Result<(), ExchangeError>;
+    /// Exchange name identifier (e.g. "binance", "okx").
+    fn name(&self) -> &str;
+}
 
 // ── Types ──────────────────────────────────────────────────────
 
@@ -84,8 +105,11 @@ pub enum ExchangeError {
 
 // ── Exchange client ────────────────────────────────────────────
 
+/// Backward-compatible type alias. New code should use `BinanceClient` directly.
+pub type Exchange = BinanceClient;
+
 #[derive(Clone)]
-pub struct Exchange {
+pub struct BinanceClient {
     client: Client,
     api_key: String,
     api_secret: String,
@@ -95,7 +119,7 @@ pub struct Exchange {
     pub order_id_prefix: String,
 }
 
-impl Exchange {
+impl BinanceClient {
     /// Primary constructor: raw credentials
     pub fn new(
         api_key: String,
@@ -725,5 +749,47 @@ impl Exchange {
             return Ok(serde_json::json!({"dryRun": true, "asset": asset, "amount": amount}));
         }
         self.signed_post("/sapi/v1/futures/transfer", &params).await
+    }
+}
+
+// ── ExchangeClient impl for BinanceClient ─────────────────────
+
+#[async_trait]
+impl ExchangeClient for BinanceClient {
+    async fn market_order(&self, symbol: &str, side: &str, qty: f64) -> Result<serde_json::Value, ExchangeError> {
+        let side_enum = match side.to_uppercase().as_str() {
+            "BUY" => Side::Buy,
+            "SELL" => Side::Sell,
+            _ => return Err(ExchangeError::Api { code: -1, msg: format!("invalid side: {side}") }),
+        };
+        let pos_side = match side_enum {
+            Side::Buy => PositionSide::Long,
+            Side::Sell => PositionSide::Short,
+        };
+        let ex = self.clone().with_symbol(symbol);
+        ex.market_order(side_enum, pos_side, qty).await
+    }
+
+    async fn get_balance(&self) -> Result<f64, ExchangeError> {
+        BinanceClient::get_balance(self).await
+    }
+
+    async fn get_position_risk(&self, symbol: Option<&str>) -> Result<Vec<PositionRisk>, ExchangeError> {
+        BinanceClient::get_position_risk(self, symbol).await
+    }
+
+    async fn set_leverage(&self, symbol: &str, leverage: u32) -> Result<(), ExchangeError> {
+        let ex = self.clone().with_symbol(symbol);
+        ex.set_leverage(leverage).await?;
+        Ok(())
+    }
+
+    async fn cancel_all_open_orders(&self, symbol: &str) -> Result<(), ExchangeError> {
+        BinanceClient::cancel_all_open_orders(self, symbol).await?;
+        Ok(())
+    }
+
+    fn name(&self) -> &str {
+        "binance"
     }
 }

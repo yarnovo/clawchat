@@ -13,7 +13,7 @@ use tracing::{error, info, warn};
 
 use clawchat_shared::account::PortfolioConfig;
 use clawchat_shared::data::DataStore;
-use clawchat_shared::exchange::Exchange;
+use clawchat_shared::exchange::{BinanceClient, Exchange};
 use clawchat_shared::paths;
 use clawchat_shared::risk::RiskConfig;
 use clawchat_shared::strategy::StrategyFile;
@@ -879,8 +879,13 @@ pub async fn run_event_loop(
 
                 // Global risk check (with alert emission)
                 let records_dir = clawchat_shared::paths::records_dir();
+                let mut leverage_halved = false;
                 match order_router.global_risk.check_and_alert(order_router.ledger(), &records_dir) {
                     GlobalRiskVerdict::Pass => {}
+                    GlobalRiskVerdict::ReduceLeverage(reason) => {
+                        warn!(strategy = strategy_name, %reason, "global risk: reduce leverage (黄灯)");
+                        leverage_halved = true;
+                    }
                     GlobalRiskVerdict::Block(reason) => {
                         warn!(strategy = strategy_name, %reason, "global risk block");
                         continue;
@@ -906,9 +911,26 @@ pub async fn run_event_loop(
                     }
                 }
 
+                    // 黄灯：临时降杠杆 50%，执行完后恢复
+                    let original_leverage = rt.leverage;
+                    if leverage_halved {
+                        rt.leverage = (rt.leverage / 2).max(1);
+                        info!(
+                            strategy = strategy_name,
+                            original = original_leverage,
+                            reduced = rt.leverage,
+                            "leverage halved due to drawdown yellow"
+                        );
+                    }
+
                     // Execute signal
                     if let Some(exchange) = exchanges.get(strategy_name) {
                         execute_signal(&worker_signal.signal, exchange, rt, &order_tx).await;
+                    }
+
+                    // Restore leverage after execution
+                    if leverage_halved {
+                        rt.leverage = original_leverage;
                     }
 
                     // Save ledger
@@ -1276,6 +1298,9 @@ pub async fn run_event_loop(
                                     max_daily_loss_pct: pr.max_daily_loss_pct.unwrap_or(5.0),
                                     max_total_exposure: pr.max_total_exposure.unwrap_or(2.0),
                                     max_per_coin_exposure_pct: pr.max_per_coin_exposure_pct.unwrap_or(50.0),
+                                    drawdown_yellow_pct: pr.drawdown_yellow_pct.unwrap_or(3.0),
+                                    drawdown_orange_pct: pr.drawdown_orange_pct.unwrap_or(6.0),
+                                    recovery_threshold_pct: pr.recovery_threshold_pct.unwrap_or(2.0),
                                 }
                             } else {
                                 GlobalRiskConfig::default()
@@ -1316,6 +1341,9 @@ pub async fn run_event_loop(
                                                 max_daily_loss_pct: pr.max_daily_loss_pct.unwrap_or(5.0),
                                                 max_total_exposure: pr.max_total_exposure.unwrap_or(2.0),
                                                 max_per_coin_exposure_pct: pr.max_per_coin_exposure_pct.unwrap_or(50.0),
+                                                drawdown_yellow_pct: pr.drawdown_yellow_pct.unwrap_or(3.0),
+                                                drawdown_orange_pct: pr.drawdown_orange_pct.unwrap_or(6.0),
+                                                recovery_threshold_pct: pr.recovery_threshold_pct.unwrap_or(2.0),
                                             }
                                         } else {
                                             GlobalRiskConfig::default()

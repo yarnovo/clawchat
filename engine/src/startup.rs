@@ -11,7 +11,7 @@ use tracing::{error, info, warn};
 
 use clawchat_shared::account::{AccountConfig, PortfolioConfig};
 use clawchat_shared::data::DataStore;
-use clawchat_shared::exchange::{Exchange, PositionRisk};
+use clawchat_shared::exchange::{BinanceClient, Exchange, ExchangeClient, PositionRisk};
 use clawchat_shared::paths;
 use clawchat_shared::risk::RiskConfig;
 use clawchat_shared::strategy::StrategyFile;
@@ -343,7 +343,7 @@ pub fn save_state(
 /// Reconcile ledger virtual positions against exchange real positions.
 /// Fixes any discrepancies (ghost positions, missing positions, qty mismatches)
 /// and logs all differences to records/reconcile_events.jsonl.
-pub async fn reconcile_positions(exchange: &Exchange, ledger: &mut Ledger) {
+pub async fn reconcile_positions(exchange: &dyn ExchangeClient, ledger: &mut Ledger) {
     info!("starting position reconciliation with exchange");
 
     // 1. Fetch real positions from exchange
@@ -593,6 +593,9 @@ pub fn init_portfolio_risk_guards(
                 max_daily_loss_pct: pr.max_daily_loss_pct.unwrap_or(5.0),
                 max_total_exposure: pr.max_total_exposure.unwrap_or(2.0),
                 max_per_coin_exposure_pct: pr.max_per_coin_exposure_pct.unwrap_or(50.0),
+                drawdown_yellow_pct: pr.drawdown_yellow_pct.unwrap_or(3.0),
+                drawdown_orange_pct: pr.drawdown_orange_pct.unwrap_or(6.0),
+                recovery_threshold_pct: pr.recovery_threshold_pct.unwrap_or(2.0),
             }
         } else {
             GlobalRiskConfig::default()
@@ -601,8 +604,10 @@ pub fn init_portfolio_risk_guards(
         info!(
             portfolio = %pname,
             max_dd = %guard.config().max_drawdown_pct,
+            yellow = %guard.config().drawdown_yellow_pct,
+            orange = %guard.config().drawdown_orange_pct,
             max_daily = %guard.config().max_daily_loss_pct,
-            "portfolio risk guard initialized"
+            "portfolio risk guard initialized (graded drawdown)"
         );
         guards.insert(pname.clone(), guard);
     }
@@ -624,6 +629,9 @@ pub fn build_order_router(
             max_daily_loss_pct: pr.max_daily_loss_pct.unwrap_or(5.0),
             max_total_exposure: pr.max_total_exposure.unwrap_or(2.0),
             max_per_coin_exposure_pct: pr.max_per_coin_exposure_pct.unwrap_or(50.0),
+            drawdown_yellow_pct: pr.drawdown_yellow_pct.unwrap_or(3.0),
+            drawdown_orange_pct: pr.drawdown_orange_pct.unwrap_or(6.0),
+            recovery_threshold_pct: pr.recovery_threshold_pct.unwrap_or(2.0),
         })
         .unwrap_or_default();
     let global_risk = GlobalRiskGuard::new(main_risk_config, account_total_capital);
