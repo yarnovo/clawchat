@@ -63,6 +63,13 @@ pub struct StrategyAllocation {
     pub recent_orders: Vec<Order>,
 }
 
+/// 资金模式
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CapitalMode {
+    Fixed,
+    Percent,
+}
+
 impl StrategyAllocation {
     pub fn new(name: &str, capital: f64) -> Self {
         Self {
@@ -165,8 +172,30 @@ impl StrategyAllocation {
     }
 
     /// Recalculate total unrealized PnL from all positions.
-    fn recalc_unrealized(&mut self) {
+    pub fn recalc_unrealized(&mut self) {
         self.unrealized_pnl = self.positions.values().map(|p| p.unrealized_pnl).sum();
+    }
+
+    /// 计算动态配额（有效资金）。
+    ///
+    /// - `Fixed` 模式：返回 `allocated_capital`（现有行为）
+    /// - `Percent` 模式：返回 `portfolio_equity * capital_pct / 100`
+    ///
+    /// 风控约束：单策略 pct 上限 10%，总分配 pct 上限 95%。
+    pub fn effective_capital(
+        &self,
+        mode: CapitalMode,
+        capital_pct: f64,
+        portfolio_equity: f64,
+    ) -> f64 {
+        match mode {
+            CapitalMode::Fixed => self.allocated_capital,
+            CapitalMode::Percent => {
+                // 单策略 pct 上限 10%
+                let capped_pct = capital_pct.min(10.0);
+                portfolio_equity * capped_pct / 100.0
+            }
+        }
     }
 
     /// Push a completed order into recent_orders, trimming to MAX_RECENT_ORDERS.
@@ -445,6 +474,25 @@ impl Ledger {
             }
         }
         map
+    }
+
+    /// Get the portfolio equity for the portfolio that contains a given strategy.
+    /// Returns the sum of virtual_equity() of all strategies in that portfolio.
+    pub fn portfolio_equity_for_strategy(&self, strategy_name: &str) -> f64 {
+        for account in self.accounts.values() {
+            for portfolio in account.portfolios.values() {
+                if portfolio.strategies.contains_key(strategy_name) {
+                    return portfolio.strategies.values().map(|s| s.virtual_equity()).sum();
+                }
+            }
+        }
+        0.0
+    }
+
+    /// Compute total percent allocation across all percent-mode strategies.
+    /// `pct_map` maps strategy_name -> capital_pct for percent-mode strategies.
+    pub fn total_pct_allocation(&self, pct_map: &std::collections::HashMap<String, f64>) -> f64 {
+        pct_map.values().sum()
     }
 
     // ── Persistence ─────────────────────────────────────────────
@@ -784,5 +832,55 @@ mod tests {
         let main_p = ledger.portfolio("acc1", "main").unwrap();
         assert!((main_p.allocated_capital - 800.0).abs() < f64::EPSILON);
         assert!(main_p.strategies.contains_key("s1"));
+    }
+
+    // ── 浮动配额（CapitalMode）测试 ──────────────────────────
+
+    #[test]
+    fn effective_capital_fixed_returns_allocated() {
+        let alloc = StrategyAllocation::new("s1", 50.0);
+        let cap = alloc.effective_capital(CapitalMode::Fixed, 5.0, 1000.0);
+        assert!((cap - 50.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn effective_capital_percent_basic() {
+        let alloc = StrategyAllocation::new("s1", 50.0);
+        // 3% of 500 = 15
+        let cap = alloc.effective_capital(CapitalMode::Percent, 3.0, 500.0);
+        assert!((cap - 15.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn effective_capital_percent_cap_at_10() {
+        let alloc = StrategyAllocation::new("s1", 50.0);
+        // 20% requested → capped to 10% of 1000 = 100
+        let cap = alloc.effective_capital(CapitalMode::Percent, 20.0, 1000.0);
+        assert!((cap - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn effective_capital_percent_zero_equity() {
+        let alloc = StrategyAllocation::new("s1", 50.0);
+        let cap = alloc.effective_capital(CapitalMode::Percent, 5.0, 0.0);
+        assert!((cap).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn portfolio_equity_for_strategy_found() {
+        let mut ledger = Ledger::new(500.0);
+        ledger.add_strategy("s1", 200.0);
+        ledger.add_strategy("s2", 300.0);
+        ledger.get_mut("s1").unwrap().realized_pnl = 20.0;
+        // Portfolio equity = 220 + 300 = 520
+        let eq = ledger.portfolio_equity_for_strategy("s1");
+        assert!((eq - 520.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn portfolio_equity_for_strategy_not_found() {
+        let ledger = Ledger::new(500.0);
+        let eq = ledger.portfolio_equity_for_strategy("nonexistent");
+        assert!((eq).abs() < f64::EPSILON);
     }
 }

@@ -1,64 +1,67 @@
 # 多交易所抽象层
 
-## 优先级：P2
+**优先级**: P2
+**来源**: 调研分析（基础设施 + 市场覆盖 + 策略Alpha + 增长路径）
 
-## 背景
+## 问题
 
-当前系统仅支持 Binance FAPI，存在：
-- 单点故障风险（Binance 宕机 = 全停）
-- 仓位上限 100 个（$100K+ 时撞限）
-- 无法跨交易所套利
-- 流动性来源单一
+当前系统完全绑定 Binance FAPI，`shared/src/exchange.rs` 硬编码了 Binance 的 API 签名、endpoint、参数格式。4/5 调研员标记此为最大架构债务：
+
+- 单交易所宕机 → 全系统停摆
+- 无法跨所套利（依赖此项的套利需求被阻塞）
+- 资金增长后单所流动性不足，大额下单滑点恶化
+- 新币可能在 OKX/Bybit 首发，错过打新机会
 
 ## 需求
 
-### 1. Exchange Adapter Trait
+### 1. Exchange trait 抽象
 
 ```rust
-pub trait ExchangeAdapter: Send + Sync {
-    async fn place_order(&self, req: OrderRequest) -> Result<OrderResponse>;
+#[async_trait]
+pub trait ExchangeClient: Send + Sync {
+    async fn market_order(&self, symbol: &str, side: Side, qty: f64) -> Result<Order>;
+    async fn limit_order(&self, symbol: &str, side: Side, qty: f64, price: f64) -> Result<Order>;
     async fn cancel_order(&self, symbol: &str, order_id: &str) -> Result<()>;
-    async fn get_positions(&self) -> Result<Vec<Position>>;
-    async fn get_balances(&self) -> Result<Vec<Balance>>;
+    async fn get_position(&self, symbol: &str) -> Result<Position>;
+    async fn get_all_positions(&self) -> Result<Vec<Position>>;
     async fn get_funding_rate(&self, symbol: &str) -> Result<f64>;
-    async fn subscribe_trades(&self, symbol: &str) -> Result<Receiver<TradeEvent>>;
-    async fn subscribe_klines(&self, symbol: &str, interval: &str) -> Result<Receiver<Kline>>;
+    async fn set_leverage(&self, symbol: &str, leverage: u32) -> Result<()>;
 }
 ```
 
-### 2. 交易所实现（按优先级）
+### 2. Binance 实现重构
 
-1. **Binance FAPI**（已有，重构为 trait 实现）
-2. **OKX USDT Swap**（第二优先）
-3. **Bybit Linear**（第三优先）
+将现有 `Exchange` struct 重构为 `BinanceClient`，实现 `ExchangeClient` trait。功能不变，只是接口抽象化。
 
-### 3. 账户配置扩展
+### 3. account.json 支持多交易所
 
+```json
+{
+  "exchanges": {
+    "binance": { "base_url": "https://fapi.binance.com", "api_key_env": "BINANCE_KEY" },
+    "okx": { "base_url": "https://www.okx.com", "api_key_env": "OKX_KEY" }
+  },
+  "default_exchange": "binance"
+}
 ```
-accounts/
-  binance-main/   （现有）
-  okx-main/       （新增）
-  bybit-main/     （新增）
-```
 
-每个账户独立的 portfolio 和 risk 配置。
+策略的 signal.json 可指定 `"exchange": "okx"` 或默认使用 account 级别的。
 
-### 4. 智能路由（后续）
+### 4. OKX 客户端（第二优先）
 
-- 同一币种选择最优交易所（最低滑点/手续费）
-- 单交易所敞口限制 < 50%
+实现 `OKXClient`，支持基本的下单、查仓、费率查询。不需要一次做完所有接口，优先：
+- market_order / get_position / get_funding_rate
 
 ## 涉及文件
 
-- 新增 `shared/src/exchange_adapter.rs` — trait 定义
-- 重构 `shared/src/exchange.rs` — Binance 实现 trait
-- 新增 `shared/src/exchanges/okx.rs`
-- 新增 `shared/src/exchanges/bybit.rs`
-- `engine/src/order_router.rs` — 支持多 adapter
-- `engine/src/main.rs` — 初始化多交易所
+- `shared/src/exchange.rs` — 抽象为 trait + BinanceClient
+- `engine/src/order_router.rs` — 使用 `dyn ExchangeClient`
+- `engine/src/main.rs` — 根据配置初始化多个 exchange client
+- `accounts/*/account.json` — 配置格式升级
 
 ## 验收标准
 
-- 现有 Binance 功能不受影响（重构透明）
-- 新增一个交易所可运行基本策略
-- 账户配置支持多交易所
+- [ ] ExchangeClient trait 定义完成
+- [ ] 现有 Binance 功能通过 BinanceClient 实现不变
+- [ ] engine 通过 trait object 调用，不直接依赖 Binance
+- [ ] account.json 支持多交易所配置（即使暂时只有 Binance）

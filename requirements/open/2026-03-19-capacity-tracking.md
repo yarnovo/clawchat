@@ -1,57 +1,65 @@
-# 策略容量追踪与自动缩仓
+# 策略容量追踪
 
-## 优先级：P1
+**优先级**: P1
+**来源**: 调研分析（市场覆盖 + 基础设施 + 增长路径）
 
-## 背景
+## 问题
 
-策略收益会随投入资金增加而衰减（参数容量衰减）。当资金增长到一定规模后，小币种流动性不足会导致：
-- 滑点急剧上升（投入占 ADV > 1% 时）
-- 策略 Sharpe 指数级下降
-- 实际 ROI 可能变为负数
-
-当前系统无任何容量监测，资金增长后会"无声地"亏损。
+当前无策略容量概念。随着资金增长，策略下单量增大，但：
+- 无法评估策略能承载多少资金（与币种流动性相关）
+- PIPPIN 已占 portfolio 54%、敞口接近限制，滑点 2-3% 吃掉利润
+- 发现引擎不考虑容量，可能推荐流动性不足的币种
+- 资金从 $222 增长到 $10K+ 后，小盘币策略会无声亏损
 
 ## 需求
 
-1. **容量计算模块** `shared/src/capacity.rs`：
-   ```rust
-   pub struct StrategyCapacity {
-       pub symbol: String,
-       pub daily_avg_volume_usd: f64,  // 24h 日均成交额
-       pub max_position_ratio: f64,    // 最大占 ADV 比例（默认 0.5%）
-       pub current_notional: f64,      // 当前敞口 USD
-       pub capacity_usd: f64,          // 计算容量 = ADV × ratio
-       pub utilization: f64,           // 当前敞口 / 容量
-   }
-   ```
+### 1. 容量计算模块
 
-2. **ADV 数据获取**：
-   - 定时拉取 Binance 24h ticker（/fapi/v1/ticker/24hr）
-   - 缓存到内存，每小时更新
+新增 `shared/src/capacity.rs`：
 
-3. **autopilot 自动缩仓**：
-   - utilization > 80% → 警告日志
-   - utilization > 100% → 阻止加仓
-   - utilization > 150% → 自动缩仓至 80%
-   - 写入 trade.json 执行
+```rust
+/// 计算策略最大可承载资金
+/// 规则：策略单笔下单量 < 币种 24h ADV 的 0.1%
+pub fn max_capacity(adv_24h: f64, leverage: f64) -> f64 {
+    adv_24h * 0.001 / leverage
+}
 
-4. **ops 查询**：
-   - `ops capacity` — 显示每个策略的容量利用率
-   - 按 utilization 降序排列
+/// 计算当前利用率
+pub fn utilization(allocated: f64, max_capacity: f64) -> f64 {
+    allocated / max_capacity
+}
+```
 
-5. **发现引擎集成**：
-   - 新策略生成时计算容量上限
-   - 容量 < $1000 的策略自动跳过（不值得部署）
+### 2. 发现引擎容量过滤
+
+在 `discovery/src/evaluator.rs` 的筛选管道中新增：
+- 拉取候选币种的 24h 成交量
+- 过滤 max_capacity < $500 的候选（当前阶段）
+- 随着 AUM 增长，动态提高过滤阈值
+
+### 3. autopilot 容量监控
+
+autopilot 定期检查所有在线策略的容量利用率：
+- 利用率 > 80% → 标记警告
+- 利用率 > 120% → 自动缩仓至 80%
+- 利用率 < 30% → 标记为"可扩仓"
+
+### 4. ops capacity 命令
+
+新增 `cargo run -p clawchat-ops -- capacity` 命令：
+- 显示每个在线策略的 ADV、max_capacity、当前利用率
+- 标记超容量的策略
 
 ## 涉及文件
 
-- 新增 `shared/src/capacity.rs` — 容量计算
-- `autopilot/src/engine.rs` — 容量缩仓规则
+- `shared/src/capacity.rs` — 新模块
 - `discovery/src/evaluator.rs` — 容量过滤
-- `ops/src/main.rs` — 新增 capacity 子命令
+- `autopilot/src/engine.rs` — 容量监控规则
+- `ops/src/` — 新增 capacity 命令
 
 ## 验收标准
 
-- 每个策略有容量利用率指标
-- 超容量自动缩仓
-- 发现引擎过滤低容量策略
+- [ ] 能计算每个策略的最大容量和当前利用率
+- [ ] 发现引擎自动过滤低容量候选
+- [ ] autopilot 对超容量策略自动缩仓
+- [ ] ops capacity 命令输出正确

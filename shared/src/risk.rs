@@ -34,6 +34,15 @@ pub struct RiskConfig {
     pub funding_rate_limit: Option<f64>,
     #[serde(default)]
     pub max_unrealized_loss: Option<f64>,
+    /// 启用波动率感知动态杠杆
+    #[serde(default)]
+    pub dynamic_leverage: bool,
+    /// 波动率回看窗口（分钟），默认 30
+    #[serde(default = "default_vol_lookback_minutes")]
+    pub vol_lookback_minutes: u32,
+    /// 波动率杠杆乘数 [low, normal, high, extreme]，默认 [1.3, 1.0, 0.7, 0.3]
+    #[serde(default = "default_vol_multipliers")]
+    pub vol_multipliers: [f64; 4],
 }
 
 fn default_max_loss_per_trade() -> f64 { 0.05 }
@@ -48,6 +57,8 @@ fn default_max_concurrent_positions() -> u32 { 3 }
 fn default_max_hold_time_hours() -> f64 { 24.0 }
 fn default_trailing_stop() -> f64 { 0.02 }
 fn default_max_portfolio_exposure() -> f64 { 0.80 }
+fn default_vol_lookback_minutes() -> u32 { 30 }
+fn default_vol_multipliers() -> [f64; 4] { [1.3, 1.0, 0.7, 0.3] }
 
 impl Default for RiskConfig {
     fn default() -> Self {
@@ -67,6 +78,9 @@ impl Default for RiskConfig {
             max_portfolio_exposure: 0.80,
             funding_rate_limit: None,
             max_unrealized_loss: None,
+            dynamic_leverage: false,
+            vol_lookback_minutes: 30,
+            vol_multipliers: [1.3, 1.0, 0.7, 0.3],
         }
     }
 }
@@ -165,6 +179,21 @@ impl RiskConfig {
         }
         if obj.contains_key("max_unrealized_loss") {
             base.max_unrealized_loss = obj.get("max_unrealized_loss").and_then(|v| v.as_f64());
+        }
+        if let Some(v) = obj.get("dynamic_leverage").and_then(|v| v.as_bool()) {
+            base.dynamic_leverage = v;
+        }
+        if let Some(v) = obj.get("vol_lookback_minutes").and_then(|v| v.as_u64()) {
+            base.vol_lookback_minutes = v as u32;
+        }
+        if let Some(arr) = obj.get("vol_multipliers").and_then(|v| v.as_array()) {
+            if arr.len() == 4 {
+                if let (Some(a), Some(b), Some(c), Some(d)) = (
+                    arr[0].as_f64(), arr[1].as_f64(), arr[2].as_f64(), arr[3].as_f64(),
+                ) {
+                    base.vol_multipliers = [a, b, c, d];
+                }
+            }
         }
 
         tracing::info!(

@@ -13,3 +13,4 @@ pub mod strategy;
 pub mod symbols;
 pub mod trade;
 pub mod types;
+pub mod volatility;

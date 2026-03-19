@@ -1,6 +1,6 @@
 use clawchat_shared::candle::Candle;
 use clawchat_shared::criteria::BacktestMetrics;
-use clawchat_shared::indicators::{atr_from_slices, ema_from_slice, ema_update, rsi_from_slice};
+use clawchat_shared::indicators::{atr_from_slices, bollinger_bands, ema_from_slice, ema_update, rsi_from_slice};
 use rayon::prelude::*;
 use std::collections::HashMap;
 
@@ -205,11 +205,111 @@ fn rsi_signal(
     }
 }
 
+/// Lightweight grid strategy — price crossing grid lines triggers buy/sell
+fn grid_signal(
+    candle: &Candle,
+    closes: &[f64],
+    _highs: &[f64],
+    _lows: &[f64],
+    params: &HashMap<String, f64>,
+) -> StrategySignal {
+    let grids = params.get("grids").copied().unwrap_or(5.0) as usize;
+    let lookback = params.get("lookback").copied().unwrap_or(50.0) as usize;
+
+    let n = closes.len();
+    if n < 2 {
+        return StrategySignal::None;
+    }
+
+    // 需要至少 min(lookback, 50) 根才能构建网格
+    if n < lookback.min(50) {
+        return StrategySignal::None;
+    }
+
+    // 用最近 lookback 根的价格区间构建网格
+    let window_size = n.min(lookback);
+    let window = &closes[n - window_size..];
+    let lo = window.iter().cloned().fold(f64::INFINITY, f64::min);
+    let hi = window.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let margin = (hi - lo) * 0.1;
+    let lo = lo - margin;
+    let hi = hi + margin;
+    let step = (hi - lo) / grids as f64;
+
+    if step < 1e-12 {
+        return StrategySignal::None;
+    }
+
+    let lines: Vec<f64> = (0..=grids).map(|i| lo + i as f64 * step).collect();
+
+    let prev = closes[n - 2];
+    let close = candle.close;
+
+    // 价格向下穿过网格线 → 买入
+    for &line in &lines {
+        if prev >= line && close < line {
+            return StrategySignal::Long;
+        }
+    }
+
+    // 价格向上穿过网格线 → 卖出
+    for &line in &lines {
+        if prev <= line && close > line {
+            return StrategySignal::Short;
+        }
+    }
+
+    StrategySignal::None
+}
+
+/// Lightweight Bollinger Reversion strategy — uses accumulated slices
+fn bollinger_reversion_signal(
+    candle: &Candle,
+    closes: &[f64],
+    highs: &[f64],
+    lows: &[f64],
+    params: &HashMap<String, f64>,
+) -> (StrategySignal, f64) {
+    let bb_period = params.get("bb_period").copied().unwrap_or(20.0) as usize;
+    let bb_std = params.get("bb_std").copied().unwrap_or(2.0);
+    let rsi_period = params.get("rsi_period").copied().unwrap_or(14.0) as usize;
+    let atr_period = params.get("atr_period").copied().unwrap_or(14.0) as usize;
+
+    let n = closes.len();
+    let warmup = bb_period.max(rsi_period + 1).max(atr_period + 1);
+    if n < warmup {
+        return (StrategySignal::None, 0.0);
+    }
+
+    let (upper, _middle, lower) = match bollinger_bands(closes, bb_period, bb_std) {
+        Some(v) => v,
+        None => return (StrategySignal::None, 0.0),
+    };
+    let rsi = match rsi_from_slice(closes, rsi_period) {
+        Some(v) => v,
+        None => return (StrategySignal::None, 0.0),
+    };
+    let atr = match atr_from_slices(highs, lows, closes, atr_period) {
+        Some(v) => v,
+        None => return (StrategySignal::None, 0.0),
+    };
+
+    // 做多：价格触及下轨 + RSI < 35
+    if candle.close <= lower && rsi < 35.0 {
+        (StrategySignal::Long, atr)
+    // 做空：价格触及上轨 + RSI > 65
+    } else if candle.close >= upper && rsi > 65.0 {
+        (StrategySignal::Short, atr)
+    } else {
+        (StrategySignal::None, atr)
+    }
+}
+
 // ── Backtest engine ─────────────────────────────────────────────
 
 /// Run a single backtest with the given candles, strategy type, and parameters.
 ///
-/// `strategy_type`: "default" (TrendFollower), "breakout", "rsi"
+/// `strategy_type`: "default" (TrendFollower), "breakout", "rsi", "grid", "bollinger_reversion"
 pub fn backtest(
     candles: &[Candle],
     strategy_type: &str,
@@ -263,8 +363,8 @@ pub fn backtest(
         }
         last_day_ts = Some(day);
 
-        // Accumulate for breakout/rsi
-        if strategy_type == "breakout" || strategy_type == "rsi" {
+        // Accumulate for breakout/rsi/grid
+        if strategy_type == "breakout" || strategy_type == "rsi" || strategy_type == "grid" || strategy_type == "bollinger_reversion" {
             closes.push(candle.close);
             highs_vec.push(candle.high);
             lows_vec.push(candle.low);
@@ -363,13 +463,22 @@ pub fn backtest(
             ),
             "breakout" => breakout_signal(candle, &closes, &highs_vec, &lows_vec, params),
             "rsi" => rsi_signal(candle, &closes, &highs_vec, &lows_vec, params),
+            "bollinger_reversion" => bollinger_reversion_signal(candle, &closes, &highs_vec, &lows_vec, params),
+            "grid" => {
+                let sig = grid_signal(candle, &closes, &highs_vec, &lows_vec, params);
+                (sig, 0.0)
+            }
             _ => (StrategySignal::None, 0.0),
         };
+
+        let is_grid = strategy_type == "grid";
 
         match signal {
             StrategySignal::Long => {
                 let entry_price = apply_slippage(candle.close, Side::Long, config.slippage_pct);
-                let (sl, tp) = if is_breakout {
+                let (sl, tp) = if is_grid {
+                    (0.0, None)
+                } else if is_breakout {
                     (entry_price - atr * trail_atr, None)
                 } else {
                     (
@@ -387,7 +496,9 @@ pub fn backtest(
             }
             StrategySignal::Short => {
                 let entry_price = apply_slippage(candle.close, Side::Short, config.slippage_pct);
-                let (sl, tp) = if is_breakout {
+                let (sl, tp) = if is_grid {
+                    (f64::MAX, None)
+                } else if is_breakout {
                     (entry_price + atr * trail_atr, None)
                 } else {
                     (
@@ -939,7 +1050,7 @@ fn backtest_with_pruning(
         }
         last_day_ts = Some(day);
 
-        if strategy_type == "breakout" || strategy_type == "rsi" {
+        if strategy_type == "breakout" || strategy_type == "rsi" || strategy_type == "grid" || strategy_type == "bollinger_reversion" {
             closes.push(candle.close);
             highs_vec.push(candle.high);
             lows_vec.push(candle.low);
@@ -1035,13 +1146,22 @@ fn backtest_with_pruning(
             ),
             "breakout" => breakout_signal(candle, &closes, &highs_vec, &lows_vec, params),
             "rsi" => rsi_signal(candle, &closes, &highs_vec, &lows_vec, params),
+            "bollinger_reversion" => bollinger_reversion_signal(candle, &closes, &highs_vec, &lows_vec, params),
+            "grid" => {
+                let sig = grid_signal(candle, &closes, &highs_vec, &lows_vec, params);
+                (sig, 0.0)
+            }
             _ => (StrategySignal::None, 0.0),
         };
+
+        let is_grid = strategy_type == "grid";
 
         match signal {
             StrategySignal::Long => {
                 let entry_price = apply_slippage(candle.close, Side::Long, config.slippage_pct);
-                let (sl, tp) = if is_breakout {
+                let (sl, tp) = if is_grid {
+                    (0.0, None)
+                } else if is_breakout {
                     (entry_price - atr * trail_atr, None)
                 } else {
                     (
@@ -1059,7 +1179,9 @@ fn backtest_with_pruning(
             }
             StrategySignal::Short => {
                 let entry_price = apply_slippage(candle.close, Side::Short, config.slippage_pct);
-                let (sl, tp) = if is_breakout {
+                let (sl, tp) = if is_grid {
+                    (f64::MAX, None)
+                } else if is_breakout {
                     (entry_price + atr * trail_atr, None)
                 } else {
                     (
@@ -1804,5 +1926,40 @@ mod tests {
             elapsed_optimized <= elapsed_original + std::time::Duration::from_millis(500),
             "optimized should not be significantly slower"
         );
+    }
+
+    // ── Grid strategy backtest tests ──────────────────────────────
+
+    #[test]
+    fn grid_backtest_no_panic() {
+        let candles = oscillating_candles(200, 100.0, 10.0);
+        let params: HashMap<String, f64> = [
+            ("grids".into(), 10.0),
+            ("lookback".into(), 50.0),
+        ]
+        .into_iter()
+        .collect();
+
+        let config = BacktestConfig::default();
+        let _result = backtest(&candles, "grid", &params, &config);
+        // No panic = pass
+    }
+
+    #[test]
+    fn grid_backtest_produces_trades_on_oscillating() {
+        // Grid strategy should trade well on oscillating data
+        let candles = oscillating_candles(300, 100.0, 15.0);
+        let params: HashMap<String, f64> = [
+            ("grids".into(), 5.0),
+            ("lookback".into(), 20.0),
+        ]
+        .into_iter()
+        .collect();
+
+        let config = BacktestConfig::default();
+        let result = backtest(&candles, "grid", &params, &config);
+        assert!(result.is_some(), "grid backtest on oscillating data should produce trades");
+        let m = result.unwrap();
+        assert!(m.total_trades > 0);
     }
 }

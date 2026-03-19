@@ -1131,6 +1131,172 @@ impl Strategy for BollingerStrategy {
 }
 
 // ══════════════════════════════════════════════════════════════
+// Bollinger 均值回归策略 — 价格触及下轨+RSI低 做多，触及上轨+RSI高 做空
+// 止损止盈用 ATR 倍数，中轨止盈
+// ══════════════════════════════════════════════════════════════
+
+struct BollingerRevPosition {
+    side: Side,
+    sl: f64,
+    tp: f64,
+}
+
+pub struct BollingerReversionStrategy {
+    pub symbol: String,
+    pub order_qty: f64,
+    bb_period: usize,
+    bb_std: f64,
+    rsi_period: usize,
+    atr_period: usize,
+    atr_sl_mult: f64,
+    atr_tp_mult: f64,
+    closes: Vec<f64>,
+    highs: Vec<f64>,
+    lows: Vec<f64>,
+    pos: Option<BollingerRevPosition>,
+}
+
+impl BollingerReversionStrategy {
+    pub fn new(symbol: &str, order_qty: f64) -> Self {
+        Self {
+            symbol: symbol.to_string(),
+            order_qty,
+            bb_period: 20,
+            bb_std: 2.0,
+            rsi_period: 14,
+            atr_period: 14,
+            atr_sl_mult: 2.0,
+            atr_tp_mult: 1.5,
+            closes: Vec::new(),
+            highs: Vec::new(),
+            lows: Vec::new(),
+            pos: None,
+        }
+    }
+
+    pub fn from_params(symbol: &str, order_qty: f64, params: &HashMap<String, f64>) -> Self {
+        Self {
+            symbol: symbol.to_string(),
+            order_qty,
+            bb_period: params.get("bb_period").copied().unwrap_or(20.0) as usize,
+            bb_std: params.get("bb_std").copied().unwrap_or(2.0),
+            rsi_period: params.get("rsi_period").copied().unwrap_or(14.0) as usize,
+            atr_period: params.get("atr_period").copied().unwrap_or(14.0) as usize,
+            atr_sl_mult: params.get("atr_sl_mult").copied().unwrap_or(2.0),
+            atr_tp_mult: params.get("atr_tp_mult").copied().unwrap_or(1.5),
+            closes: Vec::new(),
+            highs: Vec::new(),
+            lows: Vec::new(),
+            pos: None,
+        }
+    }
+}
+
+impl Strategy for BollingerReversionStrategy {
+    fn export_state(&self) -> serde_json::Value {
+        serde_json::json!({
+            "closes": self.closes,
+            "highs": self.highs,
+            "lows": self.lows,
+        })
+    }
+
+    fn restore_state(&mut self, state: &serde_json::Value) {
+        if let Some(arr) = state.get("closes").and_then(|v| v.as_array()) {
+            self.closes = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        if let Some(arr) = state.get("highs").and_then(|v| v.as_array()) {
+            self.highs = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        if let Some(arr) = state.get("lows").and_then(|v| v.as_array()) {
+            self.lows = arr.iter().filter_map(|v| v.as_f64()).collect();
+        }
+        tracing::info!(candles = self.closes.len(), "BollingerReversion state restored");
+    }
+
+    fn on_candle(&mut self, candle: &Candle) -> Option<Signal> {
+        self.closes.push(candle.close);
+        self.highs.push(candle.high);
+        self.lows.push(candle.low);
+
+        let n = self.closes.len();
+        let warmup = self.bb_period.max(self.rsi_period + 1).max(self.atr_period + 1);
+        if n < warmup {
+            return Some(Signal::None);
+        }
+
+        // Bollinger Bands
+        let (upper, middle, lower) = clawchat_shared::indicators::bollinger_bands(
+            &self.closes, self.bb_period, self.bb_std,
+        )?;
+
+        let rsi = rsi_from_slice(&self.closes, self.rsi_period)?;
+        let atr = atr_from_slices(&self.highs, &self.lows, &self.closes, self.atr_period)?;
+
+        // 持仓中：ATR 止损或止盈
+        if let Some(ref pos) = self.pos {
+            let exit = match pos.side {
+                Side::Buy => candle.close <= pos.sl || candle.close >= pos.tp,
+                Side::Sell => candle.close >= pos.sl || candle.close <= pos.tp,
+            };
+            if exit {
+                let side = match pos.side {
+                    Side::Buy => Side::Sell,
+                    Side::Sell => Side::Buy,
+                };
+                self.pos = None;
+                return Some(Signal::Order(OrderRequest {
+                    symbol: self.symbol.clone(),
+                    side,
+                    order_type: OrderType::Market,
+                    qty: self.order_qty,
+                    price: None,
+                }));
+            }
+            return Some(Signal::None);
+        }
+
+        // 做多：价格触及下轨 + RSI < 35（超卖均值回归买入）
+        if candle.close <= lower && rsi < 35.0 {
+            self.pos = Some(BollingerRevPosition {
+                side: Side::Buy,
+                sl: candle.close - atr * self.atr_sl_mult,
+                tp: middle + atr * self.atr_tp_mult,
+            });
+            return Some(Signal::Order(OrderRequest {
+                symbol: self.symbol.clone(),
+                side: Side::Buy,
+                order_type: OrderType::Market,
+                qty: self.order_qty,
+                price: None,
+            }));
+        }
+
+        // 做空：价格触及上轨 + RSI > 65（超买均值回归卖出）
+        if candle.close >= upper && rsi > 65.0 {
+            self.pos = Some(BollingerRevPosition {
+                side: Side::Sell,
+                sl: candle.close + atr * self.atr_sl_mult,
+                tp: middle - atr * self.atr_tp_mult,
+            });
+            return Some(Signal::Order(OrderRequest {
+                symbol: self.symbol.clone(),
+                side: Side::Sell,
+                order_type: OrderType::Market,
+                qty: self.order_qty,
+                price: None,
+            }));
+        }
+
+        Some(Signal::None)
+    }
+
+    fn name(&self) -> &str {
+        "BollingerReversion"
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
 // MACD 策略 — MACD(12,26,9) 金叉死叉 + EMA 趋势过滤 + ATR 移动止损
 // ══════════════════════════════════════════════════════════════
 

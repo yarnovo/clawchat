@@ -27,6 +27,10 @@ pub struct StrategyFile {
     pub min_volume: Option<f64>,
     pub min_spread_bps: Option<f64>,
     pub min_depth_usd: Option<f64>,
+    /// 资金模式: "fixed"（固定金额，默认）| "percent"（按 portfolio equity 百分比）
+    pub capital_mode: Option<String>,
+    /// percent 模式下的百分比（如 2.0 = 2%）
+    pub capital_pct: Option<f64>,
     pub status: Option<String>,
     /// 运行模式: "dry-run" (默认) | "live"
     pub mode: Option<String>,

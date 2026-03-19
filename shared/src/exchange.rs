@@ -47,6 +47,19 @@ pub struct OrderResponse {
     pub side: String,
 }
 
+/// Position risk data from /fapi/v2/positionRisk (non-zero positions only).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PositionRisk {
+    pub symbol: String,
+    pub position_amt: f64,
+    pub entry_price: f64,
+    pub mark_price: f64,
+    pub unrealized_profit: f64,
+    /// "LONG" / "SHORT" / "BOTH"
+    pub position_side: String,
+    pub leverage: u32,
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum ExchangeError {
     #[error("HTTP error: {0}")]
@@ -184,6 +197,32 @@ impl Exchange {
         let resp = self
             .client
             .post(&url)
+            .header("X-MBX-APIKEY", &self.api_key)
+            .send()
+            .await?;
+
+        let body: serde_json::Value = resp.json().await?;
+        if let Some(code) = body.get("code").and_then(|c| c.as_i64()) {
+            if code != 200 && code != 0 {
+                let msg = body["msg"].as_str().unwrap_or("unknown").to_string();
+                return Err(ExchangeError::Api { code, msg });
+            }
+        }
+        Ok(body)
+    }
+
+    pub async fn signed_delete(
+        &self,
+        path: &str,
+        params: &[(&str, String)],
+    ) -> Result<serde_json::Value, ExchangeError> {
+        let qs = self.signed_query(params)?;
+        let url = format!("{}{path}?{qs}", self.base_url);
+        tracing::debug!("DELETE {url}");
+
+        let resp = self
+            .client
+            .delete(&url)
             .header("X-MBX-APIKEY", &self.api_key)
             .send()
             .await?;
@@ -359,6 +398,79 @@ impl Exchange {
     }
 
     // ── Account & Position queries ─────────────────────────────
+
+    /// Fetch position risk for all symbols (or a specific symbol) via /fapi/v2/positionRisk.
+    /// Returns only positions with non-zero positionAmt.
+    pub async fn get_position_risk(
+        &self,
+        symbol: Option<&str>,
+    ) -> Result<Vec<PositionRisk>, ExchangeError> {
+        let params: Vec<(&str, String)> = match symbol {
+            Some(s) => vec![("symbol", s.to_string())],
+            None => vec![],
+        };
+        let body = self.signed_get("/fapi/v2/positionRisk", &params).await?;
+        let arr = body.as_array().cloned().unwrap_or_default();
+
+        let mut positions = Vec::new();
+        for item in arr {
+            let symbol = item.get("symbol").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let position_amt: f64 = item
+                .get("positionAmt")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0.0);
+            if position_amt.abs() < f64::EPSILON {
+                continue;
+            }
+            let entry_price: f64 = item
+                .get("entryPrice")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0.0);
+            let mark_price: f64 = item
+                .get("markPrice")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0.0);
+            let unrealized_profit: f64 = item
+                .get("unRealizedProfit")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0.0);
+            let position_side = item
+                .get("positionSide")
+                .and_then(|v| v.as_str())
+                .unwrap_or("BOTH")
+                .to_string();
+            let leverage: u32 = item
+                .get("leverage")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(1);
+
+            positions.push(PositionRisk {
+                symbol,
+                position_amt,
+                entry_price,
+                mark_price,
+                unrealized_profit,
+                position_side,
+                leverage,
+            });
+        }
+        Ok(positions)
+    }
+
+    /// Cancel all open orders for the current symbol.
+    pub async fn cancel_all_open_orders(&self, symbol: &str) -> Result<serde_json::Value, ExchangeError> {
+        let params = [("symbol", symbol.to_string())];
+        if self.dry_run {
+            tracing::info!("[DRY RUN] cancel_all_open_orders symbol={symbol}");
+            return Ok(serde_json::json!({"dryRun": true, "symbol": symbol}));
+        }
+        self.signed_delete("/fapi/v1/allOpenOrders", &params).await
+    }
 
     pub async fn get_account(&self) -> Result<serde_json::Value, ExchangeError> {
         self.signed_get("/fapi/v2/account", &[]).await

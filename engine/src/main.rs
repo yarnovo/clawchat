@@ -21,7 +21,7 @@ use tracing::{error, info, warn};
 
 use clawchat_shared::account::{AccountConfig, PortfolioConfig};
 use clawchat_shared::data::DataStore;
-use clawchat_shared::exchange::Exchange;
+use clawchat_shared::exchange::{Exchange, PositionRisk};
 use clawchat_shared::logging::init_logging;
 use clawchat_shared::paths;
 use clawchat_shared::risk::RiskConfig;
@@ -36,9 +36,9 @@ use hft_engine::order_router::OrderRouter;
 use hft_engine::risk::EngineRiskGuard;
 use hft_engine::state::{EngineState, TradeStats};
 use hft_engine::strategy::{
-    BollingerStrategy, BreakoutStrategy, CandleAggregator, GridStrategy, MACDStrategy,
-    MarketMaker, MeanReversionStrategy, RSIStrategy, ScalpingStrategy, Signal, Strategy,
-    TrendFollower,
+    BollingerReversionStrategy, BollingerStrategy, BreakoutStrategy, CandleAggregator,
+    GridStrategy, MACDStrategy, MarketMaker, MeanReversionStrategy, RSIStrategy,
+    ScalpingStrategy, Signal, Strategy, TrendFollower,
 };
 use hft_engine::trade::{decision_gate_allows_signal, TradeAction, TradeOverride};
 use hft_engine::types::{OrderType as StratOrderType, PositionSide, Side as StratSide};
@@ -203,6 +203,10 @@ fn create_strategy_instance(
         "bollinger" => {
             if has_params { Box::new(BollingerStrategy::from_params(symbol, order_qty, params)) }
             else { Box::new(BollingerStrategy::new(symbol, order_qty)) }
+        }
+        "bollinger_reversion" => {
+            if has_params { Box::new(BollingerReversionStrategy::from_params(symbol, order_qty, params)) }
+            else { Box::new(BollingerReversionStrategy::new(symbol, order_qty)) }
         }
         "macd" => {
             if has_params { Box::new(MACDStrategy::from_params(symbol, order_qty, params)) }
@@ -1215,6 +1219,175 @@ fn save_state(
     state.save(path);
 }
 
+// ── Startup reconciliation ─────────────────────────────────────
+
+/// Reconcile ledger virtual positions against exchange real positions.
+/// Fixes any discrepancies (ghost positions, missing positions, qty mismatches)
+/// and logs all differences to records/reconcile_events.jsonl.
+async fn reconcile_positions(exchange: &Exchange, ledger: &mut Ledger) {
+    info!("starting position reconciliation with exchange");
+
+    // 1. Fetch real positions from exchange
+    let exchange_positions = match exchange.get_position_risk(None).await {
+        Ok(positions) => positions,
+        Err(e) => {
+            error!("reconciliation failed: cannot fetch positionRisk: {e}");
+            return;
+        }
+    };
+
+    // Build a map of exchange positions: symbol → Vec<PositionRisk>
+    let mut exchange_map: HashMap<String, Vec<PositionRisk>> = HashMap::new();
+    for pos in &exchange_positions {
+        exchange_map
+            .entry(pos.symbol.clone())
+            .or_default()
+            .push(pos.clone());
+    }
+
+    info!(
+        exchange_positions = exchange_positions.len(),
+        "fetched exchange positions for reconciliation"
+    );
+
+    let mut events: Vec<serde_json::Value> = Vec::new();
+    let ts = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+
+    // 2. Check ledger positions against exchange
+    // Collect all ledger positions first to avoid borrow issues
+    let mut ledger_positions: Vec<(String, String, String, f64)> = Vec::new(); // (strategy, symbol, side, qty)
+    for alloc in ledger.all_strategies() {
+        for (symbol, vp) in &alloc.positions {
+            ledger_positions.push((
+                alloc.strategy_name.clone(),
+                symbol.clone(),
+                vp.side.clone(),
+                vp.qty,
+            ));
+        }
+    }
+
+    // Track which exchange symbols we've matched
+    let mut matched_exchange_symbols: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    for (strategy_name, symbol, side, qty) in &ledger_positions {
+        let exchange_amt = exchange_map
+            .get(symbol)
+            .map(|positions| {
+                positions.iter().map(|p| p.position_amt).sum::<f64>()
+            })
+            .unwrap_or(0.0);
+
+        matched_exchange_symbols.insert(symbol.clone());
+
+        let expected_amt = if side == "long" { *qty } else { -qty };
+
+        if exchange_amt.abs() < f64::EPSILON {
+            // Ghost position: ledger has it, exchange doesn't
+            warn!(
+                strategy = %strategy_name,
+                symbol = %symbol,
+                ledger_side = %side,
+                ledger_qty = %qty,
+                "RECONCILE: ghost position — clearing from ledger"
+            );
+            events.push(serde_json::json!({
+                "ts": ts,
+                "type": "ghost_position",
+                "strategy": strategy_name,
+                "symbol": symbol,
+                "ledger_side": side,
+                "ledger_qty": qty,
+                "action": "cleared_from_ledger"
+            }));
+
+            // Clear from ledger
+            if let Some(alloc) = ledger.get_mut(strategy_name) {
+                alloc.positions.remove(symbol);
+                alloc.recalc_unrealized();
+            }
+        } else if (exchange_amt - expected_amt).abs() > f64::EPSILON * 100.0 {
+            // Quantity mismatch
+            warn!(
+                strategy = %strategy_name,
+                symbol = %symbol,
+                ledger_amt = expected_amt,
+                exchange_amt = exchange_amt,
+                "RECONCILE: position qty mismatch — adjusting to exchange"
+            );
+            events.push(serde_json::json!({
+                "ts": ts,
+                "type": "qty_mismatch",
+                "strategy": strategy_name,
+                "symbol": symbol,
+                "ledger_amt": expected_amt,
+                "exchange_amt": exchange_amt,
+                "action": "adjusted_to_exchange"
+            }));
+
+            // Adjust ledger to match exchange
+            if let Some(alloc) = ledger.get_mut(strategy_name) {
+                if let Some(pos) = alloc.positions.get_mut(symbol) {
+                    let new_side = if exchange_amt > 0.0 { "long" } else { "short" };
+                    pos.side = new_side.to_string();
+                    pos.qty = exchange_amt.abs();
+                    // Update entry price from exchange if available
+                    if let Some(ex_positions) = exchange_map.get(symbol) {
+                        if let Some(ex_pos) = ex_positions.first() {
+                            pos.entry_price = ex_pos.entry_price;
+                        }
+                    }
+                }
+                alloc.recalc_unrealized();
+            }
+        }
+    }
+
+    // 3. Check for unrecorded exchange positions (exchange has, ledger doesn't)
+    for (symbol, ex_positions) in &exchange_map {
+        if matched_exchange_symbols.contains(symbol) {
+            continue;
+        }
+        let total_amt: f64 = ex_positions.iter().map(|p| p.position_amt).sum();
+        if total_amt.abs() < f64::EPSILON {
+            continue;
+        }
+
+        warn!(
+            symbol = %symbol,
+            exchange_amt = total_amt,
+            "RECONCILE: unrecorded position on exchange — no matching ledger strategy"
+        );
+        events.push(serde_json::json!({
+            "ts": ts,
+            "type": "unrecorded_position",
+            "symbol": symbol,
+            "exchange_amt": total_amt,
+            "entry_price": ex_positions.first().map(|p| p.entry_price).unwrap_or(0.0),
+            "action": "logged_only"
+        }));
+    }
+
+    // 4. Write reconciliation events to records/reconcile_events.jsonl
+    if !events.is_empty() {
+        let log_path = paths::records_dir().join("reconcile_events.jsonl");
+        if let Some(parent) = log_path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&log_path) {
+            for event in &events {
+                let _ = writeln!(file, "{}", event);
+            }
+        }
+        warn!(
+            discrepancies = events.len(),
+            "reconciliation complete — discrepancies found and logged"
+        );
+    } else {
+        info!("reconciliation complete — all positions match");
+    }
+}
+
 // ════════════════════════════════════════════════════════════════
 // ██  MAIN  ██
 // ════════════════════════════════════════════════════════════════
@@ -1327,6 +1500,19 @@ async fn main() {
             pc.allocated_capital,
             pc.reserve.unwrap_or(0.0),
         );
+    }
+
+    // 5b. Startup reconciliation — compare ledger with exchange real positions
+    {
+        let reconcile_exchange = Exchange::new(
+            api_key.clone(),
+            api_secret.clone(),
+            base_url.clone(),
+            false,
+        );
+        reconcile_positions(&reconcile_exchange, &mut ledger).await;
+        // Save reconciled ledger immediately
+        let _ = ledger.save(&ledger_path);
     }
 
     // Per-portfolio risk paths and trade overrides
@@ -1609,6 +1795,12 @@ async fn main() {
 
     // Save initial ledger
     let _ = order_router.ledger().save(&ledger_path);
+
+    // Setup graceful shutdown signal handler (SIGTERM + SIGINT)
+    let mut sigterm = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        .expect("failed to register SIGTERM handler");
+    let mut sigint = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::interrupt())
+        .expect("failed to register SIGINT handler");
 
     info!("engine running, {} strategies active", runtimes.len());
 
@@ -2250,8 +2442,50 @@ async fn main() {
                     }
                 }
             }
+
+            // Graceful shutdown on SIGTERM
+            _ = sigterm.recv() => {
+                warn!("received SIGTERM, initiating graceful shutdown");
+                break;
+            }
+
+            // Graceful shutdown on SIGINT
+            _ = sigint.recv() => {
+                warn!("received SIGINT, initiating graceful shutdown");
+                break;
+            }
         }
     }
+
+    // ── Graceful shutdown sequence ─────────────────────────────
+    info!("shutting down: saving ledger");
+    let _ = order_router.ledger().save(&ledger_path);
+
+    // Cancel all open orders on exchange for each symbol
+    info!("shutting down: canceling open orders");
+    let cancel_exchange = Exchange::new(
+        api_key.clone(),
+        api_secret.clone(),
+        base_url.clone(),
+        false,
+    );
+    let mut canceled_symbols = std::collections::HashSet::new();
+    for rt in runtimes.values() {
+        if canceled_symbols.insert(rt.symbol.clone()) {
+            match cancel_exchange.clone()
+                .with_symbol(&rt.symbol)
+                .cancel_all_open_orders(&rt.symbol)
+                .await
+            {
+                Ok(_) => info!(symbol = %rt.symbol, "canceled open orders"),
+                Err(e) => warn!(symbol = %rt.symbol, "failed to cancel open orders: {e}"),
+            }
+        }
+    }
+
+    // Final ledger save
+    let _ = order_router.ledger().save(&ledger_path);
+    info!("graceful shutdown complete");
 }
 
 // ── Tests ──────────────────────────────────────────────────────

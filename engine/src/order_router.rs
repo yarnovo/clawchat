@@ -3,9 +3,11 @@
 use std::collections::HashMap;
 
 use crate::global_risk::{GlobalRiskGuard, GlobalRiskVerdict};
-use crate::ledger::Ledger;
+use crate::ledger::{CapitalMode, Ledger};
 use crate::risk::EngineRiskGuard;
 use clawchat_shared::exchange::Exchange;
+use clawchat_shared::risk::RiskConfig;
+use clawchat_shared::volatility::vol_leverage_multiplier;
 
 // ── Signal / Update types ───────────────────────────────────────
 
@@ -22,6 +24,12 @@ pub struct StrategySignal {
     pub price: f64,
     /// true = open, false = close
     pub is_open: bool,
+    /// 资金模式
+    pub capital_mode: CapitalMode,
+    /// percent 模式下的百分比
+    pub capital_pct: f64,
+    /// 当前波动率百分位（0-100），None 表示未计算
+    pub vol_percentile: Option<f64>,
 }
 
 /// Filled order update (from ORDER_TRADE_UPDATE).
@@ -43,6 +51,7 @@ pub struct OrderRouter {
     pub ledger: Ledger,
     pub global_risk: GlobalRiskGuard,
     strategy_guards: HashMap<String, EngineRiskGuard>,
+    risk_configs: HashMap<String, RiskConfig>,
 }
 
 impl OrderRouter {
@@ -51,12 +60,18 @@ impl OrderRouter {
             ledger,
             global_risk,
             strategy_guards: HashMap::new(),
+            risk_configs: HashMap::new(),
         }
     }
 
     /// Register a per-strategy risk guard.
     pub fn add_strategy_guard(&mut self, name: &str, guard: EngineRiskGuard) {
         self.strategy_guards.insert(name.to_string(), guard);
+    }
+
+    /// Register a per-strategy risk config (for dynamic leverage lookup).
+    pub fn add_risk_config(&mut self, name: &str, config: RiskConfig) {
+        self.risk_configs.insert(name.to_string(), config);
     }
 
     /// Handle a strategy signal: validate, check risk, compute qty, place order.
@@ -81,13 +96,21 @@ impl OrderRouter {
             0.0, // funding rate can be injected later
         )?;
 
-        // 2. Virtual account balance check
+        // 2. Virtual account balance check + dynamic quota
         let alloc = self
             .ledger
             .get(strategy_name)
             .ok_or_else(|| format!("strategy allocation not found: {strategy_name}"))?;
-        let equity = alloc.virtual_equity();
-        if equity <= 0.0 {
+
+        let portfolio_equity = self.ledger.portfolio_equity_for_strategy(strategy_name);
+
+        let effective_capital = alloc.effective_capital(
+            signal.capital_mode,
+            signal.capital_pct,
+            portfolio_equity,
+        );
+
+        if effective_capital <= 0.0 {
             return Err("虚拟账户余额不足".into());
         }
 
@@ -100,9 +123,29 @@ impl OrderRouter {
             }
         }
 
-        // 4. Compute order quantity: equity * position_size * leverage / price
+        // 4. Compute effective leverage (volatility-aware)
+        let mut effective_leverage = signal.leverage as f64;
+        if let Some(risk_cfg) = self.risk_configs.get(strategy_name) {
+            if risk_cfg.dynamic_leverage {
+                if let Some(pct) = signal.vol_percentile {
+                    let multiplier = vol_leverage_multiplier(pct, &risk_cfg.vol_multipliers);
+                    effective_leverage *= multiplier;
+                    // Cap at max_leverage
+                    effective_leverage = effective_leverage.min(risk_cfg.max_leverage as f64);
+                    tracing::info!(
+                        strategy = strategy_name,
+                        vol_percentile = pct,
+                        multiplier,
+                        effective_leverage,
+                        "dynamic leverage applied"
+                    );
+                }
+            }
+        }
+
+        // 5. Compute order quantity: effective_capital * position_size * leverage / price
         let qty = if signal.price > 0.0 {
-            equity * signal.position_size * signal.leverage as f64 / signal.price
+            effective_capital * signal.position_size * effective_leverage / signal.price
         } else {
             return Err("price must be > 0".into());
         };
@@ -111,7 +154,7 @@ impl OrderRouter {
             return Err("computed qty <= 0".into());
         }
 
-        // 5. Place order on exchange
+        // 6. Place order on exchange
         let side_enum = if is_long {
             clawchat_shared::types::Side::Buy
         } else {
@@ -127,7 +170,7 @@ impl OrderRouter {
 
         match result {
             Ok(_resp) => {
-                // 6. Update virtual ledger
+                // 7. Update virtual ledger
                 if signal.is_open {
                     if let Some(a) = self.ledger.get_mut(strategy_name) {
                         a.open_position(&signal.symbol, &signal.side, qty, signal.price, 0.0);
@@ -227,6 +270,9 @@ mod tests {
             leverage: 5,
             price: 50.0,
             is_open: true,
+            capital_mode: CapitalMode::Fixed,
+            capital_pct: 0.0,
+            vol_percentile: None,
         };
 
         // Can't use async in sync test without runtime, so test the balance check directly
@@ -282,5 +328,77 @@ mod tests {
         let alloc = router.ledger.get("test").unwrap();
         assert!((alloc.realized_pnl - 5.0).abs() < f64::EPSILON);
         assert!((alloc.fees_paid - 0.02).abs() < f64::EPSILON);
+    }
+
+    // ── 浮动配额测试 ──────────────────────────────────────────
+
+    #[test]
+    fn effective_capital_fixed_mode() {
+        let alloc = crate::ledger::StrategyAllocation::new("test", 100.0);
+        let cap = alloc.effective_capital(CapitalMode::Fixed, 0.0, 1000.0);
+        assert!((cap - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn effective_capital_percent_mode() {
+        let alloc = crate::ledger::StrategyAllocation::new("test", 100.0);
+        // 2% of 1000 = 20
+        let cap = alloc.effective_capital(CapitalMode::Percent, 2.0, 1000.0);
+        assert!((cap - 20.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn effective_capital_percent_capped_at_10() {
+        let alloc = crate::ledger::StrategyAllocation::new("test", 100.0);
+        // 15% requested, capped to 10% of 1000 = 100
+        let cap = alloc.effective_capital(CapitalMode::Percent, 15.0, 1000.0);
+        assert!((cap - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn effective_capital_percent_scales_with_equity() {
+        let alloc = crate::ledger::StrategyAllocation::new("test", 100.0);
+        // 5% of 200 = 10
+        let cap1 = alloc.effective_capital(CapitalMode::Percent, 5.0, 200.0);
+        assert!((cap1 - 10.0).abs() < f64::EPSILON);
+        // 5% of 2000 = 100
+        let cap2 = alloc.effective_capital(CapitalMode::Percent, 5.0, 2000.0);
+        assert!((cap2 - 100.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn portfolio_equity_for_strategy_lookup() {
+        let mut ledger = Ledger::new(1000.0);
+        ledger.add_strategy("s1", 400.0);
+        ledger.add_strategy("s2", 600.0);
+        // s1 has 10 pnl: equity = 410 + 600 = 1010
+        ledger.get_mut("s1").unwrap().realized_pnl = 10.0;
+        let eq = ledger.portfolio_equity_for_strategy("s1");
+        assert!((eq - 1010.0).abs() < f64::EPSILON);
+    }
+
+    // ── 波动率感知杠杆测试 ────────────────────────────────────
+
+    #[test]
+    fn dynamic_leverage_not_applied_when_disabled() {
+        let router = make_router(100.0);
+        // Default RiskConfig has dynamic_leverage = false
+        let cfg = RiskConfig::default();
+        assert!(!cfg.dynamic_leverage);
+        // With no risk config registered, router won't adjust leverage
+        assert!(router.risk_configs.is_empty());
+    }
+
+    #[test]
+    fn dynamic_leverage_config_registered() {
+        let mut router = make_router(100.0);
+        let mut cfg = RiskConfig::default();
+        cfg.dynamic_leverage = true;
+        cfg.vol_multipliers = [1.3, 1.0, 0.7, 0.3];
+        router.add_risk_config("test", cfg);
+
+        let rc = router.risk_configs.get("test").unwrap();
+        assert!(rc.dynamic_leverage);
+        assert!((rc.vol_multipliers[0] - 1.3).abs() < f64::EPSILON);
     }
 }

@@ -56,6 +56,8 @@ pub enum StrategyType {
     Trend,
     Breakout,
     Rsi,
+    Grid,
+    Bollinger,
 }
 
 impl StrategyType {
@@ -84,6 +86,18 @@ impl StrategyType {
                 ParamSpec { name: "atr_sl_mult".into(), min: 1.0, max: 3.0, step: 0.5 },
                 ParamSpec { name: "atr_tp_mult".into(), min: 1.5, max: 4.0, step: 0.5 },
             ],
+            StrategyType::Grid => vec![
+                ParamSpec { name: "grids".into(), min: 5.0, max: 20.0, step: 5.0 },
+                ParamSpec { name: "lookback".into(), min: 20.0, max: 100.0, step: 20.0 },
+            ],
+            StrategyType::Bollinger => vec![
+                ParamSpec { name: "bb_period".into(), min: 10.0, max: 30.0, step: 2.0 },
+                ParamSpec { name: "bb_std".into(), min: 1.5, max: 3.0, step: 0.25 },
+                ParamSpec { name: "rsi_period".into(), min: 10.0, max: 20.0, step: 2.0 },
+                ParamSpec { name: "atr_period".into(), min: 10.0, max: 20.0, step: 5.0 },
+                ParamSpec { name: "atr_sl_mult".into(), min: 1.0, max: 3.0, step: 0.5 },
+                ParamSpec { name: "atr_tp_mult".into(), min: 1.0, max: 3.0, step: 0.5 },
+            ],
         }
     }
 
@@ -93,6 +107,8 @@ impl StrategyType {
             StrategyType::Trend => "default",
             StrategyType::Breakout => "breakout",
             StrategyType::Rsi => "rsi",
+            StrategyType::Grid => "grid",
+            StrategyType::Bollinger => "bollinger_reversion",
         }
     }
 
@@ -110,6 +126,11 @@ impl StrategyType {
                 let overbought = params.get("rsi_overbought").copied().unwrap_or(100.0);
                 oversold < overbought
             }
+            StrategyType::Grid => {
+                let grids = params.get("grids").copied().unwrap_or(5.0) as usize;
+                grids >= 2
+            }
+            StrategyType::Bollinger => true,
         }
     }
 
@@ -119,13 +140,15 @@ impl StrategyType {
             "trend" | "default" => Some(StrategyType::Trend),
             "breakout" => Some(StrategyType::Breakout),
             "rsi" => Some(StrategyType::Rsi),
+            "grid" => Some(StrategyType::Grid),
+            "bollinger" | "bollinger_reversion" => Some(StrategyType::Bollinger),
             _ => None,
         }
     }
 
     /// 所有类型
     pub fn all() -> Vec<Self> {
-        vec![StrategyType::Trend, StrategyType::Breakout, StrategyType::Rsi]
+        vec![StrategyType::Trend, StrategyType::Breakout, StrategyType::Rsi, StrategyType::Grid, StrategyType::Bollinger]
     }
 }
 
@@ -296,6 +319,14 @@ mod tests {
     }
 
     #[test]
+    fn grid_param_space_size_reasonable() {
+        let pg = ParamGenerator::new(StrategyType::Grid);
+        let total = pg.total_combinations();
+        assert!(total > 0);
+        assert!(total <= 50000, "total={total} exceeds 50000");
+    }
+
+    #[test]
     fn from_str_parses_correctly() {
         assert_eq!(StrategyType::from_str("trend"), Some(StrategyType::Trend));
         assert_eq!(StrategyType::from_str("default"), Some(StrategyType::Trend));
@@ -303,6 +334,10 @@ mod tests {
         assert_eq!(StrategyType::from_str("Breakout"), Some(StrategyType::Breakout));
         assert_eq!(StrategyType::from_str("rsi"), Some(StrategyType::Rsi));
         assert_eq!(StrategyType::from_str("RSI"), Some(StrategyType::Rsi));
+        assert_eq!(StrategyType::from_str("grid"), Some(StrategyType::Grid));
+        assert_eq!(StrategyType::from_str("Grid"), Some(StrategyType::Grid));
+        assert_eq!(StrategyType::from_str("bollinger"), Some(StrategyType::Bollinger));
+        assert_eq!(StrategyType::from_str("bollinger_reversion"), Some(StrategyType::Bollinger));
         assert_eq!(StrategyType::from_str("unknown"), None);
     }
 
@@ -311,11 +346,30 @@ mod tests {
         assert_eq!(StrategyType::Trend.engine_name(), "default");
         assert_eq!(StrategyType::Breakout.engine_name(), "breakout");
         assert_eq!(StrategyType::Rsi.engine_name(), "rsi");
+        assert_eq!(StrategyType::Grid.engine_name(), "grid");
+        assert_eq!(StrategyType::Bollinger.engine_name(), "bollinger_reversion");
     }
 
     #[test]
-    fn all_returns_three_types() {
-        assert_eq!(StrategyType::all().len(), 3);
+    fn all_returns_five_types() {
+        assert_eq!(StrategyType::all().len(), 5);
+    }
+
+    #[test]
+    fn bollinger_param_space_size_reasonable() {
+        let pg = ParamGenerator::new(StrategyType::Bollinger);
+        let total = pg.total_combinations();
+        assert!(total > 0);
+        assert!(total <= 50000, "total={total} exceeds 50000");
+    }
+
+    #[test]
+    fn bollinger_generates_all_combos() {
+        // Bollinger has no constraints, so generated == total
+        let pg = ParamGenerator::new(StrategyType::Bollinger);
+        let combos = pg.generate();
+        let total = pg.total_combinations();
+        assert_eq!(combos.len(), total);
     }
 
     #[test]
