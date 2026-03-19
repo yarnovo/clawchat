@@ -53,11 +53,7 @@ const KEEPALIVE_MINUTES: u64 = 20;
 
 #[derive(Parser, Debug)]
 #[command(name = "hft-engine", about = "Multi-strategy trading engine")]
-struct Args {
-    /// Dry run mode
-    #[arg(long, env = "DRY_RUN", default_value_t = false)]
-    dry_run: bool,
-}
+struct Args {}
 
 // ── Per-strategy runtime state ─────────────────────────────────
 
@@ -75,6 +71,8 @@ struct StrategyRuntime {
     params: HashMap<String, f64>,
 
     // Runtime state
+    /// Per-strategy dry-run mode (true = log only, no orders)
+    dry_run: bool,
     trade_override: TradeOverride,
     risk_config: RiskConfig,
     risk_guard: EngineRiskGuard,
@@ -237,10 +235,9 @@ async fn start_user_data_stream(
     api_key: String,
     api_secret: String,
     base_url: String,
-    dry_run: bool,
     user_tx: broadcast::Sender<UserEvent>,
 ) {
-    let exchange = Exchange::new(api_key, api_secret, base_url, dry_run);
+    let exchange = Exchange::new(api_key, api_secret, base_url, false);
 
     let mut retry_delay = std::time::Duration::from_secs(1);
     let max_delay = std::time::Duration::from_secs(30);
@@ -812,6 +809,24 @@ async fn execute_signal(
 ) {
     let Signal::Order(req) = signal else { return };
 
+    // Per-strategy dry-run: log signal, skip order
+    if rt.dry_run {
+        let side_str = match req.side {
+            StratSide::Buy => "buy",
+            StratSide::Sell => "sell",
+        };
+        info!(
+            strategy = %rt.name,
+            symbol = %rt.symbol,
+            side = side_str,
+            price = rt.last_price,
+            mode = "dry-run",
+            "signal logged (dry-run, no order placed)"
+        );
+        log_signal(&rt.name, signal, rt.last_price, &serde_json::json!({"dry_run": true}), false);
+        return;
+    }
+
     let qty = compute_order_qty(
         rt.capital,
         rt.sizing_mode,
@@ -1086,7 +1101,7 @@ fn save_state(
 
 #[tokio::main]
 async fn main() {
-    let args = Args::parse();
+    let _args = Args::parse();
 
     // 0. Load .env
     let _ = dotenvy::dotenv();
@@ -1101,15 +1116,13 @@ async fn main() {
     let portfolio_path = paths::portfolio_dir("binance-main", "main").join("portfolio.json");
     let portfolio = PortfolioConfig::load(&portfolio_path).expect("failed to load portfolio.json");
 
-    let dry_run = args.dry_run;
     let total_capital = portfolio.allocated_capital;
 
     info!(
         account = %account.name,
         portfolio = %portfolio.name,
         capital = total_capital,
-        dry_run,
-        "engine starting"
+        "engine starting (per-strategy mode)"
     );
 
     // 3. Scan approved strategies
@@ -1218,6 +1231,8 @@ async fn main() {
         let sizing_mode_str = sf.sizing_mode.as_deref().unwrap_or("percent");
         let sizing_mode = if sizing_mode_str == "fixed" { SizingMode::Fixed } else { SizingMode::Percent };
 
+        let strategy_dry_run = sf.is_dry_run();
+
         runtimes.insert(
             name.to_string(),
             StrategyRuntime {
@@ -1231,6 +1246,7 @@ async fn main() {
                 order_qty: sf.order_qty,
                 engine_strategy,
                 params,
+                dry_run: strategy_dry_run,
                 trade_override,
                 risk_config,
                 risk_guard,
@@ -1239,6 +1255,12 @@ async fn main() {
                 last_funding_rate: 0.0,
                 last_funding_log_nft: 0,
             },
+        );
+
+        info!(
+            name,
+            mode = if strategy_dry_run { "dry-run" } else { "live" },
+            "strategy mode"
         );
     }
 
@@ -1328,7 +1350,7 @@ async fn main() {
         let ask = api_secret.clone();
         let bu = base_url.clone();
         tokio::spawn(async move {
-            start_user_data_stream(ak, ask, bu, dry_run, tx).await;
+            start_user_data_stream(ak, ask, bu, tx).await;
         });
     }
 
@@ -1357,7 +1379,7 @@ async fn main() {
             api_key.clone(),
             api_secret.clone(),
             base_url.clone(),
-            dry_run,
+            false,
         )
         .with_symbol(&rt.symbol)
         .with_order_id_prefix(&format!("{}-{}", name, rt.symbol));
@@ -1368,7 +1390,7 @@ async fn main() {
             api_key.clone(),
             api_secret.clone(),
             base_url.clone(),
-            dry_run,
+            false,
         )
         .with_symbol(&rt.symbol);
 
@@ -1674,8 +1696,23 @@ async fn main() {
             Some(change) = config_rx.recv() => {
                 match change {
                     ConfigChange::Strategy(name) => {
-                        if runtimes.contains_key(&name) {
-                            info!(strategy = %name, "signal.json changed — note: worker restart not yet implemented, will apply on next engine restart");
+                        if let Some(rt) = runtimes.get_mut(&name) {
+                            // Hot-reload mode from signal.json
+                            let signal_path = rt.dir.join("signal.json");
+                            if let Ok(sf) = StrategyFile::load(&signal_path) {
+                                let new_dry_run = sf.is_dry_run();
+                                if new_dry_run != rt.dry_run {
+                                    let old_mode = if rt.dry_run { "dry-run" } else { "live" };
+                                    let new_mode = if new_dry_run { "dry-run" } else { "live" };
+                                    info!(
+                                        strategy = %name,
+                                        old_mode, new_mode,
+                                        "strategy mode changed (hot-reload)"
+                                    );
+                                    rt.dry_run = new_dry_run;
+                                }
+                            }
+                            info!(strategy = %name, "signal.json reloaded");
                         } else {
                             // Existing strategy modified but not in runtimes — might have
                             // been changed to approved. Treat like NewStrategy.
@@ -1739,7 +1776,7 @@ async fn main() {
                                             api_key.clone(),
                                             api_secret.clone(),
                                             base_url.clone(),
-                                            dry_run,
+                                            false,
                                         )
                                         .with_symbol(&symbol)
                                         .with_order_id_prefix(&format!("{}-{}", name, symbol));
@@ -1750,7 +1787,7 @@ async fn main() {
                                                 api_key.clone(),
                                                 api_secret.clone(),
                                                 base_url.clone(),
-                                                dry_run,
+                                                false,
                                             )
                                             .with_symbol(&symbol);
                                             let name_c = name.clone();
@@ -1804,6 +1841,7 @@ async fn main() {
                                         }
 
                                         // Insert runtime
+                                        let strategy_dry_run = sf.is_dry_run();
                                         runtimes.insert(
                                             name.clone(),
                                             StrategyRuntime {
@@ -1817,6 +1855,7 @@ async fn main() {
                                                 order_qty: sf.order_qty,
                                                 engine_strategy,
                                                 params,
+                                                dry_run: strategy_dry_run,
                                                 trade_override,
                                                 risk_config,
                                                 risk_guard,
@@ -1833,6 +1872,7 @@ async fn main() {
                                         info!(
                                             strategy = %name, symbol = %symbol,
                                             capital, leverage,
+                                            mode = if strategy_dry_run { "dry-run" } else { "live" },
                                             "new strategy fully loaded"
                                         );
                                     }

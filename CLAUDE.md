@@ -40,9 +40,12 @@ cargo run -p clawchat-ops -- --help
 - 内容：经验、发现、观察（不是待办，待办放 issues/）
 - 例：`notes/2026-03-19-agentmail-api.md` — AgentMail 发送 endpoint 和参数格式
 
-**requirements/** — 需求文档。loop 进程发现需要新功能时写入，或用 `/requirement` 技能创建。
-- 格式：`requirements/{日期}-{功能名}.md`
-- 来源：loop 进程发现能力缺失时自动创建、用户提出新需求时创建
+**requirements/** — 需求文档，用文件夹管理状态。
+- `requirements/open/` — 待实现
+- `requirements/closed/` — 已实现
+- 格式：`{日期}-{功能名}.md`
+- 新需求写到 `open/`，实现后移到 `closed/`
+- 来源：loop 进程发现能力缺失时写入，engineer 定时消化实现
 
 **discovered/** — 待审批策略（发现引擎产出）
 **records/** — 交易/风控/PnL 记录（引擎写入）

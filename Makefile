@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 export BASH_ENV := .env
 
-.PHONY: build hft hft-dry autopilot status watcher report-engine report-daily report-weekly data-engine data-backfill data-status data-validate discover discover-scan discover-status start-data stop-data status-data start-engine stop-engine status-engine start-all stop-all status-all install clean test help
+.PHONY: build hft autopilot status watcher report-engine report-daily report-weekly data-engine data-backfill data-status data-validate discover discover-scan discover-status start-data stop-data status-data start-engine stop-engine status-engine start-all stop-all status-all install clean test help
 
 # === Build ===
 
@@ -10,11 +10,8 @@ build: ## Build all binaries (release)
 
 # === Engine (Rust) ===
 
-hft: ## Run multi-strategy engine (all approved strategies)
+hft: ## Run multi-strategy engine (per-strategy mode from signal.json)
 	cargo run --release -p hft-engine
-
-hft-dry: ## Run engine in dry-run mode (no real orders)
-	cargo run --release -p hft-engine -- --dry-run
 
 # === Autopilot (Rust) ===
 
@@ -100,18 +97,12 @@ status-data: ## Check data engine status
 		echo "❌ 数据引擎未运行"; \
 	fi
 
-start-engine: ## Start trading engine in background (dry-run default, use MODE=live for real trading)
+start-engine: ## Start trading engine in background (per-strategy mode from signal.json)
 	@mkdir -p .pid logs
 	@if [ -f .pid/engine.pid ] && kill -0 $$(cat .pid/engine.pid) 2>/dev/null; then \
 		echo "交易引擎已在运行 (PID $$(cat .pid/engine.pid))"; \
 	else \
-		if [ "$(MODE)" = "live" ]; then \
-			echo "⚠️  正式模式启动..."; \
-			nohup cargo run --release -p hft-engine > logs/engine.log 2>&1 & \
-		else \
-			echo "🔒 dry-run 模式启动（不下单）..."; \
-			nohup cargo run --release -p hft-engine -- --dry-run > logs/engine.log 2>&1 & \
-		fi; \
+		nohup cargo run --release -p hft-engine > logs/engine.log 2>&1 & \
 		echo $$! > .pid/engine.pid; \
 		echo "交易引擎已启动 (PID $$!)"; \
 		echo "日志: logs/engine.log"; \
@@ -140,7 +131,7 @@ status-engine: ## Check trading engine status
 
 # === Phase 3: 一键管理 ===
 
-start-all: ## Start all services (data + engine dry-run)
+start-all: ## Start all services (data + engine)
 	@$(MAKE) start-data
 	@sleep 2
 	@$(MAKE) start-engine

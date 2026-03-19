@@ -1,4 +1,8 @@
 {
-  "max_drawdown_warning": 0.1,
-  "max_drawdown_stop": 0.2
+  "max_loss_per_trade": 0.05,
+  "max_profit_per_trade": 0.35,
+  "max_daily_loss": 0.15,
+  "max_leverage": 5,
+  "max_drawdown_stop": 0.25,
+  "funding_rate_limit": 0.001
 }

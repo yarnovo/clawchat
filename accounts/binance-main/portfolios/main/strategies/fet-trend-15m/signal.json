@@ -25,6 +25,7 @@
     "profit_factor": 1.89
   },
   "status": "approved",
+  "mode": "dry-run",
   "lifecycle": {
     "created": "2026-03-19",
     "last_review": "2026-03-18"

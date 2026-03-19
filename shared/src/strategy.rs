@@ -28,6 +28,8 @@ pub struct StrategyFile {
     pub min_spread_bps: Option<f64>,
     pub min_depth_usd: Option<f64>,
     pub status: Option<String>,
+    /// 运行模式: "dry-run" (默认) | "live"
+    pub mode: Option<String>,
     #[serde(default)]
     pub backtest: Option<BacktestData>,
     #[serde(default)]
@@ -85,6 +87,11 @@ impl StrategyFile {
             .collect()
     }
 
+    /// 是否为 dry-run 模式（默认 true）
+    pub fn is_dry_run(&self) -> bool {
+        self.mode.as_deref().unwrap_or("dry-run") != "live"
+    }
+
     /// 获取交易方向
     pub fn trade_direction(&self) -> TradeDirection {
         self.trade_direction
@@ -136,5 +143,55 @@ mod tests {
 
         assert!(count > 0, "no signal.json files found in {}", strategies_dir.display());
         eprintln!("validated {count} signal.json files");
+    }
+
+    #[test]
+    fn is_dry_run_defaults_to_true() {
+        let sf: StrategyFile = serde_json::from_str(r#"{"params":{}}"#).unwrap();
+        assert!(sf.is_dry_run());
+    }
+
+    #[test]
+    fn is_dry_run_explicit_dry_run() {
+        let sf: StrategyFile = serde_json::from_str(r#"{"mode":"dry-run","params":{}}"#).unwrap();
+        assert!(sf.is_dry_run());
+    }
+
+    #[test]
+    fn is_dry_run_live_mode() {
+        let sf: StrategyFile = serde_json::from_str(r#"{"mode":"live","params":{}}"#).unwrap();
+        assert!(!sf.is_dry_run());
+    }
+
+    #[test]
+    fn mode_field_roundtrip() {
+        let sf: StrategyFile = serde_json::from_str(r#"{"mode":"live","params":{}}"#).unwrap();
+        let json = serde_json::to_string(&sf).unwrap();
+        let reparsed: StrategyFile = serde_json::from_str(&json).unwrap();
+        assert_eq!(sf.mode, reparsed.mode);
+        assert!(!reparsed.is_dry_run());
+    }
+
+    #[test]
+    fn all_signal_json_have_mode() {
+        let strategies_dir = crate::paths::strategies_dir();
+        if !strategies_dir.exists() {
+            return;
+        }
+        for entry in std::fs::read_dir(&strategies_dir).unwrap() {
+            let entry = entry.unwrap();
+            let path = entry.path().join("signal.json");
+            if !path.exists() {
+                continue;
+            }
+            let sf: StrategyFile = serde_json::from_str(
+                &std::fs::read_to_string(&path).unwrap()
+            ).unwrap();
+            assert!(
+                sf.mode.is_some(),
+                "signal.json missing mode field: {}",
+                path.display()
+            );
+        }
     }
 }

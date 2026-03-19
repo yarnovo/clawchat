@@ -28,6 +28,7 @@
     "validation_sharpe": 6.8
   },
   "status": "approved",
+  "mode": "dry-run",
   "lifecycle": {
     "discovered_at": "2026-03-19",
     "discovery_engine": "v1"

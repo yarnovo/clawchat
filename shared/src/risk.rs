@@ -176,6 +176,44 @@ impl RiskConfig {
     }
 }
 
+/// 根据策略类型返回对应的 risk.json 模板
+///
+/// - trend / default: 趋势跟踪，止盈高
+/// - breakout: 突破策略，止盈略低
+/// - rsi: 均值回归，止盈保守，回撤更紧
+pub fn risk_template_for_strategy(engine_strategy: &str) -> RiskConfig {
+    match engine_strategy {
+        "breakout" => RiskConfig {
+            max_loss_per_trade: 0.05,
+            max_profit_per_trade: 0.30,
+            max_daily_loss: 0.15,
+            max_leverage: 5,
+            max_drawdown_stop: 0.25,
+            funding_rate_limit: Some(0.001),
+            ..Default::default()
+        },
+        "rsi" => RiskConfig {
+            max_loss_per_trade: 0.05,
+            max_profit_per_trade: 0.15,
+            max_daily_loss: 0.12,
+            max_leverage: 5,
+            max_drawdown_stop: 0.20,
+            funding_rate_limit: Some(0.001),
+            ..Default::default()
+        },
+        // trend / default / 其他
+        _ => RiskConfig {
+            max_loss_per_trade: 0.05,
+            max_profit_per_trade: 0.35,
+            max_daily_loss: 0.15,
+            max_leverage: 5,
+            max_drawdown_stop: 0.25,
+            funding_rate_limit: Some(0.001),
+            ..Default::default()
+        },
+    }
+}
+
 // ── 纯函数风控检查 ─────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -382,6 +420,37 @@ mod tests {
         let strategy_path = dir.path().join("nonexistent.json");
         let cfg = RiskConfig::load_merged(&portfolio_path, &strategy_path);
         assert_eq!(cfg.max_leverage, 5);
+    }
+
+    #[test]
+    fn risk_template_trend() {
+        let cfg = risk_template_for_strategy("default");
+        assert!((cfg.max_profit_per_trade - 0.35).abs() < f64::EPSILON);
+        assert!((cfg.max_daily_loss - 0.15).abs() < f64::EPSILON);
+        assert_eq!(cfg.max_leverage, 5);
+        assert!((cfg.max_drawdown_stop - 0.25).abs() < f64::EPSILON);
+        assert!((cfg.funding_rate_limit.unwrap() - 0.001).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn risk_template_breakout() {
+        let cfg = risk_template_for_strategy("breakout");
+        assert!((cfg.max_profit_per_trade - 0.30).abs() < f64::EPSILON);
+        assert!((cfg.max_drawdown_stop - 0.25).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn risk_template_rsi() {
+        let cfg = risk_template_for_strategy("rsi");
+        assert!((cfg.max_profit_per_trade - 0.15).abs() < f64::EPSILON);
+        assert!((cfg.max_daily_loss - 0.12).abs() < f64::EPSILON);
+        assert!((cfg.max_drawdown_stop - 0.20).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn risk_template_unknown_uses_trend() {
+        let cfg = risk_template_for_strategy("some_new_type");
+        assert!((cfg.max_profit_per_trade - 0.35).abs() < f64::EPSILON);
     }
 
     /// 读取 strategies/ 下所有 risk.json 并验证反序列化 + roundtrip

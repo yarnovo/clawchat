@@ -21,10 +21,11 @@
     "sharpe": 5.05,
     "max_drawdown_pct": 12.94,
     "trades": 40,
-    "win_rate": 0.500,
+    "win_rate": 0.5,
     "profit_factor": 1.82
   },
   "status": "pending",
+  "mode": "dry-run",
   "lifecycle": {
     "created": "2026-03-19"
   }

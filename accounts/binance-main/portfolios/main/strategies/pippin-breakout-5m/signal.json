@@ -23,5 +23,6 @@
     "profit_factor": 1.44
   },
   "status": "suspended",
+  "mode": "dry-run",
   "suspend_reason": "profit_factor=1.44 (need >2)"
 }

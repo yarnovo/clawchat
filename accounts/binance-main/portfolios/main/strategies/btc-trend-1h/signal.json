@@ -17,13 +17,14 @@
   },
   "backtest": {
     "days": 14,
-    "return_pct": 5.90,
+    "return_pct": 5.9,
     "sharpe": 3.34,
     "max_drawdown_pct": 3.87,
     "trades": 2,
-    "win_rate": 0.50,
+    "win_rate": 0.5,
     "profit_factor": 3.31
   },
   "status": "suspended",
+  "mode": "dry-run",
   "suspend_reason": "return=5.9% (need >20%), sharpe=3.34 (need >5), trades=2 (need >=10), win_rate=50% (need >50%)"
 }

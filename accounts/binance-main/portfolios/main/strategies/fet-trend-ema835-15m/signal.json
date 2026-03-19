@@ -24,6 +24,7 @@
   },
   "position_size": 0.3,
   "status": "approved",
+  "mode": "dry-run",
   "symbol": "FETUSDT",
   "timeframe": "15m",
   "timeframe_ms": 900000

@@ -14,7 +14,7 @@
   },
   "backtest": {
     "days": 14,
-    "return_pct": 41.30,
+    "return_pct": 41.3,
     "sharpe": 8.08,
     "max_drawdown_pct": 19.54,
     "trades": 39,
@@ -22,6 +22,7 @@
     "profit_factor": 2.07
   },
   "status": "suspended",
-  "suspend_reason": "30天回测不达标：回撤33.11%(>20%), 夏普4.90(<5), 胜率42.3%(<45%)",
+  "mode": "dry-run",
+  "suspend_reason": "30\u5929\u56de\u6d4b\u4e0d\u8fbe\u6807\uff1a\u56de\u64a433.11%(>20%), \u590f\u666e4.90(<5), \u80dc\u738742.3%(<45%)",
   "approved_date": "2026-03-18"
 }

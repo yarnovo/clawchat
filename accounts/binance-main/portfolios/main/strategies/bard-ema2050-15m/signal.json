@@ -25,8 +25,9 @@
     "profit_factor": 6.03
   },
   "status": "suspended",
+  "mode": "dry-run",
   "lifecycle": {
     "created": "2026-03-19"
   },
-  "suspend_reason": "胜率50%(需>50%)"
+  "suspend_reason": "\u80dc\u738750%(\u9700>50%)"
 }

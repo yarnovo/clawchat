@@ -25,6 +25,7 @@
     "profit_factor": 2.41
   },
   "status": "suspended",
-  "suspend_reason": "14天回测不达标",
+  "mode": "dry-run",
+  "suspend_reason": "14\u5929\u56de\u6d4b\u4e0d\u8fbe\u6807",
   "approved_date": "2026-03-18"
 }

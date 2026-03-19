@@ -24,6 +24,7 @@
   },
   "position_size": 0.3,
   "status": "approved",
+  "mode": "dry-run",
   "symbol": "SUIUSDT",
   "timeframe": "5m",
   "timeframe_ms": 300000

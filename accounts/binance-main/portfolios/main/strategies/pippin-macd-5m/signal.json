@@ -18,13 +18,14 @@
   "backtest": {
     "days": 14,
     "return_pct": 104.33,
-    "sharpe": 23.70,
+    "sharpe": 23.7,
     "max_drawdown_pct": 13.32,
     "trades": 27,
     "win_rate": 0.519,
     "profit_factor": 4.49
   },
   "status": "suspended",
-  "suspend_reason": "14天回测不达标",
+  "mode": "dry-run",
+  "suspend_reason": "14\u5929\u56de\u6d4b\u4e0d\u8fbe\u6807",
   "approved_date": "2026-03-18"
 }

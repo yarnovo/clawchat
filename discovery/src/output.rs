@@ -1,5 +1,6 @@
 use crate::selector::CandidateResult;
 use clawchat_shared::config_util::timeframe_to_ms;
+use clawchat_shared::risk::risk_template_for_strategy;
 use serde_json::json;
 use std::path::Path;
 
@@ -26,6 +27,12 @@ pub fn write_strategy_files(
 
         std::fs::create_dir_all(&dir)?;
         std::fs::write(dir.join("signal.json"), json_str)?;
+
+        // 根据策略类型生成 risk.json
+        let risk = risk_template_for_strategy(&candidate.strategy_type);
+        let risk_str = serde_json::to_string_pretty(&risk)?;
+        std::fs::write(dir.join("risk.json"), risk_str)?;
+
         created.push(name);
     }
 
@@ -266,6 +273,14 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&contents).unwrap();
         assert_eq!(parsed["name"], "ntrn-trend-ema1852-5m");
         assert_eq!(parsed["status"], "pending");
+
+        // risk.json also generated with trend template (engine_strategy=default)
+        let risk_file = tmp.path().join("ntrn-trend-ema1852-5m/risk.json");
+        assert!(risk_file.exists());
+        let risk: clawchat_shared::risk::RiskConfig =
+            serde_json::from_str(&std::fs::read_to_string(&risk_file).unwrap()).unwrap();
+        assert!((risk.max_profit_per_trade - 0.35).abs() < f64::EPSILON);
+        assert_eq!(risk.max_leverage, 5);
     }
 
     // 4. 已存在的策略目录不被覆盖

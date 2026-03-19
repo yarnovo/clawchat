@@ -18,10 +18,11 @@
     "sharpe": 21.11,
     "max_drawdown_pct": 8.16,
     "trades": 30,
-    "win_rate": 0.50,
+    "win_rate": 0.5,
     "profit_factor": 5.39
   },
   "status": "suspended",
-  "suspend_reason": "14天回测不达标",
+  "mode": "dry-run",
+  "suspend_reason": "14\u5929\u56de\u6d4b\u4e0d\u8fbe\u6807",
   "approved_date": "2026-03-18"
 }

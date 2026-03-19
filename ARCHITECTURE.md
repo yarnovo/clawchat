@@ -335,7 +335,7 @@ Account (物理): binance-main, $222
 ```bash
 # 交易引擎
 make hft                    # 启动（单进程，所有 approved 策略）
-make hft-dry                # Dry-run 模式
+                            # 每策略按 signal.json 的 mode 字段独立控制 dry-run/live
 
 # 数据引擎
 make data-engine            # 启动实时 K 线采集

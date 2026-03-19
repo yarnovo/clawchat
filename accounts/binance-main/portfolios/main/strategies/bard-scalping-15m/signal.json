@@ -23,5 +23,6 @@
     "profit_factor": 3.26
   },
   "status": "suspended",
+  "mode": "dry-run",
   "suspend_reason": "trades<20"
 }
