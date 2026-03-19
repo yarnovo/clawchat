@@ -1,236 +1,207 @@
 ---
 name: team
-description: 启动运营 — quant 团队 + 双 Rust 引擎（交易+调控）+ 全自动链路
+description: 启动运营团队 — /loop 心跳 + schedule.json 调度 + 成员常驻执行
 user-invocable: true
 ---
 
 # 启动运营团队
 
-`/team` 一键启动全自动量化交易系统：quant 团队 + autopilot 调控 + 守护进程。
+创建常驻团队，/loop 心跳驱动，schedule.json 控制各任务频率。
 
-## 全自动链路
+## KPI 目标
 
-```
-quant × N 回测找策略 → strategies/{name}/ (signal.json + risk.json + autopilot.json)
-                                ↓ status=approved 自动
-strategy_watcher → 启动 hft-engine --config signal.json
-                                ↓ 自动
-hft-engine 统一管道：策略信号 → trade override → risk gate → 执行下单
-                                ↑ autopilot 算法自动写
-autopilot 监听 state.json → 评估规则 → 写 trade.json / 调 risk.json / 调 position_size
-```
-
-## 引擎架构
-
-### hft-engine（交易引擎，每策略一个实例）
-
-```
-signal.json 信号 → SignalFilter → DecisionGate(trade.json) → RiskGate(risk.json) → Executor → 币安 API
-```
-
-### autopilot（调控引擎，全局一个实例）
-
-```
-state.json 变化 → 规则评估(autopilot.json) → 写 trade.json / 改 risk.json / 改 signal.json
-```
-
-两个引擎都用 notify crate 监听文件变化，毫秒级响应。
-
-## 团队架构
-
-```
-         ┌─────────────┐
-         │  交易总监     │
-         │ (team-lead)  │
-         │ 管理 + 运维   │
-         └──────┬──────┘
-                │
-     ┌──────┬───┴───┬──────┐
-     ▼      ▼       ▼      ▼
-   quant  quant2  engineer  devops
-   量化    量化    开发      运维
-```
-
-> **team-lead = 总监**：review 策略、approve、管理 quant 团队、运维引擎代码。
-> **autopilot 取代了** trader（手动 trade.json）和 risk（手动 risk.json）。
-
-## 成员职责
-
-| 成员 | 产出 | 说明 |
+| 指标 | 目标 | 红线 |
 |------|------|------|
-| **quant** × N | 策略研发：跑回测找策略 + 写 signal.json + risk.json + **autopilot.json** | 核心产出角色，按需多个并行 |
-| **engineer** | Rust 引擎 + Python CLI 代码实现 | 等 team-lead 派技术任务 |
-| **devops** | 引擎监控、异常修复、日志排查、重启 | 引擎稳定运行 |
+| 周增长 | +10% | — |
+| 月增长 | +50% | — |
+| 最大回撤 | — | -10% |
 
-> **同类角色默认多个**：quant 按需创建多个并行工作（quant、quant2、quant3...），name 用纯字母数字。
+**team-lead 的核心职责是达成 KPI。** 所有调度决策围绕这个目标：
+- 收益不达预期 → 加快策略发现频率、审视策略表现、调整配额
+- 回撤接近红线 → 减仓、暂停弱策略、收紧风控
+- 一切正常 → 保持节奏，持续优化
 
-## 策略配置
-
-格式规范见 [/strategy-config skill](/strategy-config skill)。
-
-### 目录结构
-
-```
-strategies/
-└── {name}/
-    ├── signal.json      ← hft-engine 读
-    ├── risk.json        ← hft-engine RiskGate 读
-    ├── autopilot.json   ← autopilot 读（quant 设计调控参数）
-    ├── trade.json       ← autopilot 写（自动调控指令）
-    ├── state.json       ← 引擎写（运行时状态）
-    └── backtest.md      ← 回测报告
-```
-
-### 状态流转
+## 架构
 
 ```
-quant 产出 signal.json + risk.json + autopilot.json (status=pending)
-  → team-lead review 回测数据
-  → team-lead 改 status=approved
-  → watcher 自动启动引擎
-  → autopilot 自动监控 + 调控
+/loop 10m 心跳
+  │
+  ├── 读 schedule.json（运维级）
+  ├── 读 accounts/binance-main/schedule.json（业务级）
+  ├── 读 records/schedule_state.json（上次执行时间）
+  │
+  ├── health_check 到期？ → SendMessage monitor
+  ├── patrol 到期？      → SendMessage monitor
+  ├── discover 到期？    → SendMessage quant
+  ├── evaluate 到期？    → SendMessage analyst
+  │
+  ├── 更新 records/schedule_state.json
+  └── 汇总异常通知用户（无异常静默）
 ```
 
-**quant 只能写 status=pending，不能直接写 approved。** team-lead review 达标后才改 approved。
+## 执行流程
 
-### 准入标准
+### Step 1: 确保引擎运行
 
-定义在 `cli/src/clawchat/criteria.py`（唯一源头），文档见 `/strategy-config skill`。**不要在其他地方重复定义标准数字。**
-
-## 风控体系
-
-### 五层防护
-
-```
-第 1 层：hft-engine SignalFilter（信号过滤）
-第 2 层：hft-engine RiskGate（风控检查 + 高水位保护）
-第 3 层：autopilot 算法调控（暂停/缩仓/停机）
-第 4 层：交易所 STOP_MARKET 条件单（安全网）
-第 5 层：交易所强平（最后防线）
+```bash
+make status-all
 ```
 
-### autopilot 调控能力
-
-| 功能 | 触发条件 | 动作 |
-|------|---------|------|
-| 暂停 | 连续亏 N 笔 / 日亏损超限 | 写 trade.json pause |
-| 自动恢复 | 暂停 N 分钟后 | 写 trade.json resume |
-| 缩仓 | 连续亏 N 笔 | 改 signal.json position_size ↓ |
-| 扩仓 | 连续赢 N 笔 | 改 signal.json position_size ↑ |
-| 停机 | 总亏损超限 / 持续亏损超时 | 改 status=suspended |
-| 风控调节 | 盈利时收紧 / 亏损时放宽 | 改 risk.json trailing_stop |
-
-参数由 quant 在 autopilot.json 中设计（每个策略不同）。
-
-## 执行
-
-### Step 1: 创建团队
+### Step 2: 创建团队 + 启动成员
 
 ```
 TeamCreate(team_name="clawchat")
 ```
 
-用 Agent 工具并行创建成员（bypassPermissions, run_in_background）：
+并行启动 3 个常驻成员（team_name="clawchat"）：
 
-**quant spawn prompt 要点：**
-- 检查 strategies/ 已有策略 + `make scan` 扫描市场
-- 格式规范见 /strategy-config skill
-- 产出策略写 **status=pending**（不能写 approved，由 team-lead review 后批准）
-- **risk.json 由你决定**：止盈止损阈值根据策略特性设不同值（scalping 紧、趋势宽）
-- **autopilot.json 由你设计**：调控参数根据策略特性设不同值，规范见 /strategy-config skill
-- 需要技术支持告诉 team-lead，engineer 会实现
-- **spawn prompt 不要重复写准入标准**，指向 criteria.py
-
-**engineer spawn prompt 要点：**
-- `make build` 编译引擎（含 autopilot）+ 检查系统
-- 等待 team-lead 派发技术任务
-- **不要修改 TODO.md**，完成任务向 team-lead 汇报
-- 代码改动必须同步更新 /strategy-config skill 文档
-
-**所有成员 spawn prompt 通用规则：**
-- 不要修改 TODO.md（只有 team-lead 维护）
-- 不要 git commit（只有 team-lead review 后提交）
-- 不要修改其他成员的文件
-- 完成任务向 team-lead 汇报，等待验收
-- **配置/标准/规则只在一处定义，其他地方引用，不重复写**
-
-### Step 2: 启动守护进程
-
-```bash
-# 策略监听（自动上架/下架引擎）
-nohup make watcher > /tmp/strategy-watcher.log 2>&1 &
-
-# autopilot 调控引擎（算法自动控制）
-nohup make autopilot > /tmp/autopilot.log 2>&1 &
-
-# hft-engine 由 watcher 自动启动（每策略一个实例）
-```
-
-### Step 3: 确认资金
-
-```bash
-make account                          # 查余额
-make transfer AMOUNT=197              # 现货→合约划转（如需）
-```
-
-### Step 4: 验证全局状态
-
-```bash
-make status   # 一屏看全局
-```
-
-确认引擎、autopilot、watcher 全部运行，账户有余额。
-
-### Step 5: 启动心跳循环
+#### quant — 策略发现员
 
 ```
-/loop 1m 心跳：团队管理
+name: quant
+prompt:
+你是 ClawChat 的策略发现员。常驻待命，收到 team-lead 消息后执行。
+
+收到"执行策略发现"时，先分析再搜索，不要盲扫：
+
+**Phase 1: 分析（决定搜什么）**
+1. 读 accounts/.../strategies/*/signal.json 统计当前组合：各币种几个策略、各策略类型分布
+2. 读 records/ledger.json 看各策略 PnL：哪类策略在赚钱、哪类在亏
+3. 读 data/*.parquet 最近 7 天行情：哪个币在趋势、哪个在震荡、哪个波动大
+4. 看 KPI 差距：本周增长够不够 10%？需要激进还是保守？
+5. 基于分析生成 search.json：
+   - 缺策略的币种 → 重点搜
+   - 已有 4 个策略的币种 → 不搜
+   - 趋势行情 → 搜 trend，震荡行情 → 搜 rsi
+   - 赚钱的策略类型 → 精细搜索（小 step），不赚的 → 跳过
+   - 控制总组合数 < 50000
+
+**Phase 2: 执行搜索**
+6. 清理 discovered/ 旧文件
+7. 运行 cargo run --release -p discovery -- scan --config search.json
+8. 如果没有 search.json（首次），用默认: --strategy trend --symbol 缺策略的币 --days 90
+
+**Phase 3: 预审上线**
+9. 预审候选（冲突/配额/相似度）
+10. 通过的直接自动上线（status=approved、分配 capital、生成 risk.json、搬到 accounts/.../strategies/）
+11. SendMessage 向 team-lead 汇报：分析了什么、搜了什么、发现了什么、上线了什么
+
+**Phase 4: 记录**
+12. 写 notes/ 记录本次分析和发现经验
+
+背景：读 CLAUDE.md 和 ARCHITECTURE.md。配置用法见 /ref-discovery。不要 git commit。
 ```
 
-## 心跳 — 交易总监的团队管理循环
-
-心跳是 team-lead 的核心工作，每 1 分钟一轮。重点是**管理 quant 团队 + 运维系统**。
-
-### 每轮做什么
+#### monitor — 系统监控员
 
 ```
-1. make status — 看全局状态（引擎/持仓/PnL/autopilot）
-2. 读 TODO.md — 检查待办进度
-3. 空闲 quant 派活：
-   ├─ quant 空闲 → 派跑回测找新策略
-   ├─ quant 产出 → review 回测数据 + approve
-   ├─ engineer 空闲 → 派 TODO 里下一个技术任务
-   └─ devops 空闲 → 派运维检查
-4. 系统检查：
-   ├─ autopilot 异常 → devops 排查
-   ├─ 引擎异常 → devops 排查
-   └─ 成员汇报完成 → review + 验收
+name: monitor
+prompt:
+你是 ClawChat 的系统监控员。常驻待命，收到 team-lead 消息后执行。
+
+收到"执行健康检查"时（轻量，< 10 秒）：
+1. 检查 hft-engine / data-engine 进程是否在跑
+2. 检查 data/ 最后更新时间
+3. 检查 logs/ 最新日志有无 ERROR
+4. SendMessage 向 team-lead 汇报
+
+收到"执行巡逻"时（深度）：
+1. 健康检查的全部内容 +
+2. 读 records/ledger.json 检查回撤（注意 total_capital 是配额不是物理总资金）
+3. 各策略回撤：>= 15% 黄灯，>= 25% 红灯
+4. 检查 issues/ 未处理问题
+5. SendMessage 向 team-lead 汇报
+6. 有异常写 issues/
+
+背景：读 CLAUDE.md。不要 git commit。
 ```
 
-**不再手动判断加减仓** — autopilot 自动处理。team-lead 专注于：找策略、review、运维。
+#### analyst — 策略分析师
 
-## TODO 管理
+```
+name: analyst
+prompt:
+你是 ClawChat 的策略分析师。常驻待命，收到 team-lead 消息后执行。
 
-**TODO.md 只有 team-lead 维护**，成员不能直接修改。
+收到"执行策略评估"时：
+1. 运行 cargo run --release -p report-engine -- daily
+2. 读 records/ledger.json 分析各策略 PnL 和回撤
+3. 对每个策略给建议：继续/观察/减配/下线
+4. SendMessage 向 team-lead 汇报
+5. 发现问题写 issues/，发现需求写 requirements/
 
-## Code Review
+背景：读 CLAUDE.md。不要 git commit。
+```
 
-quant 提交策略后，team-lead 必须验证：
-- `make backtest` 亲自跑一遍确认回测数据真实
-- 对比 signal.json 的 backtest 字段和实际输出是否一致
-- **不能信 backtest 字段的数据，必须自己验证**
-- 检查 autopilot.json 参数是否合理
+### Step 3: 启动心跳
 
-## 常用命令
+```
+/loop 10m 心跳调度
+```
 
-```bash
-# CLI 量化分析工具
-make status                 # 全局状态面板
-make scan                   # 扫描市场
+### 心跳调度逻辑
 
-# Rust 引擎
-make build                  # 编译所有（hft-engine + autopilot）
-make hft                    # 运行交易引擎
-make autopilot              # 运行调控引擎
-make watcher                # 策略监听
+每次心跳执行以下逻辑：
+
+```
+1. 读取调度配置
+   - schedule.json（运维级任务）
+   - accounts/binance-main/schedule.json（业务级任务）
+   - 合并为一个任务列表
+
+2. 读取 records/schedule_state.json（各任务上次执行时间）
+   - 文件不存在则视为全部任务从未执行
+
+3. 对每个任务检查是否到期
+   - 当前时间 - last_run >= interval_min → 到期
+   - 到期的任务并行 SendMessage 给对应 member
+
+4. 发送消息格式
+   - health_check → SendMessage monitor: "执行健康检查"
+   - patrol → SendMessage monitor: "执行巡逻"
+   - discover → SendMessage quant: "执行策略发现"
+   - evaluate → SendMessage analyst: "执行策略评估"
+
+5. 更新 records/schedule_state.json 的 last_run
+
+6. 等待成员汇报，汇总结果
+   - 有异常 → 通知用户
+   - 无异常且无重要结果 → 静默（不打扰用户）
+```
+
+## 调度配置
+
+**schedule.json**（项目根目录，运维级）：
+```json
+{
+  "health_check": { "interval_min": 60, "member": "monitor" },
+  "patrol": { "interval_min": 240, "member": "monitor" }
+}
+```
+
+**accounts/binance-main/schedule.json**（账户级，业务级）：
+```json
+{
+  "discover": { "interval_min": 1440, "member": "quant" },
+  "evaluate": { "interval_min": 1440, "member": "analyst" }
+}
+```
+
+**records/schedule_state.json**（运行时状态，自动生成）：
+```json
+{
+  "health_check": { "last_run": "2026-03-19T06:00:00Z" },
+  "patrol": { "last_run": "2026-03-19T04:00:00Z" },
+  "discover": { "last_run": "2026-03-19T00:00:00Z" },
+  "evaluate": { "last_run": "2026-03-19T00:00:00Z" }
+}
+```
+
+用户可以随时改 schedule.json 的 interval_min 调整频率，下次心跳自动生效。
+
+## 关闭团队
+
+```
+向每个成员发送 shutdown_request
+TeamDelete
 ```

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["shared", "engine", "autopilot", "cli", "data-engine", "discovery", "report-engine"]
+members = ["shared", "engine", "autopilot", "ops", "data-engine", "discovery", "report-engine"]
 
 [workspace.package]
 version = "0.1.0"

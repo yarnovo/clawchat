@@ -1,8 +1,37 @@
+use serde::Deserialize;
 use std::collections::HashMap;
 
 /// 参数维度定义
 pub struct ParamSpec {
-    pub name: &'static str,
+    pub name: String,
+    pub min: f64,
+    pub max: f64,
+    pub step: f64,
+}
+
+/// 搜索配置（从 JSON 反序列化）
+#[derive(Debug, Deserialize)]
+pub struct SearchConfig {
+    pub strategy: String,
+    pub symbols: Vec<String>,
+    #[serde(default = "default_days")]
+    pub days: u32,
+    #[serde(default = "default_timeframes")]
+    pub timeframes: Vec<String>,
+    pub params: HashMap<String, ParamRange>,
+}
+
+fn default_days() -> u32 {
+    90
+}
+
+fn default_timeframes() -> Vec<String> {
+    vec!["5m".to_string()]
+}
+
+/// 参数范围定义
+#[derive(Debug, Deserialize)]
+pub struct ParamRange {
     pub min: f64,
     pub max: f64,
     pub step: f64,
@@ -34,26 +63,26 @@ impl StrategyType {
     pub fn param_space(&self) -> Vec<ParamSpec> {
         match self {
             StrategyType::Trend => vec![
-                ParamSpec { name: "ema_fast", min: 8.0, max: 34.0, step: 2.0 },
-                ParamSpec { name: "ema_slow", min: 34.0, max: 120.0, step: 4.0 },
-                ParamSpec { name: "atr_period", min: 10.0, max: 20.0, step: 5.0 },
-                ParamSpec { name: "atr_sl_mult", min: 1.0, max: 3.0, step: 0.5 },
-                ParamSpec { name: "atr_tp_mult", min: 1.5, max: 4.0, step: 0.5 },
+                ParamSpec { name: "ema_fast".into(), min: 8.0, max: 34.0, step: 2.0 },
+                ParamSpec { name: "ema_slow".into(), min: 34.0, max: 120.0, step: 4.0 },
+                ParamSpec { name: "atr_period".into(), min: 10.0, max: 20.0, step: 5.0 },
+                ParamSpec { name: "atr_sl_mult".into(), min: 1.0, max: 3.0, step: 0.5 },
+                ParamSpec { name: "atr_tp_mult".into(), min: 1.5, max: 4.0, step: 0.5 },
             ],
             StrategyType::Breakout => vec![
-                ParamSpec { name: "lookback", min: 10.0, max: 40.0, step: 2.0 },
-                ParamSpec { name: "atr_period", min: 10.0, max: 20.0, step: 2.0 },
-                ParamSpec { name: "atr_filter", min: 0.3, max: 1.0, step: 0.1 },
-                ParamSpec { name: "trail_atr", min: 1.5, max: 4.0, step: 0.5 },
+                ParamSpec { name: "lookback".into(), min: 10.0, max: 40.0, step: 2.0 },
+                ParamSpec { name: "atr_period".into(), min: 10.0, max: 20.0, step: 2.0 },
+                ParamSpec { name: "atr_filter".into(), min: 0.3, max: 1.0, step: 0.1 },
+                ParamSpec { name: "trail_atr".into(), min: 1.5, max: 4.0, step: 0.5 },
             ],
             StrategyType::Rsi => vec![
-                ParamSpec { name: "rsi_period", min: 10.0, max: 20.0, step: 2.0 },
-                ParamSpec { name: "rsi_oversold", min: 20.0, max: 35.0, step: 5.0 },
-                ParamSpec { name: "rsi_overbought", min: 65.0, max: 80.0, step: 5.0 },
-                ParamSpec { name: "trend_ema", min: 100.0, max: 200.0, step: 50.0 },
-                ParamSpec { name: "atr_period", min: 10.0, max: 20.0, step: 5.0 },
-                ParamSpec { name: "atr_sl_mult", min: 1.0, max: 3.0, step: 0.5 },
-                ParamSpec { name: "atr_tp_mult", min: 1.5, max: 4.0, step: 0.5 },
+                ParamSpec { name: "rsi_period".into(), min: 10.0, max: 20.0, step: 2.0 },
+                ParamSpec { name: "rsi_oversold".into(), min: 20.0, max: 35.0, step: 5.0 },
+                ParamSpec { name: "rsi_overbought".into(), min: 65.0, max: 80.0, step: 5.0 },
+                ParamSpec { name: "trend_ema".into(), min: 100.0, max: 200.0, step: 50.0 },
+                ParamSpec { name: "atr_period".into(), min: 10.0, max: 20.0, step: 5.0 },
+                ParamSpec { name: "atr_sl_mult".into(), min: 1.0, max: 3.0, step: 0.5 },
+                ParamSpec { name: "atr_tp_mult".into(), min: 1.5, max: 4.0, step: 0.5 },
             ],
         }
     }
@@ -115,6 +144,35 @@ impl ParamGenerator {
         }
     }
 
+    /// 从 SearchConfig 构建，用配置中的参数范围覆盖默认值
+    pub fn from_config(strategy_type: StrategyType, config: &SearchConfig) -> Self {
+        let default_specs = strategy_type.param_space();
+        let specs = if config.params.is_empty() {
+            default_specs
+        } else {
+            // 用配置覆盖默认参数，配置中没有的参数用默认值
+            default_specs
+                .into_iter()
+                .map(|spec| {
+                    if let Some(range) = config.params.get(&spec.name) {
+                        ParamSpec {
+                            name: spec.name,
+                            min: range.min,
+                            max: range.max,
+                            step: range.step,
+                        }
+                    } else {
+                        spec
+                    }
+                })
+                .collect()
+        };
+        Self {
+            strategy_type,
+            specs,
+        }
+    }
+
     /// 返回总组合数（过滤前）
     pub fn total_combinations(&self) -> usize {
         self.specs.iter().map(|s| s.count()).product()
@@ -123,7 +181,7 @@ impl ParamGenerator {
     /// 生成所有有效参数组合
     pub fn generate(&self) -> Vec<HashMap<String, f64>> {
         let all_values: Vec<Vec<f64>> = self.specs.iter().map(|s| s.values()).collect();
-        let names: Vec<&str> = self.specs.iter().map(|s| s.name).collect();
+        let names: Vec<&str> = self.specs.iter().map(|s| s.name.as_str()).collect();
 
         let mut results = Vec::new();
         let mut indices = vec![0usize; self.specs.len()];
@@ -259,5 +317,75 @@ mod tests {
         let combos = pg.generate();
         let total = pg.total_combinations();
         assert_eq!(combos.len(), total);
+    }
+
+    #[test]
+    fn search_config_deserialize() {
+        let json = r#"{
+            "strategy": "trend",
+            "symbols": ["NTRNUSDT", "BARDUSDT"],
+            "days": 60,
+            "timeframes": ["5m", "15m"],
+            "params": {
+                "ema_fast": { "min": 5, "max": 25, "step": 5 },
+                "ema_slow": { "min": 40, "max": 80, "step": 10 }
+            }
+        }"#;
+        let config: SearchConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.strategy, "trend");
+        assert_eq!(config.symbols.len(), 2);
+        assert_eq!(config.days, 60);
+        assert_eq!(config.timeframes.len(), 2);
+        assert_eq!(config.params.len(), 2);
+        assert_eq!(config.params["ema_fast"].min, 5.0);
+        assert_eq!(config.params["ema_fast"].max, 25.0);
+        assert_eq!(config.params["ema_fast"].step, 5.0);
+    }
+
+    #[test]
+    fn search_config_defaults() {
+        let json = r#"{
+            "strategy": "breakout",
+            "symbols": ["SUIUSDT"],
+            "params": {}
+        }"#;
+        let config: SearchConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.days, 90);
+        assert_eq!(config.timeframes, vec!["5m"]);
+    }
+
+    #[test]
+    fn from_config_overrides_params() {
+        let json = r#"{
+            "strategy": "trend",
+            "symbols": ["NTRNUSDT"],
+            "params": {
+                "ema_fast": { "min": 10, "max": 20, "step": 5 }
+            }
+        }"#;
+        let config: SearchConfig = serde_json::from_str(json).unwrap();
+        let pg = ParamGenerator::from_config(StrategyType::Trend, &config);
+        // ema_fast should have 3 values: 10, 15, 20
+        // Other params keep defaults
+        let combos = pg.generate();
+        assert!(!combos.is_empty());
+        // Check ema_fast values are within config range
+        for combo in &combos {
+            let fast = combo["ema_fast"];
+            assert!(fast >= 10.0 && fast <= 20.0, "ema_fast={fast} out of config range");
+        }
+    }
+
+    #[test]
+    fn from_config_empty_params_uses_defaults() {
+        let json = r#"{
+            "strategy": "trend",
+            "symbols": ["NTRNUSDT"],
+            "params": {}
+        }"#;
+        let config: SearchConfig = serde_json::from_str(json).unwrap();
+        let pg_config = ParamGenerator::from_config(StrategyType::Trend, &config);
+        let pg_default = ParamGenerator::new(StrategyType::Trend);
+        assert_eq!(pg_config.total_combinations(), pg_default.total_combinations());
     }
 }

@@ -130,6 +130,13 @@ clawchat/
 │       ├── config.rs                      #   autopilot 规则配置
 │       └── types.rs                       #   类型定义
 │
+├── ops/                                   # CLI 工具集（binary: clawchat）
+│   └── src/
+│       ├── main.rs                        #   入口 + 子命令定义
+│       ├── cmd/                           #   子命令实现
+│       ├── backtest/                      #   回测模块
+│       └── util.rs                        #   工具函数
+│
 ├── data/                                  # K 线数据（Parquet，.gitignore）
 ├── records/                               # 运行记录（.gitignore）
 │   ├── trades.jsonl                       #   全部交易日志

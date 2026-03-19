@@ -24,15 +24,15 @@ autopilot: ## Run autopilot (algorithm-driven trade control)
 # === CLI (Rust) ===
 
 status: ## Global status dashboard
-	cargo run --release -p clawchat -- status
+	cargo run --release -p clawchat-ops -- status
 
 watcher: ## Strategy watcher (auto deploy/stop engines)
-	cargo run --release -p clawchat -- watcher
+	cargo run --release -p clawchat-ops -- watcher
 
 # === Reports ===
 
 report-engine: ## Run report engine (daily/weekly scheduler)
-	cargo run --release -p clawchat -- report-engine
+	cargo run --release -p clawchat-ops -- report-engine
 
 report-daily: ## Generate daily report
 	cargo run --release -p report-engine -- daily

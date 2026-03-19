@@ -1,5 +1,5 @@
 ---
-name: loop-evaluate
+name: evaluate
 description: 策略评估 — 分析各策略表现，生成日报，建议加配/减配/下线。定时用法：/loop 24h /evaluate
 user-invocable: true
 ---

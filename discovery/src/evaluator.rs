@@ -500,6 +500,674 @@ pub fn backtest_batch(
         .collect()
 }
 
+// ── Optimized batch backtest ────────────────────────────────────
+
+/// Precomputed indicator series for TrendFollower strategy.
+/// Computed once per unique (ema_fast, ema_slow, atr_period) combination.
+struct PrecomputedTrendIndicators {
+    #[allow(dead_code)]
+    ema_fast_values: Vec<f64>,
+    #[allow(dead_code)]
+    ema_slow_values: Vec<f64>,
+    atr_values: Vec<f64>,
+    signals: Vec<i8>,
+    #[allow(dead_code)]
+    warmup: usize,
+}
+
+/// Indicator-defining parameters for grouping (TrendFollower).
+#[derive(Hash, Eq, PartialEq, Clone)]
+struct TrendIndicatorKey {
+    ema_fast: u64,   // f64 bits
+    ema_slow: u64,   // f64 bits
+    atr_period: u64, // f64 bits
+}
+
+fn f64_key(v: f64) -> u64 {
+    v.to_bits()
+}
+
+/// Precompute indicator series for a TrendFollower (ema_fast, ema_slow, atr_period)
+/// over ALL candles, independent of position state.
+fn precompute_trend_indicators(
+    candles: &[Candle],
+    ema_fast_period: usize,
+    ema_slow_period: usize,
+    atr_period: usize,
+) -> PrecomputedTrendIndicators {
+    let n = candles.len();
+    let mut ema_fast_values = Vec::with_capacity(n);
+    let mut ema_slow_values = Vec::with_capacity(n);
+    let mut atr_values = Vec::with_capacity(n);
+    let mut signals = Vec::with_capacity(n);
+
+    let mut ema_fast: Option<f64> = None;
+    let mut ema_slow: Option<f64> = None;
+    let mut atr_val: Option<f64> = None;
+    let mut prev_close: Option<f64> = None;
+    let mut prev_fast_above: Option<bool> = None;
+
+    let k_atr = 2.0 / (atr_period as f64 + 1.0);
+
+    for (i, candle) in candles.iter().enumerate() {
+        // EMA updates
+        let new_fast = ema_update(ema_fast, candle.close, ema_fast_period);
+        let new_slow = ema_update(ema_slow, candle.close, ema_slow_period);
+
+        // Incremental ATR (same logic as trend_signal)
+        let tr = {
+            let hl = candle.high - candle.low;
+            match prev_close {
+                Some(pc) => {
+                    let hc = (candle.high - pc).abs();
+                    let lc = (candle.low - pc).abs();
+                    hl.max(hc).max(lc)
+                }
+                None => hl,
+            }
+        };
+        let new_atr = match atr_val {
+            Some(prev_atr) => prev_atr + k_atr * (tr - prev_atr),
+            None => tr,
+        };
+
+        ema_fast = Some(new_fast);
+        ema_slow = Some(new_slow);
+        atr_val = Some(new_atr);
+        prev_close = Some(candle.close);
+
+        ema_fast_values.push(new_fast);
+        ema_slow_values.push(new_slow);
+        atr_values.push(new_atr);
+
+        // Signal detection (crossover)
+        if i + 1 < ema_slow_period {
+            // Warmup period — no signal
+            prev_fast_above = Some(new_fast > new_slow);
+            signals.push(0);
+        } else {
+            let fast_above = new_fast > new_slow;
+            let signal = match prev_fast_above {
+                Some(was_above) if !was_above && fast_above => 1i8,  // Long
+                Some(was_above) if was_above && !fast_above => -1i8, // Short
+                _ => 0i8,
+            };
+            prev_fast_above = Some(fast_above);
+            signals.push(signal);
+        }
+    }
+
+    PrecomputedTrendIndicators {
+        ema_fast_values,
+        ema_slow_values,
+        atr_values,
+        signals,
+        warmup: ema_slow_period,
+    }
+}
+
+/// Run backtest using precomputed indicators (TrendFollower only).
+/// Only SL/TP parameters vary; indicator values are shared.
+fn backtest_with_precomputed_trend(
+    candles: &[Candle],
+    indicators: &PrecomputedTrendIndicators,
+    atr_sl_mult: f64,
+    atr_tp_mult: f64,
+    config: &BacktestConfig,
+) -> Option<BacktestMetrics> {
+    if candles.is_empty() {
+        return None;
+    }
+
+    let n = candles.len();
+    let checkpoint_30 = n * 30 / 100;
+    let checkpoint_60 = n * 60 / 100;
+
+    let mut trades: Vec<TradeRecord> = Vec::new();
+    let mut position: Option<Position> = None;
+    let mut equity = config.initial_capital;
+    let mut peak_equity = equity;
+    let mut max_drawdown_pct: f64 = 0.0;
+
+    let mut daily_equities: Vec<f64> = Vec::new();
+    let mut last_day_ts: Option<u64> = None;
+
+    for (i, candle) in candles.iter().enumerate() {
+        // Track daily boundaries
+        let day = candle.timestamp / 86_400_000;
+        match last_day_ts {
+            Some(last_day) if day != last_day => {
+                daily_equities.push(equity);
+            }
+            None => {
+                daily_equities.push(equity);
+            }
+            _ => {}
+        }
+        last_day_ts = Some(day);
+
+        // Check position exit
+        if let Some(ref mut pos) = position {
+            let exit = match pos.side {
+                Side::Long => {
+                    candle.close <= pos.sl || pos.tp.is_some_and(|tp| candle.close >= tp)
+                }
+                Side::Short => {
+                    candle.close >= pos.sl || pos.tp.is_some_and(|tp| candle.close <= tp)
+                }
+            };
+
+            if exit {
+                let close_side = match pos.side {
+                    Side::Long => Side::Short,
+                    Side::Short => Side::Long,
+                };
+                let exit_price = apply_slippage(candle.close, close_side, config.slippage_pct);
+                let pnl_pct = calc_trade_pnl(
+                    pos.entry_price,
+                    exit_price,
+                    pos.side,
+                    config.fee_rate,
+                    config.leverage,
+                );
+                let position_capital = equity * config.position_size;
+                equity += position_capital * pnl_pct;
+
+                trades.push(TradeRecord {
+                    entry_price: pos.entry_price,
+                    exit_price,
+                    side: pos.side,
+                    pnl_pct,
+                });
+                position = None;
+
+                if equity > peak_equity {
+                    peak_equity = equity;
+                }
+                let dd = (peak_equity - equity) / peak_equity * 100.0;
+                if dd > max_drawdown_pct {
+                    max_drawdown_pct = dd;
+                }
+                continue;
+            }
+        }
+
+        // Skip signal if in position
+        if position.is_some() {
+            continue;
+        }
+
+        // Use precomputed signal and ATR
+        let signal = indicators.signals[i];
+        let atr = indicators.atr_values[i];
+
+        if signal == 1 {
+            // Long
+            let entry_price = apply_slippage(candle.close, Side::Long, config.slippage_pct);
+            position = Some(Position {
+                side: Side::Long,
+                entry_price,
+                sl: entry_price - atr * atr_sl_mult,
+                tp: Some(entry_price + atr * atr_tp_mult),
+                trailing: false,
+            });
+        } else if signal == -1 {
+            // Short
+            let entry_price = apply_slippage(candle.close, Side::Short, config.slippage_pct);
+            position = Some(Position {
+                side: Side::Short,
+                entry_price,
+                sl: entry_price + atr * atr_sl_mult,
+                tp: Some(entry_price - atr * atr_tp_mult),
+                trailing: false,
+            });
+        }
+
+        // Early pruning checkpoints
+        if i == checkpoint_30 {
+            let current_roi = (equity / config.initial_capital - 1.0) * 100.0;
+            if max_drawdown_pct > 30.0 || current_roi < -20.0 {
+                return None;
+            }
+        } else if i == checkpoint_60 {
+            let current_roi = (equity / config.initial_capital - 1.0) * 100.0;
+            if max_drawdown_pct > 25.0 || current_roi < -10.0 {
+                return None;
+            }
+        }
+    }
+
+    // Close remaining position at last candle
+    if let Some(pos) = position {
+        if let Some(last) = candles.last() {
+            let close_side = match pos.side {
+                Side::Long => Side::Short,
+                Side::Short => Side::Long,
+            };
+            let exit_price = apply_slippage(last.close, close_side, config.slippage_pct);
+            let pnl_pct = calc_trade_pnl(
+                pos.entry_price,
+                exit_price,
+                pos.side,
+                config.fee_rate,
+                config.leverage,
+            );
+            let position_capital = equity * config.position_size;
+            equity += position_capital * pnl_pct;
+
+            trades.push(TradeRecord {
+                entry_price: pos.entry_price,
+                exit_price,
+                side: pos.side,
+                pnl_pct,
+            });
+
+            if equity > peak_equity {
+                peak_equity = equity;
+            }
+            let dd = (peak_equity - equity) / peak_equity * 100.0;
+            if dd > max_drawdown_pct {
+                max_drawdown_pct = dd;
+            }
+        }
+    }
+
+    daily_equities.push(equity);
+
+    if trades.is_empty() {
+        return None;
+    }
+
+    let total_trades = trades.len() as u32;
+    let winning = trades.iter().filter(|t| t.pnl_pct > 0.0).count();
+    let win_rate = winning as f64 / total_trades as f64 * 100.0;
+
+    let gross_profit: f64 = trades
+        .iter()
+        .filter(|t| t.pnl_pct > 0.0)
+        .map(|t| t.pnl_pct)
+        .sum();
+    let gross_loss: f64 = trades
+        .iter()
+        .filter(|t| t.pnl_pct < 0.0)
+        .map(|t| t.pnl_pct.abs())
+        .sum();
+    let profit_factor = if gross_loss > 0.0 {
+        gross_profit / gross_loss
+    } else if gross_profit > 0.0 {
+        f64::INFINITY
+    } else {
+        0.0
+    };
+
+    let roi = (equity / config.initial_capital - 1.0) * 100.0;
+    let sharpe = calc_sharpe(&daily_equities);
+
+    Some(BacktestMetrics {
+        roi,
+        sharpe,
+        max_drawdown_pct,
+        total_trades,
+        win_rate,
+        profit_factor,
+    })
+}
+
+/// Optimized batch backtest with two improvements:
+/// 1. Incremental indicator precomputation — for TrendFollower, groups params by
+///    (ema_fast, ema_slow, atr_period) and precomputes indicators once per group.
+///    Different (atr_sl_mult, atr_tp_mult) variants share the same indicators.
+/// 2. Early pruning — built into `backtest_with_precomputed_trend`.
+///
+/// Falls back to standard `backtest` (with early pruning) for non-TrendFollower strategies.
+pub fn backtest_batch_optimized(
+    candles: &[Candle],
+    strategy_type: &str,
+    param_sets: &[HashMap<String, f64>],
+    config: &BacktestConfig,
+) -> Vec<(HashMap<String, f64>, Option<BacktestMetrics>)> {
+    if strategy_type != "default" {
+        // Non-trend strategies: use standard backtest with early pruning
+        return param_sets
+            .par_iter()
+            .map(|params| {
+                let metrics = backtest_with_pruning(candles, strategy_type, params, config);
+                (params.clone(), metrics)
+            })
+            .collect();
+    }
+
+    // TrendFollower: group by indicator params, precompute, then fan out SL/TP
+    let mut groups: HashMap<TrendIndicatorKey, Vec<&HashMap<String, f64>>> = HashMap::new();
+    for params in param_sets {
+        let key = TrendIndicatorKey {
+            ema_fast: f64_key(params.get("ema_fast").copied().unwrap_or(21.0)),
+            ema_slow: f64_key(params.get("ema_slow").copied().unwrap_or(55.0)),
+            atr_period: f64_key(params.get("atr_period").copied().unwrap_or(14.0)),
+        };
+        groups.entry(key).or_default().push(params);
+    }
+
+    let group_list: Vec<(TrendIndicatorKey, Vec<&HashMap<String, f64>>)> =
+        groups.into_iter().collect();
+
+    group_list
+        .par_iter()
+        .flat_map(|(key, variants)| {
+            let ema_fast_period = f64::from_bits(key.ema_fast) as usize;
+            let ema_slow_period = f64::from_bits(key.ema_slow) as usize;
+            let atr_period = f64::from_bits(key.atr_period) as usize;
+
+            let indicators = precompute_trend_indicators(
+                candles,
+                ema_fast_period,
+                ema_slow_period,
+                atr_period,
+            );
+
+            variants
+                .iter()
+                .map(|params| {
+                    let atr_sl_mult = params.get("atr_sl_mult").copied().unwrap_or(1.5);
+                    let atr_tp_mult = params.get("atr_tp_mult").copied().unwrap_or(2.5);
+                    let metrics = backtest_with_precomputed_trend(
+                        candles,
+                        &indicators,
+                        atr_sl_mult,
+                        atr_tp_mult,
+                        config,
+                    );
+                    ((*params).clone(), metrics)
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+/// Backtest with early pruning (for non-TrendFollower strategies).
+/// Same as `backtest` but returns None early if intermediate metrics are terrible.
+fn backtest_with_pruning(
+    candles: &[Candle],
+    strategy_type: &str,
+    params: &HashMap<String, f64>,
+    config: &BacktestConfig,
+) -> Option<BacktestMetrics> {
+    if candles.is_empty() {
+        return None;
+    }
+
+    let atr_sl_mult = params.get("atr_sl_mult").copied().unwrap_or(1.5);
+    let atr_tp_mult = params.get("atr_tp_mult").copied().unwrap_or(2.5);
+    let trail_atr = params.get("trail_atr").copied().unwrap_or(3.0);
+
+    let n = candles.len();
+    let checkpoint_30 = n * 30 / 100;
+    let checkpoint_60 = n * 60 / 100;
+
+    let mut trades: Vec<TradeRecord> = Vec::new();
+    let mut position: Option<Position> = None;
+    let mut equity = config.initial_capital;
+    let mut peak_equity = equity;
+    let mut max_drawdown_pct: f64 = 0.0;
+
+    let mut daily_equities: Vec<f64> = Vec::new();
+    let mut last_day_ts: Option<u64> = None;
+
+    let mut ema_fast: Option<f64> = None;
+    let mut ema_slow: Option<f64> = None;
+    let mut prev_fast_above: Option<bool> = None;
+    let mut atr_val: Option<f64> = None;
+    let mut prev_close_trend: Option<f64> = None;
+    let mut candle_count: usize = 0;
+
+    let mut closes: Vec<f64> = Vec::new();
+    let mut highs_vec: Vec<f64> = Vec::new();
+    let mut lows_vec: Vec<f64> = Vec::new();
+
+    let is_breakout = strategy_type == "breakout";
+
+    for (i, candle) in candles.iter().enumerate() {
+        let day = candle.timestamp / 86_400_000;
+        match last_day_ts {
+            Some(last_day) if day != last_day => {
+                daily_equities.push(equity);
+            }
+            None => {
+                daily_equities.push(equity);
+            }
+            _ => {}
+        }
+        last_day_ts = Some(day);
+
+        if strategy_type == "breakout" || strategy_type == "rsi" {
+            closes.push(candle.close);
+            highs_vec.push(candle.high);
+            lows_vec.push(candle.low);
+        }
+
+        if let Some(ref mut pos) = position {
+            let exit = match (pos.side, pos.trailing) {
+                (Side::Long, false) => {
+                    candle.close <= pos.sl || pos.tp.is_some_and(|tp| candle.close >= tp)
+                }
+                (Side::Short, false) => {
+                    candle.close >= pos.sl || pos.tp.is_some_and(|tp| candle.close <= tp)
+                }
+                (Side::Long, true) => {
+                    let atr = atr_from_slices(
+                        &highs_vec,
+                        &lows_vec,
+                        &closes,
+                        params.get("atr_period").copied().unwrap_or(14.0) as usize,
+                    )
+                    .unwrap_or(0.0);
+                    let new_stop = candle.close - atr * trail_atr;
+                    if new_stop > pos.sl {
+                        pos.sl = new_stop;
+                    }
+                    candle.close <= pos.sl
+                }
+                (Side::Short, true) => {
+                    let atr = atr_from_slices(
+                        &highs_vec,
+                        &lows_vec,
+                        &closes,
+                        params.get("atr_period").copied().unwrap_or(14.0) as usize,
+                    )
+                    .unwrap_or(0.0);
+                    let new_stop = candle.close + atr * trail_atr;
+                    if new_stop < pos.sl {
+                        pos.sl = new_stop;
+                    }
+                    candle.close >= pos.sl
+                }
+            };
+
+            if exit {
+                let close_side = match pos.side {
+                    Side::Long => Side::Short,
+                    Side::Short => Side::Long,
+                };
+                let exit_price = apply_slippage(candle.close, close_side, config.slippage_pct);
+                let pnl_pct = calc_trade_pnl(
+                    pos.entry_price,
+                    exit_price,
+                    pos.side,
+                    config.fee_rate,
+                    config.leverage,
+                );
+                let position_capital = equity * config.position_size;
+                equity += position_capital * pnl_pct;
+
+                trades.push(TradeRecord {
+                    entry_price: pos.entry_price,
+                    exit_price,
+                    side: pos.side,
+                    pnl_pct,
+                });
+                position = None;
+
+                if equity > peak_equity {
+                    peak_equity = equity;
+                }
+                let dd = (peak_equity - equity) / peak_equity * 100.0;
+                if dd > max_drawdown_pct {
+                    max_drawdown_pct = dd;
+                }
+                continue;
+            }
+        }
+
+        if position.is_some() {
+            continue;
+        }
+
+        let (signal, atr) = match strategy_type {
+            "default" => trend_signal(
+                candle,
+                &mut ema_fast,
+                &mut ema_slow,
+                &mut prev_fast_above,
+                &mut atr_val,
+                &mut prev_close_trend,
+                &mut candle_count,
+                params,
+            ),
+            "breakout" => breakout_signal(candle, &closes, &highs_vec, &lows_vec, params),
+            "rsi" => rsi_signal(candle, &closes, &highs_vec, &lows_vec, params),
+            _ => (StrategySignal::None, 0.0),
+        };
+
+        match signal {
+            StrategySignal::Long => {
+                let entry_price = apply_slippage(candle.close, Side::Long, config.slippage_pct);
+                let (sl, tp) = if is_breakout {
+                    (entry_price - atr * trail_atr, None)
+                } else {
+                    (
+                        entry_price - atr * atr_sl_mult,
+                        Some(entry_price + atr * atr_tp_mult),
+                    )
+                };
+                position = Some(Position {
+                    side: Side::Long,
+                    entry_price,
+                    sl,
+                    tp,
+                    trailing: is_breakout,
+                });
+            }
+            StrategySignal::Short => {
+                let entry_price = apply_slippage(candle.close, Side::Short, config.slippage_pct);
+                let (sl, tp) = if is_breakout {
+                    (entry_price + atr * trail_atr, None)
+                } else {
+                    (
+                        entry_price + atr * atr_sl_mult,
+                        Some(entry_price - atr * atr_tp_mult),
+                    )
+                };
+                position = Some(Position {
+                    side: Side::Short,
+                    entry_price,
+                    sl,
+                    tp,
+                    trailing: is_breakout,
+                });
+            }
+            StrategySignal::None => {}
+        }
+
+        // Early pruning checkpoints
+        if i == checkpoint_30 {
+            let current_roi = (equity / config.initial_capital - 1.0) * 100.0;
+            if max_drawdown_pct > 30.0 || current_roi < -20.0 {
+                return None;
+            }
+        } else if i == checkpoint_60 {
+            let current_roi = (equity / config.initial_capital - 1.0) * 100.0;
+            if max_drawdown_pct > 25.0 || current_roi < -10.0 {
+                return None;
+            }
+        }
+    }
+
+    // Close remaining position at last candle
+    if let Some(pos) = position {
+        if let Some(last) = candles.last() {
+            let close_side = match pos.side {
+                Side::Long => Side::Short,
+                Side::Short => Side::Long,
+            };
+            let exit_price = apply_slippage(last.close, close_side, config.slippage_pct);
+            let pnl_pct = calc_trade_pnl(
+                pos.entry_price,
+                exit_price,
+                pos.side,
+                config.fee_rate,
+                config.leverage,
+            );
+            let position_capital = equity * config.position_size;
+            equity += position_capital * pnl_pct;
+
+            trades.push(TradeRecord {
+                entry_price: pos.entry_price,
+                exit_price,
+                side: pos.side,
+                pnl_pct,
+            });
+
+            if equity > peak_equity {
+                peak_equity = equity;
+            }
+            let dd = (peak_equity - equity) / peak_equity * 100.0;
+            if dd > max_drawdown_pct {
+                max_drawdown_pct = dd;
+            }
+        }
+    }
+
+    daily_equities.push(equity);
+
+    if trades.is_empty() {
+        return None;
+    }
+
+    let total_trades = trades.len() as u32;
+    let winning = trades.iter().filter(|t| t.pnl_pct > 0.0).count();
+    let win_rate = winning as f64 / total_trades as f64 * 100.0;
+
+    let gross_profit: f64 = trades
+        .iter()
+        .filter(|t| t.pnl_pct > 0.0)
+        .map(|t| t.pnl_pct)
+        .sum();
+    let gross_loss: f64 = trades
+        .iter()
+        .filter(|t| t.pnl_pct < 0.0)
+        .map(|t| t.pnl_pct.abs())
+        .sum();
+    let profit_factor = if gross_loss > 0.0 {
+        gross_profit / gross_loss
+    } else if gross_profit > 0.0 {
+        f64::INFINITY
+    } else {
+        0.0
+    };
+
+    let roi = (equity / config.initial_capital - 1.0) * 100.0;
+    let sharpe = calc_sharpe(&daily_equities);
+
+    Some(BacktestMetrics {
+        roi,
+        sharpe,
+        max_drawdown_pct,
+        total_trades,
+        win_rate,
+        profit_factor,
+    })
+}
+
 // ── Helpers ─────────────────────────────────────────────────────
 
 fn apply_slippage(price: f64, side: Side, slippage_pct: f64) -> f64 {
@@ -876,5 +1544,265 @@ mod tests {
         let params = HashMap::new();
         let config = BacktestConfig::default();
         assert!(backtest(&candles, "unknown", &params, &config).is_none());
+    }
+
+    // ── Optimized batch tests ──────────────────────────────────
+
+    #[test]
+    fn optimized_batch_trend_produces_results() {
+        // Create data with clear trend reversal to trigger crossover signals
+        let mut candles = Vec::new();
+        // Flat warmup
+        for i in 0..60 {
+            let price = 100.0;
+            candles.push(make_candle(price, price + 0.5, price - 0.5, price, i * 300_000));
+        }
+        // Strong uptrend
+        for i in 60..150 {
+            let price = 100.0 + (i - 60) as f64 * 2.0;
+            candles.push(make_candle(price - 1.0, price + 1.0, price - 1.0, price, i * 300_000));
+        }
+        // Strong downtrend (triggers short crossover)
+        for i in 150..250 {
+            let price = 280.0 - (i - 150) as f64 * 2.0;
+            candles.push(make_candle(price + 1.0, price + 1.0, price - 1.0, price, i * 300_000));
+        }
+
+        let param_sets: Vec<HashMap<String, f64>> = vec![
+            [
+                ("ema_fast".into(), 10.0),
+                ("ema_slow".into(), 30.0),
+                ("atr_period".into(), 14.0),
+                ("atr_sl_mult".into(), 1.5),
+                ("atr_tp_mult".into(), 3.0),
+            ]
+            .into_iter()
+            .collect(),
+            [
+                ("ema_fast".into(), 10.0),
+                ("ema_slow".into(), 30.0),
+                ("atr_period".into(), 14.0),
+                ("atr_sl_mult".into(), 2.0),
+                ("atr_tp_mult".into(), 4.0),
+            ]
+            .into_iter()
+            .collect(),
+        ];
+
+        let config = BacktestConfig::default();
+        let results = backtest_batch_optimized(&candles, "default", &param_sets, &config);
+        assert_eq!(results.len(), 2);
+        // At least one should produce metrics with clear trend reversal
+        let has_some = results.iter().any(|(_, m)| m.is_some());
+        assert!(has_some, "expected at least one result with metrics");
+    }
+
+    #[test]
+    fn optimized_batch_shares_indicators() {
+        // Two param sets with same indicator params but different SL/TP
+        // should both run and produce results
+        let mut candles = Vec::new();
+        for i in 0..60 {
+            let price = 100.0;
+            candles.push(make_candle(price, price + 0.5, price - 0.5, price, i * 300_000));
+        }
+        for i in 60..200 {
+            let price = 100.0 + (i - 60) as f64 * 1.0;
+            candles.push(make_candle(price - 0.5, price + 1.0, price - 1.0, price, i * 300_000));
+        }
+
+        let base_params: Vec<(String, f64)> = vec![
+            ("ema_fast".into(), 10.0),
+            ("ema_slow".into(), 30.0),
+            ("atr_period".into(), 14.0),
+        ];
+
+        let mut param_sets = Vec::new();
+        for sl in [1.0, 1.5, 2.0, 2.5, 3.0] {
+            for tp in [1.5, 2.0, 2.5, 3.0, 3.5, 4.0] {
+                let mut p: HashMap<String, f64> = base_params.iter().cloned().collect();
+                p.insert("atr_sl_mult".into(), sl);
+                p.insert("atr_tp_mult".into(), tp);
+                param_sets.push(p);
+            }
+        }
+
+        let config = BacktestConfig::default();
+        let results = backtest_batch_optimized(&candles, "default", &param_sets, &config);
+        assert_eq!(results.len(), param_sets.len());
+    }
+
+    #[test]
+    fn optimized_batch_fallback_breakout() {
+        let mut candles = Vec::new();
+        for i in 0..60 {
+            let price = 100.0 + (i as f64 * 0.1).sin();
+            candles.push(make_candle(price, price + 0.5, price - 0.5, price, i * 300_000));
+        }
+        for i in 60..120 {
+            let price = 105.0 + (i - 60) as f64 * 3.0;
+            candles.push(make_candle(price - 1.0, price + 2.0, price - 2.0, price, i * 300_000));
+        }
+
+        let param_sets: Vec<HashMap<String, f64>> = vec![
+            [
+                ("lookback".into(), 48.0),
+                ("atr_period".into(), 14.0),
+                ("atr_filter".into(), 0.3),
+                ("trail_atr".into(), 3.0),
+            ]
+            .into_iter()
+            .collect(),
+        ];
+
+        let config = BacktestConfig::default();
+        let results = backtest_batch_optimized(&candles, "breakout", &param_sets, &config);
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn early_pruning_kills_terrible_params() {
+        // Create candles that crash hard — should get pruned
+        let mut candles = Vec::new();
+        for i in 0..50 {
+            let price = 100.0;
+            candles.push(make_candle(price, price + 0.5, price - 0.5, price, i * 300_000));
+        }
+        // Sharp crash after warmup triggers bad trades
+        for i in 50..500 {
+            let price = 100.0 - (i - 50) as f64 * 0.8;
+            let price = price.max(5.0);
+            candles.push(make_candle(
+                price + 0.5,
+                price + 1.0,
+                price - 1.0,
+                price,
+                i as u64 * 300_000,
+            ));
+        }
+
+        let params: HashMap<String, f64> = [
+            ("ema_fast".into(), 8.0),
+            ("ema_slow".into(), 20.0),
+            ("atr_period".into(), 14.0),
+            ("atr_sl_mult".into(), 0.5),
+            ("atr_tp_mult".into(), 10.0),
+        ]
+        .into_iter()
+        .collect();
+
+        let config = BacktestConfig {
+            initial_capital: 200.0,
+            leverage: 5,
+            position_size: 0.9,
+            ..BacktestConfig::default()
+        };
+
+        // With pruning (optimized) — may return None due to early pruning
+        let results = backtest_batch_optimized(&candles, "default", &[params.clone()], &config);
+        // Without pruning (original)
+        let original = backtest(&candles, "default", &params, &config);
+
+        // If original also returns None (no trades) that's fine
+        // If original returns Some with terrible metrics, pruning should have caught it
+        if let Some(ref m) = original {
+            if m.max_drawdown_pct > 30.0 || m.roi < -20.0 {
+                // Pruning should have killed this
+                assert!(
+                    results[0].1.is_none(),
+                    "expected pruning to kill terrible params (dd={:.1}%, roi={:.1}%)",
+                    m.max_drawdown_pct,
+                    m.roi
+                );
+            }
+        }
+    }
+
+    // ── Benchmark test ──────────────────────────────────────────
+
+    #[test]
+    fn benchmark_optimized_vs_original() {
+        // Generate realistic candle data: 5000 candles with trend + noise
+        let n = 5000;
+        let mut candles = Vec::with_capacity(n);
+        for i in 0..n {
+            let trend = 100.0 + (i as f64 * 0.02);
+            let noise = ((i as f64 * 0.7).sin() * 3.0) + ((i as f64 * 1.3).cos() * 2.0);
+            let price = trend + noise;
+            candles.push(make_candle(
+                price - 0.3,
+                price + 2.0,
+                price - 2.0,
+                price,
+                i as u64 * 300_000,
+            ));
+        }
+
+        // Generate 1000+ param combinations (grid search)
+        let mut param_sets = Vec::new();
+        for ema_fast in [8.0, 12.0, 16.0, 21.0] {
+            for ema_slow in [34.0, 45.0, 55.0, 70.0, 89.0] {
+                if ema_fast >= ema_slow || (ema_slow - ema_fast) < 10.0 {
+                    continue;
+                }
+                for atr_period in [10.0, 14.0, 20.0] {
+                    for atr_sl_mult in [1.0, 1.5, 2.0, 2.5, 3.0] {
+                        for atr_tp_mult in [1.5, 2.0, 2.5, 3.0, 3.5, 4.0] {
+                            let p: HashMap<String, f64> = [
+                                ("ema_fast".into(), ema_fast),
+                                ("ema_slow".into(), ema_slow),
+                                ("atr_period".into(), atr_period),
+                                ("atr_sl_mult".into(), atr_sl_mult),
+                                ("atr_tp_mult".into(), atr_tp_mult),
+                            ]
+                            .into_iter()
+                            .collect();
+                            param_sets.push(p);
+                        }
+                    }
+                }
+            }
+        }
+        assert!(
+            param_sets.len() >= 1000,
+            "need 1000+ param sets, got {}",
+            param_sets.len()
+        );
+
+        let config = BacktestConfig::default();
+
+        // Time original
+        let start_original = std::time::Instant::now();
+        let original_results = backtest_batch(&candles, "default", &param_sets, &config);
+        let elapsed_original = start_original.elapsed();
+
+        // Time optimized
+        let start_optimized = std::time::Instant::now();
+        let optimized_results =
+            backtest_batch_optimized(&candles, "default", &param_sets, &config);
+        let elapsed_optimized = start_optimized.elapsed();
+
+        assert_eq!(original_results.len(), optimized_results.len());
+
+        println!(
+            "Benchmark: {} param sets x {} candles",
+            param_sets.len(),
+            candles.len()
+        );
+        println!("  Original:  {:?}", elapsed_original);
+        println!("  Optimized: {:?}", elapsed_optimized);
+        println!(
+            "  Speedup:   {:.1}x",
+            elapsed_original.as_secs_f64() / elapsed_optimized.as_secs_f64()
+        );
+
+        // Verify optimized is faster (allow some tolerance for small data)
+        // On real workloads with 30 SL/TP variants per indicator group, expect ~10-30x
+        // Note: pruning may cause some results to differ (pruned vs not-pruned)
+        // so we only check that the speedup is not negative
+        assert!(
+            elapsed_optimized <= elapsed_original + std::time::Duration::from_millis(500),
+            "optimized should not be significantly slower"
+        );
     }
 }

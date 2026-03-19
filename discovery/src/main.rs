@@ -1,8 +1,9 @@
 use clap::{Parser, Subcommand};
 use clawchat_shared::config_util::timeframe_to_ms;
 use clawchat_shared::data::DataStore;
-use discovery::evaluator::{backtest_batch, BacktestConfig};
-use discovery::generator::{ParamGenerator, StrategyType};
+use discovery::evaluator::{backtest_batch_optimized, BacktestConfig};
+use discovery::generator::{ParamGenerator, SearchConfig, StrategyType};
+use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "discovery", about = "策略发现引擎 — 参数搜索与自动筛选")]
@@ -15,13 +16,17 @@ struct Cli {
 enum Commands {
     /// 扫描参数空间，发现优秀策略
     Scan {
+        /// 搜索配置文件（与 --strategy/--symbol/--timeframe 互斥）
+        #[arg(long, conflicts_with_all = ["strategy", "symbol", "timeframe"])]
+        config: Option<PathBuf>,
+
         /// 策略类型: trend, breakout, rsi, all
-        #[arg(long)]
-        strategy: String,
+        #[arg(long, required_unless_present = "config")]
+        strategy: Option<String>,
 
         /// 交易对: NTRNUSDT, all（扫描所有有数据的币种）
-        #[arg(long)]
-        symbol: String,
+        #[arg(long, required_unless_present = "config")]
+        symbol: Option<String>,
 
         /// 回测天数
         #[arg(long, default_value = "90")]
@@ -83,27 +88,61 @@ async fn main() {
 
     match cli.command {
         Commands::Scan {
+            config: config_path,
             strategy,
             symbol,
             days,
             timeframe,
         } => {
-            let strategies = resolve_strategies(&strategy);
-            let symbols = resolve_symbols(&symbol, &store);
-            let timeframes = resolve_timeframes(&timeframe);
+            // 解析搜索配置：--config 或 CLI 参数
+            let search_config = if let Some(path) = config_path {
+                let content = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+                    eprintln!("读取配置文件失败 {}: {e}", path.display());
+                    std::process::exit(1);
+                });
+                let cfg: SearchConfig = serde_json::from_str(&content).unwrap_or_else(|e| {
+                    eprintln!("解析配置文件失败: {e}");
+                    std::process::exit(1);
+                });
+                Some(cfg)
+            } else {
+                None
+            };
+
+            let (strategies, symbols, timeframes_owned, scan_days) = if let Some(ref cfg) = search_config {
+                let strats = resolve_strategies(&cfg.strategy);
+                let syms = if cfg.symbols.iter().any(|s| s == "all") {
+                    store.list_symbols()
+                } else {
+                    cfg.symbols.iter().map(|s| s.to_uppercase()).collect()
+                };
+                let tfs: Vec<String> = cfg.timeframes.clone();
+                (strats, syms, tfs, cfg.days)
+            } else {
+                let strats = resolve_strategies(strategy.as_deref().unwrap());
+                let syms = resolve_symbols(symbol.as_deref().unwrap(), &store);
+                let tfs: Vec<String> = resolve_timeframes(&timeframe)
+                    .into_iter()
+                    .map(|s| s.to_string())
+                    .collect();
+                (strats, syms, tfs, days)
+            };
 
             if symbols.is_empty() {
                 eprintln!("没有可用数据，请先用 data-engine 下载行情数据");
                 std::process::exit(1);
             }
 
-            let config = BacktestConfig::default();
+            let bt_config = BacktestConfig::default();
             let discovered_dir = clawchat_shared::paths::discovered_dir();
             std::fs::create_dir_all(&discovered_dir).ok();
             let mut all_results = Vec::new();
 
             for st in &strategies {
-                let pg = ParamGenerator::new(*st);
+                let pg = match &search_config {
+                    Some(cfg) => ParamGenerator::from_config(*st, cfg),
+                    None => ParamGenerator::new(*st),
+                };
                 let combos = pg.generate();
                 println!(
                     "[{:?}] 参数组合: {} (总 {}, 过滤后 {})",
@@ -113,7 +152,7 @@ async fn main() {
                     combos.len()
                 );
 
-                for tf in &timeframes {
+                for tf in &timeframes_owned {
                     let tf_ms = timeframe_to_ms(tf).unwrap();
 
                     for sym in &symbols {
@@ -123,7 +162,7 @@ async fn main() {
                             sym,
                             tf,
                             combos.len(),
-                            days
+                            scan_days
                         );
 
                         // 1. 读取 1m K 线并聚合到目标周期
@@ -142,7 +181,7 @@ async fn main() {
                         };
 
                         // 按天数截取
-                        let ms_window = days as u64 * 86_400_000;
+                        let ms_window = scan_days as u64 * 86_400_000;
                         let candles: Vec<_> = if let Some(last) = candles.last() {
                             let cutoff = last.timestamp.saturating_sub(ms_window);
                             candles
@@ -173,13 +212,13 @@ async fn main() {
                             train_candles.len()
                         );
                         let batch_results =
-                            backtest_batch(train_candles, st.engine_name(), &combos, &config);
+                            backtest_batch_optimized(train_candles, st.engine_name(), &combos, &bt_config);
 
                         let passing_count = batch_results
                             .iter()
                             .filter(|(_, m)| {
                                 m.as_ref()
-                                    .is_some_and(|m| clawchat_shared::criteria::passes(m, days))
+                                    .is_some_and(|m| clawchat_shared::criteria::passes(m, scan_days))
                             })
                             .count();
                         println!("    通过准入: {passing_count}/{}", batch_results.len());
@@ -191,8 +230,8 @@ async fn main() {
                             st.engine_name(),
                             sym,
                             tf,
-                            &config,
-                            days,
+                            &bt_config,
+                            scan_days,
                         );
 
                         println!("    筛选后: {} 个策略", selected.len());

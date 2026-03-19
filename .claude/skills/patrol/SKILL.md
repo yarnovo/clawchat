@@ -1,5 +1,5 @@
 ---
-name: loop-patrol
+name: patrol
 description: 巡逻 — 检查引擎健康、策略状态、风控红线。定时用法：/loop 4h /patrol
 user-invocable: true
 ---

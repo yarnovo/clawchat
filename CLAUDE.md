@@ -6,9 +6,9 @@
 
 ## 工具
 
-**CLI 工具集** `cli/`：Agent 和人共用的命令行工具，回测、状态查询、风控检查等。
+**CLI 工具集** `ops/`：Agent 和人共用的命令行工具，回测、状态查询、风控检查等。
 ```bash
-cargo run -p clawchat -- --help
+cargo run -p clawchat-ops -- --help
 ```
 
 **交易引擎** `engine/`：配置驱动的执行引擎，加载 approved 策略，收行情、算信号、过风控、下单。

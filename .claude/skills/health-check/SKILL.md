@@ -1,5 +1,5 @@
 ---
-name: loop-health-check
+name: health-check
 description: 健康检查 — 快速检查引擎和数据管道是否正常运行。定时用法：/loop 1h /health-check
 user-invocable: true
 ---

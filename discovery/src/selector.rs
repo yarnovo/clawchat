@@ -159,7 +159,7 @@ fn generate_neighbors(
     let mut neighbors = Vec::new();
 
     for spec in specs {
-        let current = match params.get(spec.name) {
+        let current = match params.get(&spec.name) {
             Some(&v) => v,
             None => continue,
         };
@@ -184,8 +184,8 @@ fn params_too_close(
     specs: &[crate::generator::ParamSpec],
 ) -> bool {
     specs.iter().all(|spec| {
-        let va = a.get(spec.name).copied().unwrap_or(0.0);
-        let vb = b.get(spec.name).copied().unwrap_or(0.0);
+        let va = a.get(&spec.name).copied().unwrap_or(0.0);
+        let vb = b.get(&spec.name).copied().unwrap_or(0.0);
         (va - vb).abs() < 2.0 * spec.step
     })
 }
@@ -356,8 +356,8 @@ mod tests {
             let diffs: Vec<_> = specs
                 .iter()
                 .filter(|s| {
-                    let orig = params.get(s.name).unwrap();
-                    let new = n.get(s.name).unwrap();
+                    let orig = params.get(&s.name).unwrap();
+                    let new = n.get(&s.name).unwrap();
                     (orig - new).abs() > 1e-9
                 })
                 .collect();
@@ -385,7 +385,7 @@ mod tests {
 
         for n in &neighbors {
             for spec in &specs {
-                let v = n.get(spec.name).unwrap();
+                let v = n.get(&spec.name).unwrap();
                 assert!(
                     *v >= spec.min && *v <= spec.max,
                     "param {} = {} out of bounds [{}, {}]",
