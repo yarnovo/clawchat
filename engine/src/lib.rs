@@ -6,6 +6,7 @@ pub mod global_risk;
 pub mod ledger;
 pub mod order_router;
 pub mod risk;
+pub mod smart_order_router;
 pub mod state;
 pub mod strategy;
 pub mod symbol_manager;

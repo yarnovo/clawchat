@@ -198,6 +198,13 @@ enum Command {
         max_drawdown: f64,
     },
 
+    // ── 套利 ──
+    /// 套利机会扫描
+    Arbitrage {
+        #[command(subcommand)]
+        action: ArbitrageAction,
+    },
+
     // ── 币种扩展 ──
     /// 扫描 Binance 候选币种（纯输出 JSON，不写文件）
     ScanSymbols {
@@ -313,6 +320,25 @@ enum ExchangeAction {
         /// 币种（可选）
         #[arg(long)]
         symbol: Option<String>,
+    },
+}
+
+#[derive(Subcommand)]
+enum ArbitrageAction {
+    /// 扫描当前套利机会
+    Scan {
+        /// 套利类型: spot-perp, triangular（默认扫描全部）
+        #[arg(long)]
+        r#type: Option<String>,
+        /// 最低净利润百分比
+        #[arg(long, default_value_t = 0.01)]
+        min_profit: f64,
+    },
+    /// 查看历史套利记录
+    History {
+        /// 显示最近 N 条
+        #[arg(long, default_value_t = 50)]
+        limit: usize,
     },
 }
 
@@ -516,6 +542,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Command::CreatePortfolio { account, name, capital, max_drawdown } => {
             cmd::create_portfolio::run(&ctx, &account, &name, capital, max_drawdown)?;
         }
+
+        // ── 套利 ────────────────────────────────
+        Command::Arbitrage { action } => match action {
+            ArbitrageAction::Scan { r#type, min_profit } => {
+                cmd::arbitrage::run(&ctx, r#type.as_deref(), min_profit).await?;
+            }
+            ArbitrageAction::History { limit } => {
+                cmd::arbitrage::history(&ctx, limit)?;
+            }
+        },
 
         // ── 币种扩展 ────────────────────────────
         Command::ScanSymbols { min_volume, top } => {

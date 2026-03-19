@@ -1,4 +1,5 @@
 pub mod alerts;
+pub mod arbitrage;
 pub mod backtest;
 pub mod capacity;
 pub mod compare;

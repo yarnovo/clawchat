@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use crate::global_risk::{GlobalRiskGuard, GlobalRiskVerdict};
 use crate::ledger::{CapitalMode, Ledger};
 use crate::risk::EngineRiskGuard;
+use crate::smart_order_router::{self, SorConfig};
 use clawchat_shared::exchange::ExchangeClient;
 use clawchat_shared::risk::RiskConfig;
 use clawchat_shared::volatility::vol_leverage_multiplier;
@@ -166,10 +167,25 @@ impl OrderRouter {
             return Err("computed qty <= 0".into());
         }
 
-        // 6. Place order on exchange
+        // 6. Place order on exchange (SOR for large orders, market for small)
         let side_str = if is_long { "BUY" } else { "SELL" };
+        let order_usdt = qty * signal.price;
 
-        let result = exchange.market_order(&signal.symbol, side_str, qty).await;
+        // Use SOR for orders > $50 notional; small orders go direct market
+        let result = if order_usdt > 50.0 {
+            let sor_config = SorConfig::default();
+            smart_order_router::execute_sor_order(
+                exchange,
+                &signal.symbol,
+                side_str,
+                qty,
+                signal.price,
+                &sor_config,
+            )
+            .await
+        } else {
+            exchange.market_order(&signal.symbol, side_str, qty).await
+        };
 
         match result {
             Ok(_resp) => {

@@ -13,7 +13,7 @@ use tracing::{error, info, warn};
 
 use clawchat_shared::account::PortfolioConfig;
 use clawchat_shared::data::DataStore;
-use clawchat_shared::exchange::{BinanceClient, Exchange};
+use clawchat_shared::exchange::Exchange;
 use clawchat_shared::paths;
 use clawchat_shared::risk::RiskConfig;
 use clawchat_shared::strategy::StrategyFile;

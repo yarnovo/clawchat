@@ -15,6 +15,10 @@ use crate::types::{OrderType, PositionSide, Side};
 pub trait ExchangeClient: Send + Sync {
     /// Place a market order. Returns raw JSON response.
     async fn market_order(&self, symbol: &str, side: &str, qty: f64) -> Result<serde_json::Value, ExchangeError>;
+    /// Place a limit order at a specific price. Returns raw JSON response.
+    async fn limit_order(&self, symbol: &str, side: &str, qty: f64, price: f64) -> Result<serde_json::Value, ExchangeError>;
+    /// Get orderbook depth for a symbol. Returns (bids, asks) as price/qty levels.
+    async fn get_orderbook_depth(&self, symbol: &str, limit: u32) -> Result<OrderbookDepth, ExchangeError>;
     /// Get wallet balance (USDT).
     async fn get_balance(&self) -> Result<f64, ExchangeError>;
     /// Get position risk for a symbol (or all if None). Only non-zero positions.
@@ -78,6 +82,72 @@ pub struct PremiumIndex {
     pub mark_price: f64,
     /// Next funding time (unix ms)
     pub next_funding_time: u64,
+}
+
+/// Orderbook depth: bid/ask price levels with quantities.
+#[derive(Debug, Clone)]
+pub struct OrderbookDepth {
+    /// (price, qty) sorted descending by price (best bid first)
+    pub bids: Vec<(f64, f64)>,
+    /// (price, qty) sorted ascending by price (best ask first)
+    pub asks: Vec<(f64, f64)>,
+}
+
+impl OrderbookDepth {
+    /// Total bid-side USDT depth across top N levels.
+    pub fn bid_depth_usdt(&self, levels: usize) -> f64 {
+        self.bids.iter().take(levels).map(|(p, q)| p * q).sum()
+    }
+
+    /// Total ask-side USDT depth across top N levels.
+    pub fn ask_depth_usdt(&self, levels: usize) -> f64 {
+        self.asks.iter().take(levels).map(|(p, q)| p * q).sum()
+    }
+
+    /// Best bid price, or 0.0 if empty.
+    pub fn best_bid(&self) -> f64 {
+        self.bids.first().map(|(p, _)| *p).unwrap_or(0.0)
+    }
+
+    /// Best ask price, or 0.0 if empty.
+    pub fn best_ask(&self) -> f64 {
+        self.asks.first().map(|(p, _)| *p).unwrap_or(0.0)
+    }
+
+    /// Predict slippage (%) for a market buy of `order_usdt` size.
+    /// Walks through ask levels to simulate fill.
+    pub fn predict_slippage_pct(&self, order_usdt: f64, is_buy: bool) -> f64 {
+        let levels = if is_buy { &self.asks } else { &self.bids };
+        let reference_price = if is_buy { self.best_ask() } else { self.best_bid() };
+        if reference_price <= 0.0 || levels.is_empty() {
+            return 0.0;
+        }
+
+        let mut remaining_usdt = order_usdt;
+        let mut total_cost = 0.0;
+        let mut total_qty = 0.0;
+
+        for &(price, qty) in levels {
+            let level_usdt = price * qty;
+            if remaining_usdt <= level_usdt {
+                let fill_qty = remaining_usdt / price;
+                total_cost += remaining_usdt;
+                total_qty += fill_qty;
+                break;
+            } else {
+                total_cost += level_usdt;
+                total_qty += qty;
+                remaining_usdt -= level_usdt;
+            }
+        }
+
+        if total_qty <= 0.0 {
+            return 0.0;
+        }
+
+        let avg_price = total_cost / total_qty;
+        ((avg_price - reference_price) / reference_price).abs() * 100.0
+    }
 }
 
 /// Position risk data from /fapi/v2/positionRisk (non-zero positions only).
@@ -612,6 +682,37 @@ impl BinanceClient {
         }
     }
 
+    // ── Orderbook ──────────────────────────────────────────────
+
+    /// Fetch orderbook depth from /fapi/v1/depth.
+    pub async fn get_orderbook_depth(&self, symbol: &str, limit: u32) -> Result<OrderbookDepth, ExchangeError> {
+        let params = [
+            ("symbol", symbol.to_string()),
+            ("limit", limit.to_string()),
+        ];
+        let body = self.public_get("/fapi/v1/depth", &params).await?;
+
+        let parse_levels = |key: &str| -> Vec<(f64, f64)> {
+            body.get(key)
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|level| {
+                            let price: f64 = level.get(0)?.as_str()?.parse().ok()?;
+                            let qty: f64 = level.get(1)?.as_str()?.parse().ok()?;
+                            Some((price, qty))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+
+        Ok(OrderbookDepth {
+            bids: parse_levels("bids"),
+            asks: parse_levels("asks"),
+        })
+    }
+
     // ── CLI-specific endpoints (Phase 4) ───────────────────────
 
     /// Fetch OHLCV klines
@@ -768,6 +869,24 @@ impl ExchangeClient for BinanceClient {
         };
         let ex = self.clone().with_symbol(symbol);
         ex.market_order(side_enum, pos_side, qty).await
+    }
+
+    async fn limit_order(&self, symbol: &str, side: &str, qty: f64, price: f64) -> Result<serde_json::Value, ExchangeError> {
+        let side_enum = match side.to_uppercase().as_str() {
+            "BUY" => Side::Buy,
+            "SELL" => Side::Sell,
+            _ => return Err(ExchangeError::Api { code: -1, msg: format!("invalid side: {side}") }),
+        };
+        let pos_side = match side_enum {
+            Side::Buy => PositionSide::Long,
+            Side::Sell => PositionSide::Short,
+        };
+        let ex = self.clone().with_symbol(symbol);
+        ex.limit_order(side_enum, pos_side, qty, price).await
+    }
+
+    async fn get_orderbook_depth(&self, symbol: &str, limit: u32) -> Result<OrderbookDepth, ExchangeError> {
+        BinanceClient::get_orderbook_depth(self, symbol, limit).await
     }
 
     async fn get_balance(&self) -> Result<f64, ExchangeError> {
