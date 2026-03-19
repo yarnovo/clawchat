@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 export BASH_ENV := .env
 
-.PHONY: build hft autopilot status watcher report-engine report-daily report-weekly data-engine data-backfill data-status data-validate discover discover-scan discover-status start-data stop-data status-data start-engine stop-engine status-engine start-all stop-all status-all install clean test help
+.PHONY: build hft autopilot status watcher report-engine report-daily report-weekly data-engine data-backfill data-status data-validate discover discover-scan discover-status start-data stop-data status-data start-engine stop-engine status-engine start-autopilot stop-autopilot status-autopilot start-all stop-all status-all install clean test help
 
 # === Build ===
 
@@ -129,20 +129,56 @@ status-engine: ## Check trading engine status
 		echo "❌ 交易引擎未运行"; \
 	fi
 
+start-autopilot: ## Start autopilot in background
+	@mkdir -p .pid logs
+	@if [ -f .pid/autopilot.pid ] && kill -0 $$(cat .pid/autopilot.pid) 2>/dev/null; then \
+		echo "Autopilot 已在运行 (PID $$(cat .pid/autopilot.pid))"; \
+	else \
+		nohup cargo run --release -p autopilot -- --strategies-dir strategies > logs/autopilot.log 2>&1 & \
+		echo $$! > .pid/autopilot.pid; \
+		echo "Autopilot 已启动 (PID $$!)"; \
+		echo "日志: logs/autopilot.log"; \
+	fi
+
+stop-autopilot: ## Stop autopilot
+	@if [ -f .pid/autopilot.pid ]; then \
+		PID=$$(cat .pid/autopilot.pid); \
+		if kill -0 $$PID 2>/dev/null; then \
+			kill $$PID && echo "Autopilot 已停止 (PID $$PID)"; \
+		else \
+			echo "Autopilot 未在运行 (PID $$PID 已退出)"; \
+		fi; \
+		rm -f .pid/autopilot.pid; \
+	else \
+		echo "Autopilot 未在运行（无 PID 文件）"; \
+	fi
+
+status-autopilot: ## Check autopilot status
+	@if [ -f .pid/autopilot.pid ] && kill -0 $$(cat .pid/autopilot.pid) 2>/dev/null; then \
+		echo "✅ Autopilot 运行中 (PID $$(cat .pid/autopilot.pid))"; \
+		echo "   日志: $$(tail -1 logs/autopilot.log 2>/dev/null || echo '无')"; \
+	else \
+		echo "❌ Autopilot 未运行"; \
+	fi
+
 # === Phase 3: 一键管理 ===
 
-start-all: ## Start all services (data + engine)
+start-all: ## Start all services (data + engine + autopilot)
 	@$(MAKE) start-data
 	@sleep 2
 	@$(MAKE) start-engine
+	@sleep 1
+	@$(MAKE) start-autopilot
 
 stop-all: ## Stop all services
+	@$(MAKE) stop-autopilot
 	@$(MAKE) stop-engine
 	@$(MAKE) stop-data
 
 status-all: ## Check all services status
 	@$(MAKE) status-data
 	@$(MAKE) status-engine
+	@$(MAKE) status-autopilot
 
 # === Deps ===
 
