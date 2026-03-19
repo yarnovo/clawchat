@@ -1,0 +1,32 @@
+{
+  "backtest": {
+    "max_drawdown_pct": 4.62,
+    "profit_factor": 6.37,
+    "return_pct": 119.4,
+    "sharpe": 7.37,
+    "trades": 22,
+    "win_rate": 77.27
+  },
+  "capital": 15,
+  "engine_strategy": "rsi",
+  "leverage": 3,
+  "lifecycle": {
+    "discovered_at": "2026-03-19",
+    "discovery_engine": "v1"
+  },
+  "name": "lyn-rsi-rsi18os0-15m",
+  "params": {
+    "atr_period": 15,
+    "atr_sl_mult": 2,
+    "atr_tp_mult": 3.5,
+    "rsi_overbought": 80,
+    "rsi_oversold": 30,
+    "rsi_period": 18,
+    "trend_ema": 150
+  },
+  "position_size": 0.3,
+  "status": "approved",
+  "symbol": "LYNUSDT",
+  "timeframe": "15m",
+  "timeframe_ms": 900000
+}
