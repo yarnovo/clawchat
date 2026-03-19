@@ -294,6 +294,41 @@ impl Ledger {
         }
     }
 
+    /// Add a strategy allocation to a specific portfolio.
+    pub fn add_strategy_to(
+        &mut self,
+        account: &str,
+        portfolio: &str,
+        name: &str,
+        capital: f64,
+    ) {
+        if let Some(p) = self.portfolio_mut(account, portfolio) {
+            p.strategies
+                .insert(name.to_string(), StrategyAllocation::new(name, capital));
+        }
+    }
+
+    /// Add a portfolio to an account. No-op if the portfolio already exists.
+    pub fn add_portfolio(
+        &mut self,
+        account: &str,
+        portfolio_name: &str,
+        allocated_capital: f64,
+        reserve: f64,
+    ) {
+        if let Some(acct) = self.accounts.get_mut(account) {
+            acct.portfolios.entry(portfolio_name.to_string()).or_insert_with(|| {
+                Portfolio {
+                    name: portfolio_name.to_string(),
+                    allocated_capital,
+                    reserve,
+                    risk: None,
+                    strategies: HashMap::new(),
+                }
+            });
+        }
+    }
+
     pub fn get(&self, name: &str) -> Option<&StrategyAllocation> {
         self.accounts
             .values()
@@ -710,5 +745,44 @@ mod tests {
         let mut alloc = StrategyAllocation::new("test", 100.0);
         let pnl = alloc.close_position("NOTEXIST", 50.0, 0.0);
         assert!((pnl).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn add_portfolio_and_strategy_to() {
+        let mut ledger = Ledger::new_single("acc1", "binance", 1000.0, "main", 800.0, 0.0);
+        ledger.add_portfolio("acc1", "new-coins", 200.0, 0.0);
+
+        // Two portfolios exist
+        let acc = ledger.account("acc1").unwrap();
+        assert_eq!(acc.portfolios.len(), 2);
+
+        // Add strategies to specific portfolios
+        ledger.add_strategy_to("acc1", "main", "s1", 400.0);
+        ledger.add_strategy_to("acc1", "new-coins", "s2", 100.0);
+
+        assert!(ledger.get("s1").is_some());
+        assert!(ledger.get("s2").is_some());
+        assert_eq!(ledger.strategy_count(), 2);
+
+        // Strategies are in the correct portfolios
+        let main_p = ledger.portfolio("acc1", "main").unwrap();
+        assert!(main_p.strategies.contains_key("s1"));
+        assert!(!main_p.strategies.contains_key("s2"));
+
+        let nc_p = ledger.portfolio("acc1", "new-coins").unwrap();
+        assert!(nc_p.strategies.contains_key("s2"));
+        assert!(!nc_p.strategies.contains_key("s1"));
+    }
+
+    #[test]
+    fn add_portfolio_no_duplicate() {
+        let mut ledger = Ledger::new_single("acc1", "binance", 1000.0, "main", 800.0, 0.0);
+        ledger.add_strategy("s1", 100.0);
+
+        // Adding "main" again should not overwrite
+        ledger.add_portfolio("acc1", "main", 999.0, 999.0);
+        let main_p = ledger.portfolio("acc1", "main").unwrap();
+        assert!((main_p.allocated_capital - 800.0).abs() < f64::EPSILON);
+        assert!(main_p.strategies.contains_key("s1"));
     }
 }

@@ -53,7 +53,7 @@ make status-all
 TeamCreate(team_name="clawchat")
 ```
 
-并行启动 3 个常驻成员（team_name="clawchat"）：
+并行启动常驻成员（team_name="clawchat"）：
 
 #### quant — 策略发现员
 
@@ -79,6 +79,23 @@ prompt:
    - 生成默认 risk.json
    - 搬到 accounts/binance-main/portfolios/main/strategies/
 3. SendMessage 向 team-lead 汇报结果（发现几个、上线几个）
+不要 git commit。
+```
+
+侦察型 quant（q-recon）的 prompt 模板：
+```
+name: q-recon
+prompt:
+你是策略发现 quant（侦察模式）。直接执行，不要报到。
+
+任务：执行 /discover Phase 0 侦察
+1. clawchat scan-symbols --min-volume 5000000 --top 20 --json
+2. 分析候选：和已有币种相关性、成交量趋势、组合缺什么
+3. 选择要采集的 → 写 config/symbols.json
+4. 对新币种执行 clawchat expand-symbol --json（回填+发现策略）
+5. 有策略通过准入 → 上线到 strategies/
+6. SendMessage 向 team-lead 汇报（发现几个币、采集几个、上线几个策略）
+7. 写 notes/ 记录侦察经验
 不要 git commit。
 ```
 
@@ -156,25 +173,6 @@ prompt:
 背景：读 CLAUDE.md 和 ARCHITECTURE.md。不要 git commit。
 ```
 
-#### scout — 币种侦察员
-
-```
-name: scout
-prompt:
-你是 ClawChat 的币种侦察员。常驻待命，收到 team-lead 消息后执行。
-
-收到"执行币种侦察"时，按 /scout skill 流程：
-1. clawchat scan-symbols --json（纯函数，输出候选 JSON）
-2. 分析候选：和已有币种相关性、成交量趋势、组合缺什么
-3. 选择要采集的 → 写 config/symbols.json（data-engine 自动采集）
-4. 对新币种执行 clawchat expand-symbol --json（回填+发现策略）
-5. 有策略 → 上线到 strategies/
-6. SendMessage 向 team-lead 汇报
-7. 写 notes/ 记录侦察经验
-
-背景：读 CLAUDE.md 和 /scout skill。不要 git commit。
-```
-
 ### Step 3: 启动心跳
 
 ```
@@ -205,11 +203,10 @@ prompt:
      3. cargo run -p clawchat-ops -- notify --subject "ClawChat 快照" --body-file reports/snapshot/最新文件
    - health_check → SendMessage monitor: "执行健康检查"
    - patrol → SendMessage monitor: "执行巡逻"
-   - discover → 并行创建 N 个 quant（team-lead 先分析再派活）
+   - discover → 检查 recon 是否也到期（recon_interval_min），是则先派 q-recon 侦察新币，再并行创建 N 个 quant 搜索策略；否则直接派 quant
    - evaluate → SendMessage analyst: "执行策略评估"
    - fix_issues → 多个 issue 时并行创建多个 engineer 修复（同 impl_requirements）
    - impl_requirements → 多个需求时并行创建多个 engineer，team-lead 调度
-   - symbol_scan → SendMessage scout: "执行币种侦察"
 
 5. 更新 records/schedule_state.json 的 last_run
 
@@ -237,7 +234,7 @@ prompt:
 **accounts/binance-main/schedule.json**（账户级，业务级）：
 ```json
 {
-  "discover": { "interval_min": 1440, "member": "quant" },
+  "discover": { "interval_min": 1440, "recon_interval_min": 10080, "member": "quant" },
   "evaluate": { "interval_min": 1440, "member": "analyst" }
 }
 ```

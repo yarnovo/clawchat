@@ -8,6 +8,35 @@ user-invocable: true
 
 先分析再搜索，不要盲扫。配置用法见 `/ref-discovery`。
 
+## Phase 0: 侦察（仅 team-lead 指定时执行）
+
+仅当 team-lead 派发 q-recon 任务时执行此阶段，普通 discover 跳过直接从 Phase 1 开始。
+
+### 0.1 扫描候选币种
+
+```bash
+clawchat scan-symbols --min-volume 5000000 --top 20 --json
+```
+
+纯 stdout 输出，不写文件。
+
+### 0.2 分析候选
+
+- 候选币种按赛道分类（AI/meme/DeFi/L2 等）
+- 和已有组合对比：缺什么？重复什么？
+- 当前市场环境适合什么类型的组合？
+- 配额是否充足？
+
+### 0.3 选中的落地
+
+- 写 `config/symbols.json` 新增币种（data-engine 自动采集）
+- 对新币种执行 `clawchat expand-symbol --json`（回填数据 + 发现策略）
+- 有策略通过准入 → 上线到 strategies/
+
+### 0.4 新币加入后续搜索范围
+
+新增的币种自动纳入后续 Phase 1 的分析和搜索范围。
+
 ## Phase 1: 分析（决定搜什么）
 
 ### 1.1 当前组合分析

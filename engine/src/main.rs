@@ -61,6 +61,7 @@ struct Args {}
 #[allow(dead_code)]
 struct StrategyRuntime {
     name: String,
+    portfolio: String,
     symbol: String,
     dir: PathBuf,
     leverage: u32,
@@ -97,48 +98,63 @@ enum ConfigChange {
 
 // ── Scan approved strategies ───────────────────────────────────
 
-fn scan_approved_strategies() -> Vec<(String, StrategyFile)> {
-    let dir = paths::strategies_dir();
+/// Scan result: (strategy_name, portfolio_name, StrategyFile)
+fn scan_approved_strategies_multi(account: &str) -> Vec<(String, String, StrategyFile)> {
+    let portfolios_dir = paths::portfolios_dir(account);
     let mut strategies = Vec::new();
 
-    let entries = match std::fs::read_dir(&dir) {
+    let portfolio_entries = match std::fs::read_dir(&portfolios_dir) {
         Ok(e) => e,
         Err(e) => {
-            error!("failed to read strategies dir {}: {e}", dir.display());
+            error!("failed to read portfolios dir {}: {e}", portfolios_dir.display());
             return strategies;
         }
     };
 
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if !path.is_dir() {
+    for portfolio_entry in portfolio_entries.flatten() {
+        let portfolio_path = portfolio_entry.path();
+        if !portfolio_path.is_dir() {
             continue;
         }
-        let strat_json = path.join("signal.json");
-        if !strat_json.exists() {
-            continue;
-        }
-        let sf = match StrategyFile::load(&strat_json) {
-            Ok(sf) => sf,
-            Err(e) => {
-                warn!("skip {}: {e}", path.display());
+        let portfolio_name = portfolio_entry.file_name().to_string_lossy().to_string();
+        let strats_dir = portfolio_path.join("strategies");
+        let entries = match std::fs::read_dir(&strats_dir) {
+            Ok(e) => e,
+            Err(_) => continue, // no strategies/ subdir
+        };
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
                 continue;
             }
-        };
-        let status = sf.status.as_deref().unwrap_or("pending");
-        if status != "approved" {
-            info!(
-                name = entry.file_name().to_string_lossy().as_ref(),
-                status,
-                "skipping non-approved strategy"
-            );
-            continue;
+            let strat_json = path.join("signal.json");
+            if !strat_json.exists() {
+                continue;
+            }
+            let sf = match StrategyFile::load(&strat_json) {
+                Ok(sf) => sf,
+                Err(e) => {
+                    warn!("skip {}: {e}", path.display());
+                    continue;
+                }
+            };
+            let status = sf.status.as_deref().unwrap_or("pending");
+            if status != "approved" {
+                info!(
+                    name = entry.file_name().to_string_lossy().as_ref(),
+                    portfolio = %portfolio_name,
+                    status,
+                    "skipping non-approved strategy"
+                );
+                continue;
+            }
+            let name = sf
+                .name
+                .clone()
+                .unwrap_or_else(|| entry.file_name().to_string_lossy().to_string());
+            strategies.push((name, portfolio_name.clone(), sf));
         }
-        let name = sf
-            .name
-            .clone()
-            .unwrap_or_else(|| entry.file_name().to_string_lossy().to_string());
-        strategies.push((name, sf));
     }
 
     strategies
@@ -639,13 +655,12 @@ fn parse_mark_price_msg(raw: &str) -> Option<UserEvent> {
 // ── Config watcher ─────────────────────────────────────────────
 
 fn start_config_watcher(
-    strategies_dir: PathBuf,
-    portfolio_dir: PathBuf,
+    portfolio_dirs: Vec<PathBuf>,
     config_tx: mpsc::Sender<ConfigChange>,
 ) {
     std::thread::spawn(move || {
         let tx = config_tx;
-        let portfolio_dir_clone = portfolio_dir.clone();
+        let portfolio_dirs_clone = portfolio_dirs.clone();
         let mut watcher = notify::recommended_watcher(
             move |res: Result<notify::Event, notify::Error>| {
                 let Ok(event) = res else { return };
@@ -661,7 +676,10 @@ fn start_config_watcher(
                         .unwrap_or("");
 
                     // Check if this is a portfolio-level config change
-                    if path.parent() == Some(portfolio_dir_clone.as_path()) {
+                    let is_portfolio_level = portfolio_dirs_clone.iter().any(|pd| {
+                        path.parent() == Some(pd.as_path())
+                    });
+                    if is_portfolio_level {
                         let change = match file_name {
                             "trade.json" => ConfigChange::PortfolioTrade,
                             "risk.json" => ConfigChange::PortfolioRisk,
@@ -695,19 +713,22 @@ fn start_config_watcher(
         )
         .expect("failed to create config watcher");
 
-        watcher
-            .watch(&strategies_dir, RecursiveMode::Recursive)
-            .expect("failed to watch strategies directory");
-
-        // Also watch portfolio directory for portfolio-level config changes
-        watcher
-            .watch(&portfolio_dir, RecursiveMode::NonRecursive)
-            .expect("failed to watch portfolio directory");
+        for pdir in &portfolio_dirs {
+            let strats_dir = pdir.join("strategies");
+            if strats_dir.is_dir() {
+                watcher
+                    .watch(&strats_dir, RecursiveMode::Recursive)
+                    .unwrap_or_else(|e| warn!("failed to watch {}: {e}", strats_dir.display()));
+            }
+            // Watch portfolio directory for portfolio-level config changes
+            watcher
+                .watch(pdir, RecursiveMode::NonRecursive)
+                .unwrap_or_else(|e| warn!("failed to watch {}: {e}", pdir.display()));
+        }
 
         info!(
-            "config watcher started: strategies={}, portfolio={}",
-            strategies_dir.display(),
-            portfolio_dir.display()
+            "config watcher started: watching {} portfolio directories",
+            portfolio_dirs.len()
         );
         loop {
             std::thread::sleep(std::time::Duration::from_secs(3600));
@@ -1190,33 +1211,49 @@ async fn main() {
     // 1. Logging
     let _guard = init_logging(&paths::logs_dir(), "engine");
 
-    // 2. Load account + portfolio config
-    let account_path = paths::account_dir("binance-main").join("account.json");
+    // 2. Load account config
+    let account_name = "binance-main";
+    let account_path = paths::account_dir(account_name).join("account.json");
     let account = AccountConfig::load(&account_path).expect("failed to load account.json");
 
-    let portfolio_path = paths::portfolio_dir("binance-main", "main").join("portfolio.json");
-    let portfolio = PortfolioConfig::load(&portfolio_path).expect("failed to load portfolio.json");
+    info!(account = %account.name, "engine starting (multi-portfolio mode)");
 
-    let total_capital = portfolio.allocated_capital;
+    // 3. Discover all portfolios and load their configs
+    let mut portfolio_configs: HashMap<String, PortfolioConfig> = HashMap::new();
+    let portfolios_base = paths::portfolios_dir(account_name);
+    if let Ok(entries) = std::fs::read_dir(&portfolios_base) {
+        for entry in entries.flatten() {
+            if !entry.path().is_dir() { continue; }
+            let pname = entry.file_name().to_string_lossy().to_string();
+            let ppath = entry.path().join("portfolio.json");
+            match PortfolioConfig::load(&ppath) {
+                Ok(pc) => {
+                    info!(portfolio = %pname, capital = pc.allocated_capital, "portfolio loaded");
+                    portfolio_configs.insert(pname, pc);
+                }
+                Err(e) => {
+                    warn!(portfolio = %pname, "failed to load portfolio.json: {e}, skipping");
+                }
+            }
+        }
+    }
+    if portfolio_configs.is_empty() {
+        error!("no portfolios found, exiting");
+        return;
+    }
 
-    info!(
-        account = %account.name,
-        portfolio = %portfolio.name,
-        capital = total_capital,
-        "engine starting (per-strategy mode)"
-    );
-
-    // 3. Scan approved strategies
-    let approved = scan_approved_strategies();
+    // 4. Scan approved strategies across all portfolios
+    let approved = scan_approved_strategies_multi(account_name);
     if approved.is_empty() {
         error!("no approved strategies found, exiting");
         return;
     }
 
     info!(count = approved.len(), "approved strategies found");
-    for (name, sf) in &approved {
+    for (name, portfolio_name, sf) in &approved {
         info!(
             name,
+            portfolio = %portfolio_name,
             symbol = sf.symbol.as_deref().unwrap_or("?"),
             engine = sf.engine_strategy.as_deref().unwrap_or("default"),
             "strategy loaded"
@@ -1233,7 +1270,7 @@ async fn main() {
         .clone()
         .unwrap_or_else(|| "https://fapi.binance.com".to_string());
 
-    // 5. Init Ledger
+    // 5. Init Ledger — create with first portfolio, then add remaining
     let ledger_path = paths::records_dir().join("ledger.json");
     let mut ledger = if ledger_path.exists() {
         match Ledger::load(&ledger_path) {
@@ -1247,9 +1284,9 @@ async fn main() {
                     &account.name,
                     &account.exchange,
                     account.total_capital,
-                    &portfolio.name,
-                    portfolio.allocated_capital,
-                    portfolio.reserve.unwrap_or(0.0),
+                    "main", // seed with main
+                    portfolio_configs.get("main").map(|p| p.allocated_capital).unwrap_or(0.0),
+                    portfolio_configs.get("main").and_then(|p| p.reserve).unwrap_or(0.0),
                 )
             }
         }
@@ -1258,25 +1295,42 @@ async fn main() {
             &account.name,
             &account.exchange,
             account.total_capital,
-            &portfolio.name,
-            portfolio.allocated_capital,
-            portfolio.reserve.unwrap_or(0.0),
+            "main",
+            portfolio_configs.get("main").map(|p| p.allocated_capital).unwrap_or(0.0),
+            portfolio_configs.get("main").and_then(|p| p.reserve).unwrap_or(0.0),
         )
     };
 
-    // Portfolio directory for portfolio-level configs
-    let portfolio_dir = paths::portfolio_dir("binance-main", "main");
-    let portfolio_risk_path = portfolio_dir.join("risk.json");
-    let portfolio_trade_path = portfolio_dir.join("trade.json");
+    // Ensure all discovered portfolios exist in the ledger
+    for (pname, pc) in &portfolio_configs {
+        ledger.add_portfolio(
+            account_name,
+            pname,
+            pc.allocated_capital,
+            pc.reserve.unwrap_or(0.0),
+        );
+    }
 
-    // Load portfolio-level trade override (highest priority)
-    let mut portfolio_trade_override = TradeOverride::load(&portfolio_trade_path);
+    // Per-portfolio risk paths and trade overrides
+    let mut portfolio_risk_paths: HashMap<String, PathBuf> = HashMap::new();
+    let mut portfolio_trade_paths: HashMap<String, PathBuf> = HashMap::new();
+    let mut portfolio_trade_overrides: HashMap<String, TradeOverride> = HashMap::new();
+
+    for pname in portfolio_configs.keys() {
+        let pdir = paths::portfolio_dir(account_name, pname);
+        let risk_path = pdir.join("risk.json");
+        let trade_path = pdir.join("trade.json");
+        let trade_override = TradeOverride::load(&trade_path);
+        portfolio_risk_paths.insert(pname.clone(), risk_path);
+        portfolio_trade_paths.insert(pname.clone(), trade_path);
+        portfolio_trade_overrides.insert(pname.clone(), trade_override);
+    }
 
     // Collect unique symbols and build strategy runtimes
     let mut symbols: Vec<String> = Vec::new();
     let mut runtimes: HashMap<String, StrategyRuntime> = HashMap::new();
 
-    for (name, sf) in &approved {
+    for (name, portfolio_name, sf) in &approved {
         let symbol = match sf.normalized_symbol() {
             Some(s) => s,
             None => {
@@ -1289,18 +1343,28 @@ async fn main() {
             symbols.push(symbol_upper.clone());
         }
 
-        let strat_dir = paths::strategy_dir(name);
-        let capital = sf.capital.unwrap_or(total_capital / approved.len() as f64);
+        let pc = match portfolio_configs.get(portfolio_name) {
+            Some(pc) => pc,
+            None => {
+                warn!(name, portfolio = %portfolio_name, "portfolio config not found, skipping");
+                continue;
+            }
+        };
+
+        let strat_dir = paths::strategy_dir_in(account_name, portfolio_name, name);
+        let capital = sf.capital.unwrap_or(pc.allocated_capital / approved.iter().filter(|(_, p, _)| p == portfolio_name).count().max(1) as f64);
         let leverage = sf.leverage.unwrap_or(10);
         let engine_strategy = sf.engine_strategy.clone().unwrap_or_else(|| "default".to_string());
         let params = sf.numeric_params();
 
         // Add to ledger if not already present
         if ledger.get(name).is_none() {
-            ledger.add_strategy(name, capital);
+            ledger.add_strategy_to(account_name, portfolio_name, name, capital);
         }
 
         // Load risk config: portfolio default + strategy override merge
+        let portfolio_risk_path = portfolio_risk_paths.get(portfolio_name).cloned()
+            .unwrap_or_else(|| strat_dir.join("risk.json"));
         let risk_path = strat_dir.join("risk.json");
         let risk_config = RiskConfig::load_merged(&portfolio_risk_path, &risk_path);
         let risk_guard = EngineRiskGuard::new(risk_config.clone(), capital);
@@ -1318,6 +1382,7 @@ async fn main() {
             name.to_string(),
             StrategyRuntime {
                 name: name.to_string(),
+                portfolio: portfolio_name.to_string(),
                 symbol: symbol_upper.clone(),
                 dir: strat_dir,
                 leverage,
@@ -1340,23 +1405,46 @@ async fn main() {
 
         info!(
             name,
+            portfolio = %portfolio_name,
             mode = if strategy_dry_run { "dry-run" } else { "live" },
             "strategy mode"
         );
     }
 
-    // 6. Init GlobalRiskGuard
-    let global_risk_config = if let Some(ref pr) = portfolio.risk {
-        GlobalRiskConfig {
+    // 6. Init per-portfolio GlobalRiskGuards
+    let mut portfolio_risk_guards: HashMap<String, GlobalRiskGuard> = HashMap::new();
+    for (pname, pc) in &portfolio_configs {
+        let grc = if let Some(ref pr) = pc.risk {
+            GlobalRiskConfig {
+                max_drawdown_pct: pr.max_drawdown_pct.unwrap_or(10.0),
+                max_daily_loss_pct: pr.max_daily_loss_pct.unwrap_or(5.0),
+                max_total_exposure: pr.max_total_exposure.unwrap_or(2.0),
+                max_per_coin_exposure_pct: pr.max_per_coin_exposure_pct.unwrap_or(50.0),
+            }
+        } else {
+            GlobalRiskConfig::default()
+        };
+        let guard = GlobalRiskGuard::new(grc, pc.allocated_capital);
+        info!(
+            portfolio = %pname,
+            max_dd = %guard.config().max_drawdown_pct,
+            max_daily = %guard.config().max_daily_loss_pct,
+            "portfolio risk guard initialized"
+        );
+        portfolio_risk_guards.insert(pname.clone(), guard);
+    }
+
+    // Use main portfolio's global risk as the aggregate guard for OrderRouter
+    let main_risk_config = portfolio_configs.get("main")
+        .and_then(|pc| pc.risk.as_ref())
+        .map(|pr| GlobalRiskConfig {
             max_drawdown_pct: pr.max_drawdown_pct.unwrap_or(10.0),
             max_daily_loss_pct: pr.max_daily_loss_pct.unwrap_or(5.0),
             max_total_exposure: pr.max_total_exposure.unwrap_or(2.0),
             max_per_coin_exposure_pct: pr.max_per_coin_exposure_pct.unwrap_or(50.0),
-        }
-    } else {
-        GlobalRiskConfig::default()
-    };
-    let global_risk = GlobalRiskGuard::new(global_risk_config, total_capital);
+        })
+        .unwrap_or_default();
+    let global_risk = GlobalRiskGuard::new(main_risk_config, account.total_capital);
 
     // 7. Init OrderRouter
     let mut order_router = OrderRouter::new(ledger, global_risk);
@@ -1376,7 +1464,7 @@ async fn main() {
 
     // 11. Spawn workers per strategy
     let mut worker_handles = Vec::new();
-    for (name, sf) in &approved {
+    for (name, _portfolio_name, sf) in &approved {
         let symbol = match sf.normalized_symbol() {
             Some(s) => s.to_uppercase(),
             None => continue,
@@ -1447,10 +1535,13 @@ async fn main() {
         });
     }
 
-    // 13. Start Config Watcher (strategies + portfolio dirs)
+    // 13. Start Config Watcher (all portfolio dirs)
     let (config_tx, mut config_rx) = mpsc::channel::<ConfigChange>(256);
     let config_tx_main = config_tx.clone(); // for main loop to re-inject NewStrategy
-    start_config_watcher(paths::strategies_dir(), portfolio_dir.clone(), config_tx);
+    let watch_dirs: Vec<PathBuf> = portfolio_configs.keys()
+        .map(|pname| paths::portfolio_dir(account_name, pname))
+        .collect();
+    start_config_watcher(watch_dirs, config_tx);
 
     // 14. Order record channel + writer task
     let (order_tx, order_rx) = mpsc::channel::<Order>(4096);
@@ -1523,14 +1614,17 @@ async fn main() {
                     &serde_json::json!({}), false);
 
                 // Decision gate: portfolio-level trade override (highest priority)
-                if portfolio_trade_override.is_active(rt.last_price) {
-                    if !decision_gate_allows_signal(&portfolio_trade_override) {
-                        tracing::debug!(
-                            strategy = strategy_name,
-                            action = ?portfolio_trade_override.action,
-                            "signal blocked by portfolio trade override"
-                        );
-                        continue;
+                if let Some(pto) = portfolio_trade_overrides.get(&rt.portfolio) {
+                    if pto.is_active(rt.last_price) {
+                        if !decision_gate_allows_signal(pto) {
+                            tracing::debug!(
+                                strategy = strategy_name,
+                                portfolio = %rt.portfolio,
+                                action = ?pto.action,
+                                "signal blocked by portfolio trade override"
+                            );
+                            continue;
+                        }
                     }
                 }
 
@@ -1805,165 +1899,179 @@ async fn main() {
                         }
                     }
                     ConfigChange::NewStrategy(dir_name) => {
-                        // New signal.json detected — check if approved and spin up worker
-                        let strat_dir = paths::strategy_dir(&dir_name);
+                        // New signal.json detected — search all portfolios to find it
+                        let mut found = None;
+                        for pname in portfolio_configs.keys() {
+                            let strat_dir = paths::strategy_dir_in(account_name, pname, &dir_name);
+                            let signal_path = strat_dir.join("signal.json");
+                            if signal_path.exists() {
+                                found = Some((pname.clone(), strat_dir));
+                                break;
+                            }
+                        }
+                        let Some((found_portfolio, strat_dir)) = found else {
+                            info!(dir = %dir_name, "new strategy dir detected but no signal.json found in any portfolio");
+                            continue;
+                        };
                         let signal_path = strat_dir.join("signal.json");
-                        if !signal_path.exists() {
-                            info!(dir = %dir_name, "new strategy dir detected but no signal.json yet");
-                        } else {
-                            match StrategyFile::load(&signal_path) {
-                                Ok(sf) => {
-                                    let status = sf.status.as_deref().unwrap_or("pending");
-                                    let name = sf.name.clone().unwrap_or_else(|| dir_name.clone());
+                        match StrategyFile::load(&signal_path) {
+                            Ok(sf) => {
+                                let status = sf.status.as_deref().unwrap_or("pending");
+                                let name = sf.name.clone().unwrap_or_else(|| dir_name.clone());
 
-                                    if status != "approved" {
-                                        info!(strategy = %name, status, "new strategy detected but not approved, ignoring");
-                                    } else if runtimes.contains_key(&name) {
-                                        info!(strategy = %name, "new strategy detected but already running");
-                                    } else {
-                                        // Load strategy config
-                                        let symbol = match sf.normalized_symbol() {
-                                            Some(s) => s.to_uppercase(),
-                                            None => {
-                                                warn!(strategy = %name, "new strategy has no symbol, skipping");
-                                                continue;
-                                            }
-                                        };
-
-                                        let capital = sf.capital.unwrap_or(total_capital / (runtimes.len() + 1) as f64);
-                                        let leverage = sf.leverage.unwrap_or(10);
-                                        let engine_strategy = sf.engine_strategy.clone().unwrap_or_else(|| "default".to_string());
-                                        let params = sf.numeric_params();
-
-                                        // Add to ledger
-                                        if order_router.ledger().get(&name).is_none() {
-                                            order_router.ledger_mut().add_strategy(&name, capital);
+                                if status != "approved" {
+                                    info!(strategy = %name, status, "new strategy detected but not approved, ignoring");
+                                } else if runtimes.contains_key(&name) {
+                                    info!(strategy = %name, "new strategy detected but already running");
+                                } else {
+                                    // Load strategy config
+                                    let symbol = match sf.normalized_symbol() {
+                                        Some(s) => s.to_uppercase(),
+                                        None => {
+                                            warn!(strategy = %name, "new strategy has no symbol, skipping");
+                                            continue;
                                         }
+                                    };
 
-                                        // Load risk config
-                                        let risk_path = strat_dir.join("risk.json");
-                                        let risk_config = RiskConfig::load_merged(&portfolio_risk_path, &risk_path);
-                                        let risk_guard = EngineRiskGuard::new(risk_config.clone(), capital);
+                                    let pc = portfolio_configs.get(&found_portfolio);
+                                    let pc_capital = pc.map(|p| p.allocated_capital).unwrap_or(0.0);
+                                    let capital = sf.capital.unwrap_or(pc_capital / (runtimes.len() + 1).max(1) as f64);
+                                    let leverage = sf.leverage.unwrap_or(10);
+                                    let engine_strategy = sf.engine_strategy.clone().unwrap_or_else(|| "default".to_string());
+                                    let params = sf.numeric_params();
 
-                                        // Add to order router
-                                        order_router.add_strategy_guard(&name, EngineRiskGuard::new(risk_config.clone(), capital));
+                                    // Add to ledger (specific portfolio)
+                                    if order_router.ledger().get(&name).is_none() {
+                                        order_router.ledger_mut().add_strategy_to(account_name, &found_portfolio, &name, capital);
+                                    }
 
-                                        // Load trade override
-                                        let trade_path = strat_dir.join("trade.json");
-                                        let trade_override = TradeOverride::load(&trade_path);
+                                    // Load risk config (using the correct portfolio's risk.json)
+                                    let p_risk_path = portfolio_risk_paths.get(&found_portfolio).cloned()
+                                        .unwrap_or_else(|| strat_dir.join("risk.json"));
+                                    let risk_path = strat_dir.join("risk.json");
+                                    let risk_config = RiskConfig::load_merged(&p_risk_path, &risk_path);
+                                    let risk_guard = EngineRiskGuard::new(risk_config.clone(), capital);
 
-                                        let sizing_mode_str = sf.sizing_mode.as_deref().unwrap_or("percent");
-                                        let sizing_mode = if sizing_mode_str == "fixed" { SizingMode::Fixed } else { SizingMode::Percent };
+                                    // Add to order router
+                                    order_router.add_strategy_guard(&name, EngineRiskGuard::new(risk_config.clone(), capital));
 
-                                        // Create exchange instance
-                                        let ex = Exchange::new(
+                                    // Load trade override
+                                    let trade_path = strat_dir.join("trade.json");
+                                    let trade_override = TradeOverride::load(&trade_path);
+
+                                    let sizing_mode_str = sf.sizing_mode.as_deref().unwrap_or("percent");
+                                    let sizing_mode = if sizing_mode_str == "fixed" { SizingMode::Fixed } else { SizingMode::Percent };
+
+                                    // Create exchange instance
+                                    let ex = Exchange::new(
+                                        api_key.clone(),
+                                        api_secret.clone(),
+                                        base_url.clone(),
+                                        false,
+                                    )
+                                    .with_symbol(&symbol)
+                                    .with_order_id_prefix(&format!("{}-{}", name, symbol));
+
+                                    // Set leverage
+                                    {
+                                        let ex_lev = Exchange::new(
                                             api_key.clone(),
                                             api_secret.clone(),
                                             base_url.clone(),
                                             false,
                                         )
-                                        .with_symbol(&symbol)
-                                        .with_order_id_prefix(&format!("{}-{}", name, symbol));
+                                        .with_symbol(&symbol);
+                                        let name_c = name.clone();
+                                        tokio::spawn(async move {
+                                            if let Err(e) = ex_lev.set_leverage(leverage).await {
+                                                warn!(strategy = %name_c, "failed to set leverage: {e}");
+                                            }
+                                        });
+                                    }
 
-                                        // Set leverage
+                                    exchanges.insert(name.clone(), ex);
+
+                                    // Dynamically add symbol if not yet in gateway
+                                    if gateway.subscribe_market(&symbol).is_none() {
+                                        let feed_config = FeedConfig {
+                                            symbols: vec![symbol.to_lowercase()],
+                                            agg_trade: true,
+                                            depth: true,
+                                            depth_speed: "100ms".to_string(),
+                                            mark_price: false,
+                                        };
+                                        if let Some(handle) = gateway.add_symbol(&symbol, feed_config).await {
+                                            worker_handles.push(handle);
+                                        }
+
+                                        // Also add to combined markPrice feed
                                         {
-                                            let ex_lev = Exchange::new(
-                                                api_key.clone(),
-                                                api_secret.clone(),
-                                                base_url.clone(),
-                                                false,
-                                            )
-                                            .with_symbol(&symbol);
-                                            let name_c = name.clone();
+                                            let tx = user_tx.clone();
+                                            let sym = symbol.clone();
                                             tokio::spawn(async move {
-                                                if let Err(e) = ex_lev.set_leverage(leverage).await {
-                                                    warn!(strategy = %name_c, "failed to set leverage: {e}");
-                                                }
+                                                start_combined_mark_price_feed(vec![sym], tx).await;
                                             });
                                         }
-
-                                        exchanges.insert(name.clone(), ex);
-
-                                        // Dynamically add symbol if not yet in gateway
-                                        if gateway.subscribe_market(&symbol).is_none() {
-                                            let feed_config = FeedConfig {
-                                                symbols: vec![symbol.to_lowercase()],
-                                                agg_trade: true,
-                                                depth: true,
-                                                depth_speed: "100ms".to_string(),
-                                                mark_price: false,
-                                            };
-                                            if let Some(handle) = gateway.add_symbol(&symbol, feed_config).await {
-                                                worker_handles.push(handle);
-                                            }
-
-                                            // Also add to combined markPrice feed
-                                            {
-                                                let tx = user_tx.clone();
-                                                let sym = symbol.clone();
-                                                tokio::spawn(async move {
-                                                    start_combined_mark_price_feed(vec![sym], tx).await;
-                                                });
-                                            }
-                                        }
-
-                                        // Build and spawn worker
-                                        {
-                                            let trade_dir = sf.trade_direction();
-                                            let cooldown = sf.cooldown_bars.unwrap_or(0);
-                                            let min_vol = sf.min_volume.unwrap_or(0.0);
-                                            let min_spread = sf.min_spread_bps.unwrap_or(0.0);
-                                            let min_depth = sf.min_depth_usd.unwrap_or(0.0);
-                                            let filter = SignalFilter::new(trade_dir, cooldown, min_vol, min_spread, min_depth);
-
-                                            if let Some(worker_config) = build_worker_config(&name, &sf, filter, &data_store) {
-                                                let market_rx = gateway.subscribe_market(&symbol).unwrap();
-                                                let handle = worker::spawn_worker(worker_config, market_rx, signal_tx.clone());
-                                                worker_handles.push(handle);
-                                                info!(strategy = %name, symbol = %symbol, "new strategy worker spawned");
-                                            }
-                                        }
-
-                                        // Insert runtime
-                                        let strategy_dry_run = sf.is_dry_run();
-                                        runtimes.insert(
-                                            name.clone(),
-                                            StrategyRuntime {
-                                                name: name.clone(),
-                                                symbol: symbol.clone(),
-                                                dir: strat_dir,
-                                                leverage,
-                                                capital,
-                                                position_size: sf.position_size,
-                                                sizing_mode,
-                                                order_qty: sf.order_qty,
-                                                engine_strategy,
-                                                params,
-                                                dry_run: strategy_dry_run,
-                                                trade_override,
-                                                risk_config,
-                                                risk_guard,
-                                                trade_stats: TradeStats::default(),
-                                                last_price: 0.0,
-                                                last_funding_rate: 0.0,
-                                                last_funding_log_nft: 0,
-                                            },
-                                        );
-
-                                        // Save ledger
-                                        let _ = order_router.ledger().save(&ledger_path);
-
-                                        info!(
-                                            strategy = %name, symbol = %symbol,
-                                            capital, leverage,
-                                            mode = if strategy_dry_run { "dry-run" } else { "live" },
-                                            "new strategy fully loaded"
-                                        );
                                     }
+
+                                    // Build and spawn worker
+                                    {
+                                        let trade_dir = sf.trade_direction();
+                                        let cooldown = sf.cooldown_bars.unwrap_or(0);
+                                        let min_vol = sf.min_volume.unwrap_or(0.0);
+                                        let min_spread = sf.min_spread_bps.unwrap_or(0.0);
+                                        let min_depth = sf.min_depth_usd.unwrap_or(0.0);
+                                        let filter = SignalFilter::new(trade_dir, cooldown, min_vol, min_spread, min_depth);
+
+                                        if let Some(worker_config) = build_worker_config(&name, &sf, filter, &data_store) {
+                                            let market_rx = gateway.subscribe_market(&symbol).unwrap();
+                                            let handle = worker::spawn_worker(worker_config, market_rx, signal_tx.clone());
+                                            worker_handles.push(handle);
+                                            info!(strategy = %name, symbol = %symbol, "new strategy worker spawned");
+                                        }
+                                    }
+
+                                    // Insert runtime
+                                    let strategy_dry_run = sf.is_dry_run();
+                                    runtimes.insert(
+                                        name.clone(),
+                                        StrategyRuntime {
+                                            name: name.clone(),
+                                            portfolio: found_portfolio.clone(),
+                                            symbol: symbol.clone(),
+                                            dir: strat_dir,
+                                            leverage,
+                                            capital,
+                                            position_size: sf.position_size,
+                                            sizing_mode,
+                                            order_qty: sf.order_qty,
+                                            engine_strategy,
+                                            params,
+                                            dry_run: strategy_dry_run,
+                                            trade_override,
+                                            risk_config,
+                                            risk_guard,
+                                            trade_stats: TradeStats::default(),
+                                            last_price: 0.0,
+                                            last_funding_rate: 0.0,
+                                            last_funding_log_nft: 0,
+                                        },
+                                    );
+
+                                    // Save ledger
+                                    let _ = order_router.ledger().save(&ledger_path);
+
+                                    info!(
+                                        strategy = %name, symbol = %symbol,
+                                        portfolio = %found_portfolio,
+                                        capital, leverage,
+                                        mode = if strategy_dry_run { "dry-run" } else { "live" },
+                                        "new strategy fully loaded"
+                                    );
                                 }
-                                Err(e) => {
-                                    warn!(dir = %dir_name, "failed to load signal.json for new strategy: {e}");
-                                }
+                            }
+                            Err(e) => {
+                                warn!(dir = %dir_name, "failed to load signal.json for new strategy: {e}");
                             }
                         }
                     }
@@ -1988,10 +2096,13 @@ async fn main() {
                     }
                     ConfigChange::Risk(name) => {
                         if let Some(rt) = runtimes.get_mut(&name) {
+                            let p_risk_path = portfolio_risk_paths.get(&rt.portfolio).cloned()
+                                .unwrap_or_else(|| rt.dir.join("risk.json"));
                             let risk_path = rt.dir.join("risk.json");
-                            let new_risk = RiskConfig::load_merged(&portfolio_risk_path, &risk_path);
+                            let new_risk = RiskConfig::load_merged(&p_risk_path, &risk_path);
                             info!(
                                 strategy = %name,
+                                portfolio = %rt.portfolio,
                                 max_loss = new_risk.max_loss_per_trade,
                                 max_daily_loss = new_risk.max_daily_loss,
                                 "risk.json reloaded (merged with portfolio)"
@@ -2001,34 +2112,57 @@ async fn main() {
                         }
                     }
                     ConfigChange::PortfolioTrade => {
-                        let new_override = TradeOverride::load(&portfolio_trade_path);
-                        info!(
-                            action = ?new_override.action,
-                            note = %new_override.note,
-                            "portfolio trade.json reloaded"
-                        );
-                        portfolio_trade_override = new_override;
-                        // If portfolio-level is pause/stop, it applies globally
-                        // If it's a oneshot action, execute across all strategies
-                        if portfolio_trade_override.needs_execution() {
-                            for (name, exchange) in &exchanges {
-                                let mut po_clone = portfolio_trade_override.clone();
-                                let rt_price = runtimes.get(name).map(|r| r.last_price).unwrap_or(0.0);
-                                execute_trade_override(
-                                    &mut po_clone, &portfolio_trade_path, exchange, name, rt_price,
-                                ).await;
+                        // Reload all portfolio trade overrides
+                        for (pname, trade_path) in &portfolio_trade_paths {
+                            let new_override = TradeOverride::load(trade_path);
+                            info!(
+                                portfolio = %pname,
+                                action = ?new_override.action,
+                                note = %new_override.note,
+                                "portfolio trade.json reloaded"
+                            );
+                            portfolio_trade_overrides.insert(pname.clone(), new_override);
+                        }
+                        // Execute oneshot overrides for affected portfolios
+                        for (pname, pto) in portfolio_trade_overrides.iter_mut() {
+                            if pto.needs_execution() {
+                                let trade_path = portfolio_trade_paths.get(pname).unwrap();
+                                for (name, exchange) in &exchanges {
+                                    if runtimes.get(name).map(|r| &r.portfolio) == Some(pname) {
+                                        let mut po_clone = pto.clone();
+                                        let rt_price = runtimes.get(name).map(|r| r.last_price).unwrap_or(0.0);
+                                        execute_trade_override(
+                                            &mut po_clone, trade_path, exchange, name, rt_price,
+                                        ).await;
+                                    }
+                                }
+                                pto.mark_executed(trade_path);
                             }
-                            // Mark as executed on the original
-                            portfolio_trade_override.mark_executed(&portfolio_trade_path);
                         }
                     }
                     ConfigChange::PortfolioRisk => {
                         info!("portfolio risk.json changed — reloading all strategy risk configs");
                         for (_name, rt) in runtimes.iter_mut() {
+                            let p_risk_path = portfolio_risk_paths.get(&rt.portfolio).cloned()
+                                .unwrap_or_else(|| rt.dir.join("risk.json"));
                             let risk_path = rt.dir.join("risk.json");
-                            let new_risk = RiskConfig::load_merged(&portfolio_risk_path, &risk_path);
+                            let new_risk = RiskConfig::load_merged(&p_risk_path, &risk_path);
                             rt.risk_guard = EngineRiskGuard::new(new_risk.clone(), rt.capital);
                             rt.risk_config = new_risk;
+                        }
+                        // Also reload per-portfolio GlobalRiskGuards
+                        for (pname, pc) in &portfolio_configs {
+                            let grc = if let Some(ref pr) = pc.risk {
+                                GlobalRiskConfig {
+                                    max_drawdown_pct: pr.max_drawdown_pct.unwrap_or(10.0),
+                                    max_daily_loss_pct: pr.max_daily_loss_pct.unwrap_or(5.0),
+                                    max_total_exposure: pr.max_total_exposure.unwrap_or(2.0),
+                                    max_per_coin_exposure_pct: pr.max_per_coin_exposure_pct.unwrap_or(50.0),
+                                }
+                            } else {
+                                GlobalRiskConfig::default()
+                            };
+                            portfolio_risk_guards.insert(pname.clone(), GlobalRiskGuard::new(grc, pc.allocated_capital));
                         }
                     }
                 }
@@ -2200,16 +2334,17 @@ mod tests {
         assert!((qty - 7.0).abs() < 1e-8);
     }
 
-    // ── scan_approved_strategies ──
+    // ── scan_approved_strategies_multi ──
 
     #[test]
     fn scan_finds_strategies() {
-        let strategies = scan_approved_strategies();
+        let strategies = scan_approved_strategies_multi("binance-main");
         // Should find at least some approved strategies in the project
         // (test depends on actual files, but validates the scan logic runs)
-        for (name, sf) in &strategies {
+        for (name, portfolio, sf) in &strategies {
             assert_eq!(sf.status.as_deref(), Some("approved"));
             assert!(!name.is_empty());
+            assert!(!portfolio.is_empty());
         }
     }
 

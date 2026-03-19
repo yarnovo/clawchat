@@ -44,6 +44,11 @@ pub fn portfolio_dir(account: &str, portfolio: &str) -> PathBuf {
     account_dir(account).join("portfolios").join(portfolio)
 }
 
+/// All portfolios dir: accounts/{account}/portfolios/
+pub fn portfolios_dir(account: &str) -> PathBuf {
+    account_dir(account).join("portfolios")
+}
+
 /// Default strategies dir: accounts/binance-main/portfolios/main/strategies/
 /// This is the most commonly used shortcut across the codebase.
 pub fn strategies_dir() -> PathBuf {
@@ -52,6 +57,11 @@ pub fn strategies_dir() -> PathBuf {
 
 pub fn strategy_dir(name: &str) -> PathBuf {
     strategies_dir().join(name)
+}
+
+/// Strategy dir within a specific portfolio
+pub fn strategy_dir_in(account: &str, portfolio: &str, name: &str) -> PathBuf {
+    portfolio_dir(account, portfolio).join("strategies").join(name)
 }
 
 pub fn records_dir() -> PathBuf {
