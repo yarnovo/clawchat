@@ -20,6 +20,7 @@ use tokio_tungstenite::connect_async;
 use tracing::{error, info, warn};
 
 use clawchat_shared::account::{AccountConfig, PortfolioConfig};
+use clawchat_shared::data::DataStore;
 use clawchat_shared::exchange::Exchange;
 use clawchat_shared::logging::init_logging;
 use clawchat_shared::paths;
@@ -205,12 +206,87 @@ fn create_strategy_instance(
     }
 }
 
+// ── Warmup: compute max indicator period from params ──────────
+
+/// 从策略参数中提取最大指标周期
+/// trend: max(ema_fast, ema_slow, atr_period)
+/// breakout: max(lookback, atr_period)
+/// rsi: rsi_period
+/// bollinger: bb_period
+/// macd: max(macd_slow, signal_period)
+/// 其他: 取所有 period/lookback 相关参数的最大值
+fn max_indicator_period(params: &HashMap<String, f64>) -> u64 {
+    let period_keys = [
+        "ema_fast", "ema_slow", "atr_period", "lookback",
+        "rsi_period", "bb_period", "macd_fast", "macd_slow",
+        "signal_period", "ma_period", "period",
+    ];
+    let max = params
+        .iter()
+        .filter(|(k, _)| period_keys.contains(&k.as_str()))
+        .map(|(_, &v)| v as u64)
+        .max()
+        .unwrap_or(0);
+    // 至少 20，避免无参数策略完全不预热
+    max.max(20)
+}
+
+/// 从 DataStore 加载历史 1m K 线并聚合到目标 timeframe
+fn load_warmup_candles(
+    data_store: &DataStore,
+    symbol: &str,
+    timeframe_ms: u64,
+    max_period: u64,
+) -> Vec<clawchat_shared::candle::Candle> {
+    // 需要 max_period × 2 根目标 timeframe K 线
+    // 每根目标 K 线 = timeframe_ms / 60_000 根 1m K 线
+    let tf_minutes = timeframe_ms / 60_000;
+    let candles_needed_1m = max_period * 2 * tf_minutes;
+
+    // 读取最新的 N 根 1m K 线
+    let all_1m = match data_store.read_candles(symbol, "1m", None, None) {
+        Ok(candles) => candles,
+        Err(e) => {
+            warn!(symbol, "warmup: failed to read 1m candles: {e}");
+            return Vec::new();
+        }
+    };
+
+    if all_1m.is_empty() {
+        warn!(symbol, "warmup: no 1m candles available");
+        return Vec::new();
+    }
+
+    // 取最后 candles_needed_1m 根
+    let start = if all_1m.len() > candles_needed_1m as usize {
+        all_1m.len() - candles_needed_1m as usize
+    } else {
+        0
+    };
+    let recent_1m = &all_1m[start..];
+
+    // 聚合到目标 timeframe
+    let aggregated = DataStore::aggregate_candles(recent_1m, timeframe_ms);
+
+    info!(
+        symbol,
+        timeframe_ms,
+        candles_1m = recent_1m.len(),
+        candles_aggregated = aggregated.len(),
+        max_period,
+        "warmup: loaded historical candles"
+    );
+
+    aggregated
+}
+
 // ── Build worker config from StrategyFile ──────────────────────
 
 fn build_worker_config(
     name: &str,
     sf: &StrategyFile,
     signal_filter: SignalFilter,
+    data_store: &DataStore,
 ) -> Option<WorkerConfig> {
     let symbol = sf.normalized_symbol()?;
     let engine_strategy = sf.engine_strategy.as_deref().unwrap_or("default");
@@ -220,12 +296,17 @@ fn build_worker_config(
 
     let strategy = create_strategy_instance(engine_strategy, &symbol, order_qty, &params);
 
+    // 加载预热用的历史 K 线
+    let max_period = max_indicator_period(&params);
+    let warmup_candles = load_warmup_candles(data_store, &symbol, timeframe_ms, max_period);
+
     Some(WorkerConfig {
         strategy_name: name.to_string(),
         symbol,
         timeframe_ms,
         strategy,
         filter: signal_filter,
+        warmup_candles,
     })
 }
 
@@ -1290,7 +1371,10 @@ async fn main() {
     // 9. Create signal channel (workers → main loop)
     let (signal_tx, mut signal_rx) = mpsc::channel::<worker::StrategySignal>(4096);
 
-    // 10. Spawn workers per strategy
+    // 10. Init DataStore for warmup
+    let data_store = DataStore::new(paths::data_dir());
+
+    // 11. Spawn workers per strategy
     let mut worker_handles = Vec::new();
     for (name, sf) in &approved {
         let symbol = match sf.normalized_symbol() {
@@ -1305,7 +1389,7 @@ async fn main() {
         let min_depth = sf.min_depth_usd.unwrap_or(0.0);
         let filter = SignalFilter::new(trade_dir, cooldown, min_vol, min_spread, min_depth);
 
-        let worker_config = match build_worker_config(name, sf, filter) {
+        let worker_config = match build_worker_config(name, sf, filter, &data_store) {
             Some(wc) => wc,
             None => {
                 warn!(name, "failed to build worker config, skipping");
@@ -1832,7 +1916,7 @@ async fn main() {
                                             let min_depth = sf.min_depth_usd.unwrap_or(0.0);
                                             let filter = SignalFilter::new(trade_dir, cooldown, min_vol, min_spread, min_depth);
 
-                                            if let Some(worker_config) = build_worker_config(&name, &sf, filter) {
+                                            if let Some(worker_config) = build_worker_config(&name, &sf, filter, &data_store) {
                                                 let market_rx = gateway.subscribe_market(&symbol).unwrap();
                                                 let handle = worker::spawn_worker(worker_config, market_rx, signal_tx.clone());
                                                 worker_handles.push(handle);

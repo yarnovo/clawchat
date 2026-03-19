@@ -7,7 +7,7 @@ use tokio::sync::{broadcast, mpsc};
 use tracing::{info, warn};
 
 use crate::filter::{FilterResult, SignalFilter};
-use crate::strategy::{CandleAggregator, Signal, Strategy};
+use crate::strategy::{Candle, CandleAggregator, Signal, Strategy};
 use crate::types::MarketEvent;
 
 // ── StrategySignal ───────────────────────────────────────────
@@ -31,6 +31,8 @@ pub struct WorkerConfig {
     pub timeframe_ms: u64,
     pub strategy: Box<dyn Strategy + Send>,
     pub filter: SignalFilter,
+    /// 预热用的历史 K 线（已聚合到策略 timeframe），预热期间信号被忽略
+    pub warmup_candles: Vec<Candle>,
 }
 
 // ── spawn_worker ─────────────────────────────────────────────
@@ -62,10 +64,32 @@ async fn worker_loop(
     let mut aggregator = CandleAggregator::new(config.timeframe_ms);
     let mut tick_count: u64 = 0;
 
+    // ── 快速预热：用历史 K 线驱动策略指标，忽略信号 ──
+    let warmup_count = config.warmup_candles.len();
+    if warmup_count > 0 {
+        info!(
+            strategy = %config.strategy_name,
+            symbol = %config.symbol,
+            candles = warmup_count,
+            "warmup: feeding historical candles"
+        );
+        for candle in &config.warmup_candles {
+            // 只更新指标，丢弃产生的信号
+            let _ = config.strategy.on_candle(candle);
+        }
+        info!(
+            strategy = %config.strategy_name,
+            symbol = %config.symbol,
+            candles = warmup_count,
+            "warmup: complete, strategy ready"
+        );
+    }
+
     info!(
         strategy = %config.strategy_name,
         symbol = %config.symbol,
         timeframe_ms = config.timeframe_ms,
+        warmup_candles = warmup_count,
         "worker started"
     );
 
@@ -212,6 +236,7 @@ mod tests {
             timeframe_ms: 1000, // 1s K 线
             strategy: Box::new(AlwaysBuyStrategy),
             filter: SignalFilter::new(TradeDirection::Both, 0, 0.0, 0.0, 0.0),
+            warmup_candles: Vec::new(),
         };
 
         let market_rx = market_tx.subscribe();
@@ -256,6 +281,7 @@ mod tests {
             timeframe_ms: 1000,
             strategy: Box::new(AlwaysBuyStrategy),
             filter: SignalFilter::new(TradeDirection::Both, 0, 0.0, 0.0, 0.0),
+            warmup_candles: Vec::new(),
         };
 
         let market_rx = market_tx.subscribe();
@@ -293,6 +319,7 @@ mod tests {
             timeframe_ms: 1000,
             strategy: Box::new(NeverSignalStrategy),
             filter: SignalFilter::new(TradeDirection::Both, 0, 0.0, 0.0, 0.0),
+            warmup_candles: Vec::new(),
         };
 
         let market_rx = market_tx.subscribe();
@@ -323,6 +350,7 @@ mod tests {
             timeframe_ms: 1000,
             strategy: Box::new(NeverSignalStrategy),
             filter: SignalFilter::new(TradeDirection::Both, 0, 0.0, 0.0, 0.0),
+            warmup_candles: Vec::new(),
         };
 
         let market_rx = market_tx.subscribe();
@@ -349,6 +377,7 @@ mod tests {
             timeframe_ms: 1000,
             strategy: Box::new(AlwaysBuyStrategy),
             filter: SignalFilter::new(TradeDirection::Both, 5, 0.0, 0.0, 0.0),
+            warmup_candles: Vec::new(),
         };
 
         let market_rx = market_tx.subscribe();
