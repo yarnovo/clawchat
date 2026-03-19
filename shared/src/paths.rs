@@ -70,6 +70,11 @@ pub fn data_dir() -> PathBuf {
     project_root().join("data")
 }
 
+/// 配置目录: config/
+pub fn config_dir() -> PathBuf {
+    project_root().join("config")
+}
+
 /// 策略暂存区：发现引擎产出 pending 策略到此目录
 pub fn discovered_dir() -> PathBuf {
     project_root().join("discovered")
@@ -79,12 +84,17 @@ pub fn engine_bin() -> PathBuf {
     project_root().join("engine/target/release/hft-engine")
 }
 
-/// 币种注册表: accounts/binance-main/symbols.json
-pub fn symbols_json(account: &str) -> PathBuf {
-    account_dir(account).join("symbols.json")
+/// 币种注册表: config/symbols.json
+pub fn symbols_json(_account: &str) -> PathBuf {
+    config_dir().join("symbols.json")
 }
 
-/// 默认账户的 symbols.json
+/// 默认 symbols.json: config/symbols.json
 pub fn default_symbols_json() -> PathBuf {
-    symbols_json("binance-main")
+    config_dir().join("symbols.json")
+}
+
+/// 运维级调度配置: config/schedule.json
+pub fn schedule_json() -> PathBuf {
+    config_dir().join("schedule.json")
 }

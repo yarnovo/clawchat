@@ -1,5 +1,4 @@
-use clawchat_shared::paths;
-use clawchat_shared::symbols::SymbolRegistry;
+use serde_json::json;
 
 use crate::Ctx;
 
@@ -8,22 +7,25 @@ const SKIP_BASES: &[&str] = &[
     "USDC", "BUSD", "TUSD", "FDUSD", "DAI", "UST", "USDP",
 ];
 
-/// 从 Binance 扫描候选币种，更新 symbols.json
+/// 扫描 Binance 候选币种，纯 stdout 输出（不写文件）
+///
+/// --json 模式输出 JSON 数组:
+/// ```json
+/// [
+///   {"symbol":"BTCUSDT","volume_24h":18808000000,"listing_days":365},
+///   {"symbol":"ETHUSDT","volume_24h":17627000000,"listing_days":365}
+/// ]
+/// ```
+///
+/// 默认输出表格格式。
 pub async fn run(
     ctx: &Ctx,
     min_volume: f64,
     top: usize,
+    existing_symbols: &[String],
+    blacklist: &[String],
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let symbols_path = paths::default_symbols_json();
-
-    // 加载现有注册表（不存在则创建空的）
-    let mut registry = if symbols_path.exists() {
-        SymbolRegistry::load(&symbols_path).map_err(|e| format!("load symbols.json: {e}"))?
-    } else {
-        SymbolRegistry::default()
-    };
-
-    println!("  正在扫描 Binance USDT 永续合约...");
+    eprintln!("  正在扫描 Binance USDT 永续合约...");
 
     // 获取交易所信息（用于检查上线时间）
     let exchange_info = ctx.exchange.fetch_exchange_info().await?;
@@ -34,7 +36,8 @@ pub async fn run(
         .unwrap_or_default();
 
     // 180 天前的时间戳
-    let cutoff_ms = chrono::Utc::now().timestamp_millis() - 180 * 86_400 * 1_000;
+    let now_ms = chrono::Utc::now().timestamp_millis();
+    let cutoff_ms = now_ms - 180 * 86_400 * 1_000;
 
     // 构建 symbol -> onboardDate 映射
     let mut onboard_dates: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
@@ -55,7 +58,7 @@ pub async fn run(
     // 获取 24h tickers
     let tickers = ctx.exchange.fetch_tickers().await?;
 
-    let mut candidates: Vec<(String, f64)> = Vec::new();
+    let mut candidates: Vec<(String, f64, i64)> = Vec::new();
 
     for t in &tickers {
         let symbol = t
@@ -76,12 +79,12 @@ pub async fn run(
         }
 
         // 排除已有币种
-        if registry.contains(&symbol) {
+        if existing_symbols.iter().any(|s| s == &symbol) {
             continue;
         }
 
         // 排除黑名单
-        if registry.is_blacklisted(&symbol) {
+        if blacklist.iter().any(|s| s == &symbol) {
             continue;
         }
 
@@ -101,53 +104,36 @@ pub async fn run(
             continue;
         }
 
-        candidates.push((symbol, vol));
+        let listing_days = (now_ms - onboard) / (86_400 * 1_000);
+        candidates.push((symbol, vol, listing_days));
     }
 
     // 按成交量排序
     candidates.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
     let selected: Vec<_> = candidates.into_iter().take(top).collect();
 
-    if selected.is_empty() {
-        println!("  未发现符合条件的新币种");
+    if ctx.json {
+        // --json: 输出 JSON 数组（与需求文档格式一致）
+        let arr: Vec<serde_json::Value> = selected
+            .iter()
+            .map(|(sym, vol, days)| {
+                json!({ "symbol": sym, "volume_24h": *vol as i64, "listing_days": days })
+            })
+            .collect();
+        println!("{}", serde_json::to_string_pretty(&arr)?);
+    } else {
+        // 默认: 表格格式
         println!(
-            "  (条件: 24h成交额 > ${:.0}M, 上线 > 180 天, 排除已有 {} 个币种)",
-            min_volume / 1e6,
-            registry.symbols.len()
+            "{:<16} {:>18} {:>14}",
+            "SYMBOL", "VOLUME_24H (USDT)", "LISTING_DAYS"
         );
-        return Ok(());
+        println!("{}", "-".repeat(50));
+        for (sym, vol, days) in &selected {
+            println!("{:<16} {:>18.0} {:>14}", sym, vol, days);
+        }
+        println!("{}", "-".repeat(50));
+        println!("共 {} 个候选币种", selected.len());
     }
-
-    // 输出结果
-    println!(
-        "\n  发现 {} 个候选币种 (24h成交额 > ${:.0}M, 上线 > 180 天):\n",
-        selected.len(),
-        min_volume / 1e6
-    );
-    println!("  {:<4} {:<14} {:>14}", "#", "交易对", "24h成交额(M)");
-    println!("  {}", "-".repeat(36));
-
-    let mut added = 0;
-    for (i, (sym, vol)) in selected.iter().enumerate() {
-        println!(
-            "  {:<4} {:<14} {:>14.1}",
-            i + 1,
-            sym,
-            vol / 1e6
-        );
-        registry.add_symbol(sym.clone(), Some(*vol));
-        added += 1;
-    }
-
-    // 保存
-    registry.save(&symbols_path).map_err(|e| format!("save symbols.json: {e}"))?;
-    println!(
-        "\n  已添加 {added} 个新币种到 symbols.json (状态: data_ready)"
-    );
-    println!("  总币种数: {}", registry.symbols.len());
-    println!(
-        "\n  下一步: clawchat expand-symbol --symbol <SYMBOL> 回填数据+发现策略"
-    );
 
     Ok(())
 }

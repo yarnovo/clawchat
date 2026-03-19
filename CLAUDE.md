@@ -28,6 +28,10 @@ cargo run -p clawchat-ops -- --help
 
 整个系统的通信协议是文件。引擎读文件做事写文件，Agent 读文件判断写文件。
 
+**config/** — 引擎级配置（agent 写，引擎读）。
+- `symbols.json` — 币种注册表（data-engine / discovery 读）
+- `schedule.json` — 运维级调度（心跳读）
+
 **issues/** — 问题上报，用文件夹管理状态。
 - `issues/open/` — 未解决的问题
 - `issues/closed/` — 已解决的问题

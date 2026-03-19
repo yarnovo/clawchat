@@ -171,7 +171,7 @@ enum Command {
     },
 
     // ── 币种扩展 ──
-    /// 扫描 Binance 候选币种，更新 symbols.json
+    /// 扫描 Binance 候选币种（纯输出 JSON，不写文件）
     ScanSymbols {
         /// 最低 24h 成交额 (USDT)
         #[arg(long, default_value_t = 5_000_000.0)]
@@ -480,7 +480,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // ── 币种扩展 ────────────────────────────
         Command::ScanSymbols { min_volume, top } => {
-            cmd::scan_symbols::run(&ctx, min_volume, top).await?;
+            // 加载现有注册表用于排除已有币种
+            let symbols_path = clawchat_shared::paths::default_symbols_json();
+            let (existing, blacklist) = if symbols_path.exists() {
+                match clawchat_shared::symbols::SymbolRegistry::load(&symbols_path) {
+                    Ok(reg) => {
+                        let existing: Vec<String> = reg.symbols.keys().cloned().collect();
+                        let blacklist = reg.blacklist.clone();
+                        (existing, blacklist)
+                    }
+                    Err(_) => (Vec::new(), Vec::new()),
+                }
+            } else {
+                (Vec::new(), Vec::new())
+            };
+            cmd::scan_symbols::run(&ctx, min_volume, top, &existing, &blacklist).await?;
         }
         Command::ExpandSymbol { symbol, days } => {
             cmd::expand_symbol::run(&ctx, &symbol, days).await?;

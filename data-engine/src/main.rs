@@ -10,11 +10,8 @@ use tracing::info;
 use clawchat_shared::config_util::timeframe_to_ms;
 use clawchat_shared::data::DataStore;
 use clawchat_shared::exchange::Exchange;
-use clawchat_shared::paths::project_root;
-
-const DEFAULT_SYMBOLS: &[&str] = &[
-    "BARDUSDT", "NTRNUSDT", "FETUSDT", "SUIUSDT", "LYNUSDT",
-];
+use clawchat_shared::paths;
+use clawchat_shared::symbols::SymbolRegistry;
 
 #[derive(Parser)]
 #[command(name = "data-engine", about = "ClawChat data engine — backfill & realtime collection")]
@@ -66,12 +63,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let cli = Cli::parse();
 
-    let data_dir = cli.data_dir.unwrap_or_else(|| project_root().join("data"));
+    let data_dir = cli.data_dir.unwrap_or_else(paths::data_dir);
     std::fs::create_dir_all(&data_dir)?;
 
-    let symbols: Vec<String> = cli
-        .symbols
-        .unwrap_or_else(|| DEFAULT_SYMBOLS.iter().map(|s| s.to_string()).collect());
+    let symbols: Vec<String> = cli.symbols.unwrap_or_else(|| {
+        // 从 config/symbols.json 读取可采集数据的币种
+        let symbols_path = paths::default_symbols_json();
+        if symbols_path.exists() {
+            if let Ok(registry) = SymbolRegistry::load(&symbols_path) {
+                let syms = registry.data_symbols();
+                if !syms.is_empty() {
+                    info!(count = syms.len(), "loaded symbols from config/symbols.json");
+                    return syms;
+                }
+            }
+        }
+        info!("config/symbols.json not found or empty, using hardcoded defaults");
+        vec![
+            "BARDUSDT".into(), "NTRNUSDT".into(), "FETUSDT".into(),
+            "SUIUSDT".into(), "LYNUSDT".into(),
+        ]
+    });
 
     let store = DataStore::new(&data_dir);
 
@@ -93,7 +105,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "starting realtime collection"
             );
 
-            collector::run_collector(&exchange, &store, &symbols, &intervals).await?;
+            let symbols_json_path = paths::default_symbols_json();
+            let watch_path = if symbols_json_path.exists() {
+                Some(symbols_json_path.as_path())
+            } else {
+                None
+            };
+
+            collector::run_collector(&exchange, &store, &symbols, &intervals, watch_path).await?;
         }
         Command::Backfill { days, intervals } => {
             let api_key = std::env::var("BINANCE_API_KEY").unwrap_or_default();

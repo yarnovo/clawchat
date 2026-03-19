@@ -1,8 +1,15 @@
+use std::collections::HashSet;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
 use clawchat_shared::candle::Candle;
 use clawchat_shared::data::DataStore;
 use clawchat_shared::exchange::Exchange;
+use clawchat_shared::symbols::SymbolRegistry;
 use futures_util::{SinkExt, StreamExt};
+use notify::{EventKind, RecursiveMode, Watcher};
 use serde::Deserialize;
+use tokio::sync::Mutex;
 use tokio_tungstenite::connect_async;
 use tracing::{debug, error, info, warn};
 
@@ -56,12 +63,32 @@ struct BinanceKline {
 ///
 /// Connects to combined kline streams for all symbols/intervals,
 /// stores closed candles, and periodically runs gap detection.
+///
+/// If `symbols_json_path` is provided, also watches that file for changes
+/// and dynamically spawns individual WS connections for newly added symbols.
 pub async fn run_collector(
     exchange: &Exchange,
     store: &DataStore,
     symbols: &[String],
     intervals: &[String],
+    symbols_json_path: Option<&Path>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // Track all known symbols (initial + dynamically added)
+    let known_symbols: Arc<Mutex<HashSet<String>>> =
+        Arc::new(Mutex::new(symbols.iter().cloned().collect()));
+
+    // Start symbol watcher if path provided
+    if let Some(path) = symbols_json_path {
+        spawn_symbol_watcher(
+            path.to_path_buf(),
+            Arc::clone(&known_symbols),
+            exchange.clone(),
+            store.clone(),
+            intervals.to_vec(),
+        );
+        info!(path = %path.display(), "symbols.json watcher started");
+    }
+
     let url = build_kline_url(symbols, intervals);
     info!(url = %url, symbols = ?symbols, intervals = ?intervals, "starting realtime kline collector");
 
@@ -217,6 +244,299 @@ pub async fn run_collector(
         tokio::time::sleep(retry_delay).await;
         retry_delay = (retry_delay * 2).min(max_delay);
     }
+}
+
+// ── Dynamic Symbol Watcher ──────────────────────────────────
+
+/// Watch `symbols.json` for changes. When new symbols appear (not already in
+/// `known_symbols`), spawn an individual WS kline connection for each.
+/// Only adds, never removes — existing connections are not affected.
+fn spawn_symbol_watcher(
+    symbols_json_path: PathBuf,
+    known_symbols: Arc<Mutex<HashSet<String>>>,
+    exchange: Exchange,
+    store: DataStore,
+    intervals: Vec<String>,
+) {
+    // Channel to forward fs events from the sync notify callback into async
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<()>(4);
+
+    // Watch the parent directory (notify requires the dir to exist)
+    let watch_dir = symbols_json_path
+        .parent()
+        .unwrap_or(Path::new("."))
+        .to_path_buf();
+    let watched_filename = symbols_json_path
+        .file_name()
+        .unwrap_or_default()
+        .to_os_string();
+
+    // Spawn the watcher on a dedicated thread (notify uses sync callbacks)
+    std::thread::spawn(move || {
+        let tx = tx;
+        let watched_filename = watched_filename;
+
+        let mut watcher = match notify::recommended_watcher(
+            move |res: Result<notify::Event, notify::Error>| {
+                if let Ok(event) = res {
+                    let dominated = matches!(
+                        event.kind,
+                        EventKind::Modify(_) | EventKind::Create(_)
+                    );
+                    if !dominated {
+                        return;
+                    }
+                    // Only trigger if the changed file matches symbols.json
+                    let is_target = event.paths.iter().any(|p| {
+                        p.file_name()
+                            .map(|f| f == watched_filename)
+                            .unwrap_or(false)
+                    });
+                    if is_target {
+                        let _ = tx.try_send(());
+                    }
+                }
+            },
+        ) {
+            Ok(w) => w,
+            Err(e) => {
+                error!(%e, "failed to create file watcher for symbols.json");
+                return;
+            }
+        };
+
+        if let Err(e) = watcher.watch(&watch_dir, RecursiveMode::NonRecursive) {
+            error!(dir = %watch_dir.display(), %e, "failed to watch config directory");
+            return;
+        }
+
+        info!(dir = %watch_dir.display(), "file watcher thread started");
+
+        // Keep watcher alive — block this thread forever
+        loop {
+            std::thread::park();
+        }
+    });
+
+    // Async task that reacts to file change notifications
+    let symbols_json_path_for_task = symbols_json_path;
+    tokio::spawn(async move {
+        // Debounce: wait a bit after each notification to coalesce rapid writes
+        let debounce = std::time::Duration::from_secs(2);
+
+        while rx.recv().await.is_some() {
+            // Drain any pending notifications (debounce)
+            tokio::time::sleep(debounce).await;
+            while rx.try_recv().is_ok() {}
+
+            info!("symbols.json changed, checking for new symbols");
+
+            let new_symbols = match detect_new_symbols(
+                &symbols_json_path_for_task,
+                &known_symbols,
+            )
+            .await
+            {
+                Ok(syms) => syms,
+                Err(e) => {
+                    warn!(%e, "failed to read updated symbols.json");
+                    continue;
+                }
+            };
+
+            if new_symbols.is_empty() {
+                debug!("no new symbols detected");
+                continue;
+            }
+
+            info!(new = ?new_symbols, "new symbols detected, spawning WS connections");
+
+            for symbol in new_symbols {
+                spawn_single_symbol_ws(
+                    symbol,
+                    exchange.clone(),
+                    store.clone(),
+                    intervals.clone(),
+                );
+            }
+        }
+    });
+}
+
+/// Compare current symbols.json against known_symbols, return new ones.
+/// Also inserts newly found symbols into the known set.
+async fn detect_new_symbols(
+    path: &Path,
+    known_symbols: &Arc<Mutex<HashSet<String>>>,
+) -> Result<Vec<String>, String> {
+    let registry = SymbolRegistry::load(path)?;
+    let file_symbols = registry.data_symbols();
+
+    let mut known = known_symbols.lock().await;
+    let mut new_symbols = Vec::new();
+
+    for sym in file_symbols {
+        if !known.contains(&sym) {
+            known.insert(sym.clone());
+            new_symbols.push(sym);
+        }
+    }
+
+    Ok(new_symbols)
+}
+
+/// Spawn a standalone WS kline connection for a single symbol.
+/// Runs with its own reconnect loop, independent from the main combined stream.
+fn spawn_single_symbol_ws(
+    symbol: String,
+    exchange: Exchange,
+    store: DataStore,
+    intervals: Vec<String>,
+) {
+    tokio::spawn(async move {
+        let symbols = vec![symbol.clone()];
+        let url = build_kline_url(&symbols, &intervals);
+        info!(symbol = %symbol, url = %url, "starting individual WS for new symbol");
+
+        // Run gap detection first to backfill any recent data
+        for interval in &intervals {
+            match detect_and_fill_gaps(&exchange, &store, &symbol, interval, GAP_CHECK_HOURS).await
+            {
+                Ok(filled) => {
+                    if filled > 0 {
+                        info!(%symbol, %interval, filled, "initial gap fill for new symbol");
+                    }
+                }
+                Err(e) => {
+                    warn!(%symbol, %interval, %e, "initial gap fill failed for new symbol");
+                }
+            }
+        }
+
+        let mut retry_delay = std::time::Duration::from_secs(1);
+        let max_delay = std::time::Duration::from_secs(30);
+        let read_timeout = std::time::Duration::from_secs(60);
+        let mut consecutive_failures: u32 = 0;
+
+        loop {
+            match connect_async(&url).await {
+                Ok((ws_stream, _)) => {
+                    info!(symbol = %symbol, "individual ws connected");
+                    retry_delay = std::time::Duration::from_secs(1);
+                    consecutive_failures = 0;
+
+                    let (mut write, mut read) = ws_stream.split();
+                    let mut last_gap_check = std::time::Instant::now();
+
+                    loop {
+                        if last_gap_check.elapsed().as_secs() >= GAP_CHECK_INTERVAL_SECS {
+                            run_gap_detection(&exchange, &store, &symbols, &intervals).await;
+                            last_gap_check = std::time::Instant::now();
+                        }
+
+                        match tokio::time::timeout(read_timeout, read.next()).await {
+                            Ok(Some(msg)) => match msg {
+                                Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
+                                    match serde_json::from_str::<BinanceCombinedKline>(&text) {
+                                        Ok(combined) => {
+                                            let event = combined.data;
+                                            let kline = &event.k;
+
+                                            if !kline.is_closed {
+                                                continue;
+                                            }
+
+                                            let candle =
+                                                match parse_ws_kline(kline, event.symbol.as_str())
+                                                {
+                                                    Some(c) => c,
+                                                    None => continue,
+                                                };
+
+                                            debug!(
+                                                symbol = %event.symbol,
+                                                interval = %kline.interval,
+                                                ts = candle.timestamp,
+                                                close = candle.close,
+                                                "closed kline (individual ws)"
+                                            );
+
+                                            match store.append_candles(
+                                                &event.symbol,
+                                                &kline.interval,
+                                                &[candle],
+                                            ) {
+                                                Ok(n) => {
+                                                    if n > 0 {
+                                                        info!(
+                                                            symbol = %event.symbol,
+                                                            interval = %kline.interval,
+                                                            "candle stored (individual ws)"
+                                                        );
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    error!(
+                                                        symbol = %event.symbol,
+                                                        interval = %kline.interval,
+                                                        %e,
+                                                        "failed to store candle (individual ws)"
+                                                    );
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {
+                                            debug!(%e, "failed to parse ws message");
+                                        }
+                                    }
+                                }
+                                Ok(tokio_tungstenite::tungstenite::Message::Ping(data)) => {
+                                    if let Err(e) = write
+                                        .send(tokio_tungstenite::tungstenite::Message::Pong(data))
+                                        .await
+                                    {
+                                        error!(symbol = %symbol, %e, "failed to send pong");
+                                        break;
+                                    }
+                                }
+                                Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => {
+                                    warn!(symbol = %symbol, "ws close frame received");
+                                    break;
+                                }
+                                Err(e) => {
+                                    error!(symbol = %symbol, %e, "ws read error");
+                                    break;
+                                }
+                                _ => {}
+                            },
+                            Ok(None) => {
+                                warn!(symbol = %symbol, "ws stream ended");
+                                break;
+                            }
+                            Err(_) => {
+                                warn!(symbol = %symbol, "ws read timeout, reconnecting");
+                                break;
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    error!(symbol = %symbol, %e, "ws connect failed");
+                    consecutive_failures += 1;
+                }
+            }
+
+            if consecutive_failures >= 10 {
+                error!(symbol = %symbol, "10+ consecutive failures — still retrying");
+            }
+
+            run_gap_detection(&exchange, &store, &symbols, &intervals).await;
+
+            warn!(symbol = %symbol, delay_secs = retry_delay.as_secs(), "reconnecting");
+            tokio::time::sleep(retry_delay).await;
+            retry_delay = (retry_delay * 2).min(max_delay);
+        }
+    });
 }
 
 // ── Gap Detection ───────────────────────────────────────────
@@ -549,5 +869,81 @@ mod tests {
 
         let msg: BinanceCombinedKline = serde_json::from_str(raw).unwrap();
         assert!(!msg.data.k.is_closed);
+    }
+
+    #[tokio::test]
+    async fn test_detect_new_symbols() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("symbols.json");
+
+        // Write a symbols.json with 3 symbols
+        let json = r#"{
+            "symbols": {
+                "NTRNUSDT": { "status": "active", "added_at": "2026-01-01T00:00:00Z" },
+                "BARDUSDT": { "status": "data_ready", "added_at": "2026-01-01T00:00:00Z" },
+                "NEWUSDT": { "status": "data_ready", "added_at": "2026-03-19T00:00:00Z" }
+            },
+            "blacklist": []
+        }"#;
+        std::fs::write(&path, json).unwrap();
+
+        // Known set has NTRNUSDT and BARDUSDT already
+        let known: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(
+            ["NTRNUSDT".to_string(), "BARDUSDT".to_string()]
+                .into_iter()
+                .collect(),
+        ));
+
+        let new = detect_new_symbols(&path, &known).await.unwrap();
+        assert_eq!(new, vec!["NEWUSDT".to_string()]);
+
+        // Now known should contain all 3
+        let known_set = known.lock().await;
+        assert!(known_set.contains("NEWUSDT"));
+        assert_eq!(known_set.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_detect_new_symbols_no_new() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("symbols.json");
+
+        let json = r#"{
+            "symbols": {
+                "NTRNUSDT": { "status": "active", "added_at": "2026-01-01T00:00:00Z" }
+            },
+            "blacklist": []
+        }"#;
+        std::fs::write(&path, json).unwrap();
+
+        let known: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(
+            ["NTRNUSDT".to_string()].into_iter().collect(),
+        ));
+
+        let new = detect_new_symbols(&path, &known).await.unwrap();
+        assert!(new.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_detect_new_symbols_skips_delisted() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("symbols.json");
+
+        let json = r#"{
+            "symbols": {
+                "NTRNUSDT": { "status": "active", "added_at": "2026-01-01T00:00:00Z" },
+                "DEADUSDT": { "status": "delisted", "added_at": "2026-01-01T00:00:00Z" }
+            },
+            "blacklist": []
+        }"#;
+        std::fs::write(&path, json).unwrap();
+
+        let known: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(
+            ["NTRNUSDT".to_string()].into_iter().collect(),
+        ));
+
+        // DEADUSDT is delisted so data_symbols() won't return it
+        let new = detect_new_symbols(&path, &known).await.unwrap();
+        assert!(new.is_empty());
     }
 }

@@ -26,7 +26,7 @@ user-invocable: true
 ```
 /loop 10m 心跳
   │
-  ├── 读 schedule.json（运维级）
+  ├── 读 config/schedule.json（运维级）
   ├── 读 accounts/binance-main/schedule.json（业务级）
   ├── 读 records/schedule_state.json（上次执行时间）
   │
@@ -168,7 +168,7 @@ prompt:
 
 ```
 1. 读取调度配置
-   - schedule.json（运维级任务）
+   - config/schedule.json（运维级任务）
    - accounts/binance-main/schedule.json（业务级任务）
    - 合并为一个任务列表
 
@@ -210,7 +210,7 @@ prompt:
 
 ## 调度配置
 
-**schedule.json**（项目根目录，运维级）：
+**config/schedule.json**（运维级）：
 ```json
 {
   "health_check": { "interval_min": 60, "member": "monitor" },
@@ -237,7 +237,7 @@ prompt:
 }
 ```
 
-用户可以随时改 schedule.json 的 interval_min 调整频率，下次心跳自动生效。
+用户可以随时改 config/schedule.json 的 interval_min 调整频率，下次心跳自动生效。
 
 ## 关闭团队
 

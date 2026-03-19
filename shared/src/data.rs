@@ -22,6 +22,7 @@ pub enum DataError {
     NoData { symbol: String, interval: String },
 }
 
+#[derive(Clone)]
 pub struct DataStore {
     base_dir: PathBuf,
 }

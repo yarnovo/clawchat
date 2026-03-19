@@ -59,6 +59,7 @@ pub enum ExchangeError {
 
 // ── Exchange client ────────────────────────────────────────────
 
+#[derive(Clone)]
 pub struct Exchange {
     client: Client,
     api_key: String,

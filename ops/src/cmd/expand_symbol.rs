@@ -1,21 +1,26 @@
 use std::process::Command;
 
 use clawchat_shared::paths;
-use clawchat_shared::symbols::{SymbolRegistry, SymbolStatus};
+use serde_json::json;
 
 use crate::Ctx;
 
-/// 单币种全链路扩展：回填历史数据 + 策略发现
+/// 单币种全链路扩展：回填历史数据 + 策略发现（纯 stdout 输出，不写文件）
+///
+/// 输出格式:
+/// ```json
+/// {"symbol":"WLDUSDT","backfill":"ok","discovery":"ok","candidates":3}
+/// ```
 pub async fn run(
-    _ctx: &Ctx,
+    ctx: &Ctx,
     symbol: &str,
     days: u32,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let symbol = symbol.to_uppercase();
-    println!("=== 扩展币种: {} ===\n", symbol);
+    eprintln!("=== 扩展币种: {} ===\n", symbol);
 
     // ── Step 1: 回填历史数据 ──
-    println!("  [1/2] 回填 {} 天 1m K 线...", days);
+    eprintln!("  [1/2] 回填 {} 天 1m K 线...", days);
 
     let backfill_status = Command::new("cargo")
         .args([
@@ -27,13 +32,25 @@ pub async fn run(
         ])
         .status()?;
 
-    if !backfill_status.success() {
+    let backfill_ok = backfill_status.success();
+    if !backfill_ok {
+        let output = json!({
+            "symbol": symbol,
+            "backfill": "failed",
+            "discovery": "skipped",
+            "candidates": 0,
+        });
+        if ctx.json {
+            println!("{}", serde_json::to_string_pretty(&output)?);
+        } else {
+            println!("{}", serde_json::to_string(&output)?);
+        }
         return Err(format!("data-engine backfill 失败 (exit code: {:?})", backfill_status.code()).into());
     }
-    println!("  回填完成\n");
+    eprintln!("  回填完成\n");
 
     // ── Step 2: 策略发现 ──
-    println!("  [2/2] 运行策略发现 (all strategies, 90 天, all timeframes)...");
+    eprintln!("  [2/2] 运行策略发现 (all strategies, 90 天, all timeframes)...");
 
     let discovery_status = Command::new("cargo")
         .args([
@@ -46,15 +63,26 @@ pub async fn run(
         ])
         .status()?;
 
-    if !discovery_status.success() {
+    let discovery_ok = discovery_status.success();
+    if !discovery_ok {
+        let output = json!({
+            "symbol": symbol,
+            "backfill": "ok",
+            "discovery": "failed",
+            "candidates": 0,
+        });
+        if ctx.json {
+            println!("{}", serde_json::to_string_pretty(&output)?);
+        } else {
+            println!("{}", serde_json::to_string(&output)?);
+        }
         return Err(format!("discovery scan 失败 (exit code: {:?})", discovery_status.code()).into());
     }
 
-    // ── Step 3: 检查结果并更新状态 ──
+    // ── Step 3: 检查结果（只读，不写文件） ──
     let discovered_dir = paths::discovered_dir();
     let sym_lower = symbol.to_lowercase().replace("usdt", "");
 
-    // 扫描 discovered/ 看是否有匹配 symbol 的策略产出
     let mut found_count = 0;
     if discovered_dir.exists() {
         if let Ok(entries) = std::fs::read_dir(&discovered_dir) {
@@ -67,28 +95,20 @@ pub async fn run(
         }
     }
 
-    // 更新 symbols.json 状态
-    let symbols_path = paths::default_symbols_json();
-    if symbols_path.exists() {
-        if let Ok(mut registry) = SymbolRegistry::load(&symbols_path) {
-            if found_count > 0 {
-                registry.set_status(&symbol, SymbolStatus::DataReady);
-            } else {
-                registry.set_status(&symbol, SymbolStatus::NoSignal);
-            }
-            registry.save(&symbols_path).map_err(|e| format!("save symbols.json: {e}"))?;
-        }
-    }
+    let discovery_result = if found_count > 0 { "ok" } else { "no_signal" };
 
-    // ── 汇总 ──
-    println!("\n=== 结果 ===");
-    if found_count > 0 {
-        println!("  发现 {} 个候选策略", found_count);
-        println!("  位置: discovered/{}*", sym_lower);
-        println!("  下一步: 审批策略 → status=approved → 移到 strategies/");
+    // 输出结果 JSON 到 stdout
+    let output = json!({
+        "symbol": symbol,
+        "backfill": "ok",
+        "discovery": discovery_result,
+        "candidates": found_count,
+    });
+
+    if ctx.json {
+        println!("{}", serde_json::to_string_pretty(&output)?);
     } else {
-        println!("  未发现合格策略");
-        println!("  symbols.json 状态已更新为 no_signal");
+        println!("{}", serde_json::to_string(&output)?);
     }
 
     Ok(())
