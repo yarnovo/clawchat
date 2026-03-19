@@ -1,0 +1,8 @@
+{
+  "name": "binance-main",
+  "exchange": "binance",
+  "base_url": "https://fapi.binance.com",
+  "total_capital": 222,
+  "api_key_env": "BINANCE_API_KEY",
+  "api_secret_env": "BINANCE_API_SECRET"
+}

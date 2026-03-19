@@ -1,37 +1,16 @@
 use clap::Parser;
-use serde::Deserialize;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
-use crate::filter::TradeDirection;
-
-/// 下单量模式
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum SizingMode {
-    /// 固定下单量（order_qty 原值）
-    #[default]
-    Fixed,
-    /// 百分比下单：order_qty = (equity × position_size × leverage) / price
-    Percent,
-}
-
-impl SizingMode {
-    pub fn from_str_lossy(s: &str) -> Self {
-        match s {
-            "percent" => Self::Percent,
-            "fixed" => Self::Fixed,
-            other => {
-                eprintln!("WARN: unknown sizing_mode '{other}', defaulting to fixed");
-                Self::Fixed
-            }
-        }
-    }
-}
+// Re-export shared types used by Config
+pub use clawchat_shared::config_util::{normalize_symbol, timeframe_to_ms};
+pub use clawchat_shared::strategy::StrategyFile;
+pub use clawchat_shared::types::{SizingMode, TradeDirection};
 
 #[derive(Parser, Debug, Clone)]
 #[command(name = "hft-engine", about = "High-frequency trading engine for Binance futures")]
 pub struct Config {
-    /// Path to strategy.json config file
+    /// Path to signal.json config file
     #[arg(long)]
     pub config: Option<PathBuf>,
 
@@ -63,7 +42,7 @@ pub struct Config {
     #[arg(long, env = "BINANCE_BASE_URL", default_value = "https://fapi.binance.com")]
     pub base_url: String,
 
-    // ── Fields populated from strategy.json ──
+    // ── Fields populated from signal.json ──
     /// Strategy display name (from config file)
     #[arg(skip)]
     pub strategy_name: Option<String>,
@@ -113,48 +92,6 @@ pub struct Config {
     pub min_depth_usd: f64,
 }
 
-/// Deserialized strategy.json
-#[derive(Debug, Deserialize)]
-pub struct StrategyFile {
-    pub name: Option<String>,
-    /// Maps to Config.strategy: "scalping", "breakout", "rsi", etc.
-    #[serde(alias = "engine_strategy", alias = "strategy")]
-    pub engine_strategy: Option<String>,
-    pub symbol: Option<String>,
-    pub leverage: Option<u32>,
-    pub order_qty: Option<f64>,
-    pub capital: Option<f64>,
-    pub position_size: Option<f64>,
-    pub sizing_mode: Option<String>,
-    pub timeframe_ms: Option<u64>,
-    /// Timeframe string like "5m", "1h" — converted to ms
-    pub timeframe: Option<String>,
-    #[serde(default)]
-    pub params: HashMap<String, serde_json::Value>,
-    pub trade_direction: Option<String>,
-    pub cooldown_bars: Option<u32>,
-    pub min_volume: Option<f64>,
-    pub min_spread_bps: Option<f64>,
-    pub min_depth_usd: Option<f64>,
-}
-
-pub fn timeframe_to_ms(tf: &str) -> Option<u64> {
-    let (num_str, unit) = tf.split_at(tf.len().saturating_sub(1));
-    let num: u64 = num_str.parse().ok()?;
-    match unit {
-        "m" => Some(num * 60_000),
-        "h" => Some(num * 3_600_000),
-        "d" => Some(num * 86_400_000),
-        "s" => Some(num * 1_000),
-        _ => None,
-    }
-}
-
-/// Normalize symbol: "PIPPIN/USDT" → "PIPPINUSDT", "BTC/USDT" → "BTCUSDT"
-pub fn normalize_symbol(s: &str) -> String {
-    s.replace("/", "").replace(":USDT", "")
-}
-
 const VALID_STRATEGIES: &[&str] = &[
     "mm", "market_maker", "default", "scalping", "breakout", "rsi", "bollinger", "macd",
     "mean_reversion", "grid",
@@ -178,7 +115,7 @@ fn known_params(strategy: &str) -> &'static [&'static str] {
 
 impl Config {
     /// Load config from .env file (if present), then parse CLI args + env vars,
-    /// then overlay strategy.json if --config is provided.
+    /// then overlay signal.json if --config is provided.
     pub fn load() -> Self {
         let _ = dotenvy::dotenv();
         let mut config = Self::parse();

@@ -1,0 +1,25 @@
+[package]
+name = "data-engine"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "data-engine"
+path = "src/main.rs"
+
+[dependencies]
+clawchat-shared = { workspace = true }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+clap = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+chrono = { workspace = true }
+tokio-tungstenite = { workspace = true }
+futures-util = { workspace = true }
+dotenvy = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

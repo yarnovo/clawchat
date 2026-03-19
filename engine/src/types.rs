@@ -1,5 +1,8 @@
 use serde::Deserialize;
 
+// ── Re-export shared types ──────────────────────────────────────
+pub use clawchat_shared::types::{OrderRequest, OrderType, Position, PositionSide, Side};
+
 // ── 行情事件（策略接收的统一事件流）──────────────────────────
 
 /// 策略层消费的事件枚举
@@ -63,38 +66,6 @@ pub struct MarkPriceData {
     pub funding_rate: f64,
     pub next_funding_time: u64,
     pub timestamp: u64,
-}
-
-// ── 订单 / 仓位 ──────────────────────────────────────────────
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Side {
-    Buy,
-    Sell,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OrderType {
-    Limit,
-    Market,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct OrderRequest {
-    pub symbol: String,
-    pub side: Side,
-    pub order_type: OrderType,
-    pub qty: f64,
-    pub price: Option<f64>,
-}
-
-#[derive(Debug, Clone)]
-pub struct Position {
-    pub symbol: String,
-    pub side: Side,
-    pub qty: f64,
-    pub entry_price: f64,
-    pub unrealized_pnl: f64,
 }
 
 // ── 币安 WebSocket 原始 JSON 映射 ────────────────────────────

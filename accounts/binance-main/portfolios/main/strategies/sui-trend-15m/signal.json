@@ -1,0 +1,32 @@
+{
+  "name": "sui-trend-15m",
+  "engine_strategy": "default",
+  "symbol": "SUIUSDT",
+  "timeframe": "15m",
+  "timeframe_ms": 900000,
+  "leverage": 3,
+  "position_size": 0.3,
+  "sizing_mode": "percent",
+  "capital": 25,
+  "params": {
+    "ema_fast": 8,
+    "ema_slow": 30,
+    "atr_period": 14,
+    "atr_sl_mult": 2.0,
+    "atr_tp_mult": 4.0
+  },
+  "backtest": {
+    "days": 30,
+    "return_pct": 38.79,
+    "sharpe": 5.06,
+    "max_drawdown_pct": 9.99,
+    "trades": 43,
+    "win_rate": 0.465,
+    "profit_factor": 1.82
+  },
+  "status": "approved",
+  "lifecycle": {
+    "created": "2026-03-19",
+    "last_review": "2026-03-18"
+  }
+}

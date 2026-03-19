@@ -2,6 +2,12 @@ use std::collections::HashMap;
 
 use crate::types::{DepthData, MarketEvent, OrderRequest, OrderType, Side, TickData};
 
+// Re-export Candle from shared
+pub use clawchat_shared::candle::Candle;
+
+// Import indicator functions from shared
+use clawchat_shared::indicators::{atr_from_slices, ema_from_slice, rsi_from_slice};
+
 // ── 信号 ──────────────────────────────────────────────────────
 
 /// 策略输出信号
@@ -11,19 +17,6 @@ pub enum Signal {
     Order(OrderRequest),
     /// 不操作
     None,
-}
-
-// ── Candle（从 tick 聚合）──────────────────────────────────────
-
-/// K 线数据，由引擎从 tick 流聚合后传入策略
-#[derive(Debug, Clone)]
-pub struct Candle {
-    pub open: f64,
-    pub high: f64,
-    pub low: f64,
-    pub close: f64,
-    pub volume: f64,
-    pub timestamp: u64,
 }
 
 // ── Strategy trait ────────────────────────────────────────────
@@ -441,63 +434,6 @@ impl Strategy for TrendFollower {
     fn name(&self) -> &str {
         "TrendFollower"
     }
-}
-
-// ── 工具函数 ─────────────────────────────────────────────────
-
-/// 从历史序列计算 EMA
-fn ema_from_slice(data: &[f64], period: usize) -> Option<f64> {
-    if data.len() < period {
-        return None;
-    }
-    let k = 2.0 / (period as f64 + 1.0);
-    let mut ema: f64 = data[..period].iter().sum::<f64>() / period as f64;
-    for &v in &data[period..] {
-        ema = v * k + ema * (1.0 - k);
-    }
-    Some(ema)
-}
-
-/// 从历史序列计算 RSI
-fn rsi_from_slice(closes: &[f64], period: usize) -> Option<f64> {
-    if closes.len() < period + 1 {
-        return None;
-    }
-    let start = closes.len() - period - 1;
-    let mut gains = 0.0;
-    let mut losses = 0.0;
-    for i in (start + 1)..closes.len() {
-        let delta = closes[i] - closes[i - 1];
-        if delta > 0.0 {
-            gains += delta;
-        } else {
-            losses -= delta;
-        }
-    }
-    let avg_gain = gains / period as f64;
-    let avg_loss = losses / period as f64;
-    if avg_loss == 0.0 {
-        return Some(100.0);
-    }
-    let rs = avg_gain / avg_loss;
-    Some(100.0 - (100.0 / (1.0 + rs)))
-}
-
-/// 从历史序列计算 ATR
-fn atr_from_slices(highs: &[f64], lows: &[f64], closes: &[f64], period: usize) -> Option<f64> {
-    if closes.len() < period + 1 {
-        return None;
-    }
-    let n = closes.len();
-    let start = n - period;
-    let mut sum = 0.0;
-    for i in start..n {
-        let hl = highs[i] - lows[i];
-        let hc = (highs[i] - closes[i - 1]).abs();
-        let lc = (lows[i] - closes[i - 1]).abs();
-        sum += hl.max(hc).max(lc);
-    }
-    Some(sum / period as f64)
 }
 
 // ══════════════════════════════════════════════════════════════

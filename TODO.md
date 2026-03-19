@@ -46,7 +46,7 @@
 - [x] clawchat report daily/weekly
 - [x] filter.rs 信号过滤（trade_direction/cooldown/volume/liquidity）
 - [x] funding_rate_limit
-- [x] strategy.json 4 个过滤字段已实现
+- [x] signal.json 4 个过滤字段已实现
 - [x] 生命周期 Phase 1+2
 - [x] 架构重构 Phase 1/2/3
 - [x] CLI 重构 + 3 配置 skill

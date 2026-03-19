@@ -1,166 +1,9 @@
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::path::Path;
-
-/// hft-engine 运行时状态，持久化到 strategies/{name}/state.json
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EngineState {
-    pub last_updated: String,
-    #[serde(default)]
-    pub indicators: serde_json::Value,
-    #[serde(default)]
-    pub candle_aggregator: Option<CandleAggregatorState>,
-    #[serde(default)]
-    pub trade_stats: TradeStats,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CandleAggregatorState {
-    pub open: f64,
-    pub high: f64,
-    pub low: f64,
-    pub close: f64,
-    pub volume: f64,
-    pub window_start: u64,
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct TradeStats {
-    pub total: u32,
-    pub wins: u32,
-    pub losses: u32,
-    pub realized_pnl: f64,
-}
-
-impl TradeStats {
-    pub fn record(&mut self, pnl: f64) {
-        self.total += 1;
-        self.realized_pnl += pnl;
-        if pnl >= 0.0 {
-            self.wins += 1;
-        } else {
-            self.losses += 1;
-        }
-    }
-}
-
-impl EngineState {
-    /// 从文件加载状态，失败返回 None
-    pub fn load(path: &Path) -> Option<Self> {
-        let contents = std::fs::read_to_string(path).ok()?;
-        match serde_json::from_str(&contents) {
-            Ok(state) => {
-                tracing::info!("restored engine state from {}", path.display());
-                Some(state)
-            }
-            Err(e) => {
-                tracing::warn!("failed to parse state.json: {e}");
-                None
-            }
-        }
-    }
-
-    /// 写入状态到文件
-    pub fn save(&self, path: &Path) {
-        let json = match serde_json::to_string_pretty(self) {
-            Ok(j) => j,
-            Err(e) => {
-                tracing::warn!("failed to serialize state: {e}");
-                return;
-            }
-        };
-        if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        if let Err(e) = std::fs::write(path, json) {
-            tracing::warn!("failed to write state.json: {e}");
-        }
-    }
-}
-
-// ── risk-engine 持久化状态 ──────────────────────────────────────
-
-/// 每个策略的风控运行状态
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct StrategyRiskState {
-    /// 当日已实现损益（USDT）
-    pub daily_realized_pnl: f64,
-    /// 当日交易笔数
-    pub daily_trades: u32,
-    /// 连续亏损笔数
-    pub consecutive_losses: u32,
-    /// 当日起始时间戳（UTC 零点，unix 毫秒）
-    pub day_start_ts: u64,
-}
-
-impl StrategyRiskState {
-    /// 检查是否需要日切重置
-    pub fn maybe_reset_day(&mut self, today_ts: u64) {
-        if today_ts > self.day_start_ts {
-            self.daily_realized_pnl = 0.0;
-            self.daily_trades = 0;
-            self.day_start_ts = today_ts;
-        }
-    }
-
-    /// 记录一笔平仓
-    pub fn record_close(&mut self, pnl: f64) {
-        self.daily_realized_pnl += pnl;
-        self.daily_trades += 1;
-        if pnl < 0.0 {
-            self.consecutive_losses += 1;
-        } else {
-            self.consecutive_losses = 0;
-        }
-    }
-}
-
-/// risk-engine 全局持久化状态
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct RiskEngineState {
-    pub last_updated: String,
-    /// 每个策略名 → 风控运行状态
-    #[serde(default)]
-    pub strategies: HashMap<String, StrategyRiskState>,
-}
-
-impl RiskEngineState {
-    pub fn load(path: &Path) -> Self {
-        match std::fs::read_to_string(path) {
-            Ok(contents) => match serde_json::from_str(&contents) {
-                Ok(state) => {
-                    tracing::info!("restored risk-engine state from {}", path.display());
-                    state
-                }
-                Err(e) => {
-                    tracing::warn!("failed to parse risk-engine state: {e}");
-                    Self::default()
-                }
-            },
-            Err(_) => Self::default(),
-        }
-    }
-
-    pub fn save(&self, path: &Path) {
-        let json = match serde_json::to_string_pretty(self) {
-            Ok(j) => j,
-            Err(e) => {
-                tracing::warn!("failed to serialize risk-engine state: {e}");
-                return;
-            }
-        };
-        if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        if let Err(e) = std::fs::write(path, json) {
-            tracing::warn!("failed to write risk-engine state: {e}");
-        }
-    }
-}
+pub use clawchat_shared::state::*;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     #[test]
     fn trade_stats_record() {
@@ -312,7 +155,7 @@ mod tests {
 
     #[test]
     fn risk_engine_state_load_missing_returns_default() {
-        let loaded = RiskEngineState::load(Path::new("/nonexistent/risk_state.json"));
+        let loaded = RiskEngineState::load(std::path::Path::new("/nonexistent/risk_state.json"));
         assert!(loaded.strategies.is_empty());
     }
 }

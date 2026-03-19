@@ -1,0 +1,11 @@
+{
+  "name": "main",
+  "allocated_capital": 203,
+  "reserve": 19,
+  "risk": {
+    "max_drawdown_pct": 10,
+    "max_daily_loss_pct": 5,
+    "max_total_exposure": 2.0,
+    "max_per_coin_exposure_pct": 50
+  }
+}

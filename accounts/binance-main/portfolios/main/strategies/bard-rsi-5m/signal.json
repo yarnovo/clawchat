@@ -1,0 +1,30 @@
+{
+  "name": "bard-rsi-5m",
+  "engine_strategy": "rsi",
+  "symbol": "BARDUSDT",
+  "timeframe": "5m",
+  "timeframe_ms": 300000,
+  "leverage": 3,
+  "position_size": 0.3,
+  "sizing_mode": "percent",
+  "capital": 18,
+  "params": {
+    "rsi_period": 10,
+    "rsi_oversold": 35,
+    "rsi_overbought": 82
+  },
+  "backtest": {
+    "days": 30,
+    "return_pct": 115.25,
+    "sharpe": 7.03,
+    "max_drawdown_pct": 16.7,
+    "trades": 41,
+    "win_rate": 0.463,
+    "profit_factor": 2.34
+  },
+  "status": "approved",
+  "lifecycle": {
+    "created": "2026-03-19",
+    "last_review": "2026-03-18"
+  }
+}

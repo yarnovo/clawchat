@@ -6,30 +6,8 @@ use crate::config::Config;
 use crate::strategy::{Candle, Signal};
 use crate::types::{DepthData, Side};
 
-/// 交易方向过滤
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum TradeDirection {
-    #[default]
-    Both,
-    LongOnly,
-    ShortOnly,
-}
-
-impl TradeDirection {
-    pub fn from_str_lossy(s: &str) -> Self {
-        match s {
-            "long_only" => Self::LongOnly,
-            "short_only" => Self::ShortOnly,
-            "both" => Self::Both,
-            other => {
-                if !other.is_empty() {
-                    tracing::warn!("unknown trade_direction '{other}', defaulting to both");
-                }
-                Self::Both
-            }
-        }
-    }
-}
+// Re-export TradeDirection from shared (via config)
+pub use crate::config::TradeDirection;
 
 /// 信号过滤器
 #[derive(Debug)]
@@ -67,7 +45,7 @@ impl SignalFilter {
         }
     }
 
-    /// 从 Config 构建（读取 strategy.json 的 5 个字段）
+    /// 从 Config 构建（读取 signal.json 的 5 个字段）
     pub fn from_config(config: &Config) -> Self {
         Self::new(
             config.trade_direction,

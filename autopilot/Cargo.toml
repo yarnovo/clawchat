@@ -1,0 +1,27 @@
+[package]
+name = "autopilot"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "autopilot"
+path = "src/main.rs"
+
+[dependencies]
+clawchat-shared = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+notify = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

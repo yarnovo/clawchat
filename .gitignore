@@ -10,5 +10,9 @@ venv/
 data/
 target/
 records/
-strategies/*/performance.json
-strategies/*/state.json
+reports/
+**/strategies/*/performance.json
+**/strategies/*/state.json
+logs/
+Cargo.lock
+discovered/

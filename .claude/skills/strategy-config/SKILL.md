@@ -1,6 +1,6 @@
 ---
 name: strategy-config
-description: 策略配置编写规范 — strategy.json + risk.json 格式和字段说明
+description: 策略配置编写规范 — signal.json + risk.json 格式和字段说明
 user-invocable: true
 ---
 
@@ -8,7 +8,7 @@ user-invocable: true
 
 quant 产出策略时需要写 2 个配置文件。
 
-## strategy.json
+## signal.json
 
 引擎读取，控制交易信号逻辑。
 
@@ -127,9 +127,10 @@ pending → approved → active → degraded → suspended
 
 ```
 strategies/{name}/
-├── strategy.json    ← 引擎读（含 lifecycle）
+├── signal.json      ← 引擎读（含 lifecycle）
 ├── risk.json        ← 风控读
-├── trade.json       ← 交易员写（见 /trade skill）
+├── autopilot.json   ← autopilot 读（自动调控规则，quant 写）
+├── trade.json       ← autopilot 写（自动调控指令）
 ├── state.json       ← 引擎写（运行时状态）
 ├── performance.json ← clawchat review 写（实盘评估结果）
 └── backtest.md      ← 回测报告
@@ -150,3 +151,83 @@ strategies/{name}/
 ```
 
 health 值：`healthy` / `warning` / `degraded` / `no_data` / `no_backtest`
+
+## autopilot.json
+
+autopilot 自动调控引擎读取，由 quant 根据策略特性设计参数。
+
+```json
+{
+  "name": "ntrn-trend-fast-5m",
+  "enabled": true,
+  "scaling": {
+    "position_size_min": 0.10,
+    "position_size_max": 0.50,
+    "scale_up_factor": 1.2,
+    "scale_down_factor": 0.7,
+    "scale_up_after_wins": 3,
+    "scale_down_after_losses": 2,
+    "cooldown_secs": 300
+  },
+  "pause_rules": {
+    "consecutive_losses": 3,
+    "daily_loss_pct": 0.10,
+    "auto_resume_minutes": 30
+  },
+  "suspend_rules": {
+    "max_total_loss_pct": 0.20,
+    "negative_pnl_hours": 48,
+    "auto_suspend": true,
+    "auto_resume": false
+  },
+  "risk_tuning": {
+    "trailing_stop_min": 0.01,
+    "trailing_stop_max": 0.05,
+    "tighten_on_profit": true,
+    "widen_on_loss": false
+  }
+}
+```
+
+### 字段说明
+
+| 分组 | 字段 | 默认值 | 说明 |
+|------|------|--------|------|
+| scaling | position_size_min | 0.10 | 仓位下限 |
+| scaling | position_size_max | 0.50 | 仓位上限 |
+| scaling | scale_up_factor | 1.2 | 连胜扩仓倍数 |
+| scaling | scale_down_factor | 0.7 | 连亏缩仓倍数 |
+| scaling | scale_up_after_wins | 3 | 连赢 N 笔后扩仓 |
+| scaling | scale_down_after_losses | 2 | 连亏 N 笔后缩仓 |
+| scaling | cooldown_secs | 300 | 缩放冷却期（秒）|
+| pause | consecutive_losses | 3 | 连续亏 N 笔暂停 |
+| pause | daily_loss_pct | 0.10 | 日亏损占 capital 比例暂停 |
+| pause | auto_resume_minutes | 0 | 暂停后自动恢复（分钟），0=不恢复 |
+| suspend | max_total_loss_pct | 0.20 | 总亏损超限停机 |
+| suspend | negative_pnl_hours | 48 | 持续亏损超时停机 |
+| suspend | auto_suspend | true | 是否允许自动停机 |
+| suspend | auto_resume | false | 是否允许自动恢复 |
+| risk | trailing_stop_min | 0.01 | trailing_stop 最紧 |
+| risk | trailing_stop_max | 0.05 | trailing_stop 最宽 |
+| risk | tighten_on_profit | true | 盈利时收紧 trailing |
+| risk | widen_on_loss | false | 亏损时放宽 trailing |
+
+### 调控原则
+
+| 策略类型 | 建议 |
+|---------|------|
+| scalping | 紧缩放（连赢2扩、连亏1缩）、短暂停（10分钟自动恢复）|
+| trend | 宽缩放（连赢4扩、连亏3缩）、长暂停（30分钟恢复）|
+| breakout | 中等缩放、连亏2暂停、放宽 trailing |
+
+### 热更新
+
+autopilot 监听 autopilot.json 变化，改了立即生效。
+
+### 运行
+
+```bash
+make autopilot                                    # 启动
+make autopilot ARGS="--dry-run"                   # 只看决策不执行
+nohup make autopilot > /tmp/autopilot.log 2>&1 &  # 后台运行
+```

@@ -1,7 +1,38 @@
-use hft_engine::config::{Config, SizingMode, StrategyFile};
-use hft_engine::exchange::{self, Exchange};
-use hft_engine::filter::{FilterResult, SignalFilter};
-use hft_engine::risk::{risk_gate, RiskConfig, RiskVerdict};
+//! ClawChat Multi-Strategy Trading Engine
+//!
+//! Single process managing all approved strategies via:
+//! - Gateway: per-symbol WS connection pool + broadcast channels
+//! - Workers: per-strategy tokio tasks consuming market data
+//! - OrderRouter: central order gateway with risk checks
+//! - Ledger: per-strategy virtual capital tracking
+//! - GlobalRisk: portfolio-level risk limits
+
+use std::collections::HashMap;
+use std::fs::OpenOptions;
+use std::io::Write;
+use std::path::PathBuf;
+
+use clap::Parser;
+use futures_util::{SinkExt, StreamExt};
+use notify::{EventKind, RecursiveMode, Watcher};
+use tokio::sync::{broadcast, mpsc};
+use tokio_tungstenite::connect_async;
+use tracing::{error, info, warn};
+
+use clawchat_shared::account::{AccountConfig, PortfolioConfig};
+use clawchat_shared::exchange::Exchange;
+use clawchat_shared::logging::init_logging;
+use clawchat_shared::paths;
+use clawchat_shared::risk::RiskConfig;
+use clawchat_shared::strategy::StrategyFile;
+use clawchat_shared::types::SizingMode;
+
+use hft_engine::filter::SignalFilter;
+use hft_engine::gateway::{Gateway, UserEvent};
+use hft_engine::global_risk::{GlobalRiskConfig, GlobalRiskGuard, GlobalRiskVerdict};
+use hft_engine::ledger::Ledger;
+use hft_engine::order_router::OrderRouter;
+use hft_engine::risk::EngineRiskGuard;
 use hft_engine::state::{EngineState, TradeStats};
 use hft_engine::strategy::{
     BollingerStrategy, BreakoutStrategy, CandleAggregator, GridStrategy, MACDStrategy,
@@ -9,254 +40,204 @@ use hft_engine::strategy::{
     TrendFollower,
 };
 use hft_engine::trade::{decision_gate_allows_signal, TradeAction, TradeOverride};
-use hft_engine::types::{MarketEvent, OrderType as StratOrderType, Side as StratSide};
-use hft_engine::ws_feed::{start_feed, FeedConfig};
+use hft_engine::types::{OrderType as StratOrderType, PositionSide, Side as StratSide};
+use hft_engine::worker::{self, WorkerConfig};
+use hft_engine::ws_feed::FeedConfig;
 
-use futures_util::{SinkExt, StreamExt};
-use notify::{EventKind, RecursiveMode, Watcher};
-use std::collections::HashMap;
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use tokio::sync::mpsc as tokio_mpsc;
-use tokio_tungstenite::connect_async;
+// ── Constants ──────────────────────────────────────────────────
 
-const TRADES_LOG: &str = "records/trades.jsonl";
-const RISK_EVENTS_LOG: &str = "records/risk_events.jsonl";
-const SIGNALS_LOG: &str = "records/signals.jsonl";
-const HIGH_WATER_FILE: &str = "records/high_water.json";
-const FUNDING_CSV: &str = "records/funding_rate_history.csv";
 const BINANCE_FSTREAM_WS: &str = "wss://fstream.binance.com";
-/// listenKey keepalive 间隔（分钟）
 const KEEPALIVE_MINUTES: u64 = 20;
 
-// ── 用户数据流事件 ───────────────────────────────────────────
+// ── CLI Args ───────────────────────────────────────────────────
+
+#[derive(Parser, Debug)]
+#[command(name = "hft-engine", about = "Multi-strategy trading engine")]
+struct Args {
+    /// Dry run mode
+    #[arg(long, env = "DRY_RUN", default_value_t = false)]
+    dry_run: bool,
+}
+
+// ── Per-strategy runtime state ─────────────────────────────────
+
+#[allow(dead_code)]
+struct StrategyRuntime {
+    name: String,
+    symbol: String,
+    dir: PathBuf,
+    leverage: u32,
+    capital: f64,
+    position_size: Option<f64>,
+    sizing_mode: SizingMode,
+    order_qty: Option<f64>,
+    engine_strategy: String,
+    params: HashMap<String, f64>,
+
+    // Runtime state
+    trade_override: TradeOverride,
+    risk_config: RiskConfig,
+    risk_guard: EngineRiskGuard,
+    trade_stats: TradeStats,
+    last_price: f64,
+    last_funding_rate: f64,
+    last_funding_log_nft: u64,
+}
+
+// ── Config change event ────────────────────────────────────────
 
 #[derive(Debug)]
-enum UserEvent {
-    /// 标记价格更新（含资金费率）
-    MarkPrice { symbol: String, mark_price: f64, funding_rate: f64, next_funding_time: u64 },
-    /// 持仓更新（ACCOUNT_UPDATE）
-    PositionUpdate {
-        symbol: String,
-        position_side: String,
-        position_amt: f64,
-        entry_price: f64,
-        unrealized_pnl: f64,
-    },
-    /// 余额更新
-    BalanceUpdate { wallet_balance: f64 },
+enum ConfigChange {
+    Strategy(String),  // strategy name
+    Trade(String),     // strategy name
+    Risk(String),      // strategy name
 }
 
-// ── 持仓跟踪 ────────────────────────────────────────────────
+// ── Scan approved strategies ───────────────────────────────────
 
-#[derive(Debug, Clone)]
-struct TrackedPosition {
-    symbol: String,
-    position_side: String,
-    position_amt: f64,
-    entry_price: f64,
-    unrealized_pnl: f64,
-    mark_price: f64,
-}
+fn scan_approved_strategies() -> Vec<(String, StrategyFile)> {
+    let dir = paths::strategies_dir();
+    let mut strategies = Vec::new();
 
-impl TrackedPosition {
-    fn recalc_pnl(&mut self) {
-        if self.mark_price <= 0.0 || self.entry_price <= 0.0 {
-            return;
+    let entries = match std::fs::read_dir(&dir) {
+        Ok(e) => e,
+        Err(e) => {
+            error!("failed to read strategies dir {}: {e}", dir.display());
+            return strategies;
         }
-        let price_diff = self.mark_price - self.entry_price;
-        self.unrealized_pnl = if self.position_amt > 0.0 {
-            price_diff * self.position_amt
-        } else {
-            -price_diff * self.position_amt.abs()
-        };
-    }
+    };
 
-    fn key(&self) -> String {
-        format!("{}:{}", self.symbol, self.position_side)
-    }
-}
-
-struct PositionTracker {
-    positions: HashMap<String, TrackedPosition>,
-}
-
-impl PositionTracker {
-    fn new() -> Self {
-        Self {
-            positions: HashMap::new(),
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
         }
-    }
-
-    fn update_position(
-        &mut self,
-        symbol: &str,
-        position_side: &str,
-        position_amt: f64,
-        entry_price: f64,
-        unrealized_pnl: f64,
-    ) {
-        let key = format!("{symbol}:{position_side}");
-        if position_amt.abs() < f64::EPSILON {
-            self.positions.remove(&key);
-            return;
+        let strat_json = path.join("signal.json");
+        if !strat_json.exists() {
+            continue;
         }
-        let pos = self.positions.entry(key).or_insert_with(|| TrackedPosition {
-            symbol: symbol.to_string(),
-            position_side: position_side.to_string(),
-            position_amt: 0.0,
-            entry_price: 0.0,
-            unrealized_pnl: 0.0,
-            mark_price: 0.0,
-        });
-        pos.position_amt = position_amt;
-        pos.entry_price = entry_price;
-        pos.unrealized_pnl = unrealized_pnl;
-    }
-
-    fn update_mark_price(&mut self, symbol: &str, mark_price: f64) {
-        for pos in self.positions.values_mut() {
-            if pos.symbol == symbol {
-                pos.mark_price = mark_price;
-                pos.recalc_pnl();
-            }
-        }
-    }
-
-    fn get_positions_for_symbol(&self, symbol: &str) -> Vec<&TrackedPosition> {
-        self.positions
-            .values()
-            .filter(|p| p.symbol == symbol)
-            .collect()
-    }
-
-    fn remove(&mut self, key: &str) {
-        self.positions.remove(key);
-    }
-}
-
-// ── 高水位管理 ───────────────────────────────────────────────
-
-type HighWaterMarks = HashMap<String, f64>;
-
-fn load_high_water() -> HighWaterMarks {
-    let path = Path::new(HIGH_WATER_FILE);
-    if let Ok(contents) = std::fs::read_to_string(path) {
-        serde_json::from_str(&contents).unwrap_or_default()
-    } else {
-        HashMap::new()
-    }
-}
-
-fn save_high_water(hwm: &HighWaterMarks) {
-    let path = Path::new(HIGH_WATER_FILE);
-    if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    if let Ok(json) = serde_json::to_string_pretty(hwm) {
-        let _ = std::fs::write(path, json);
-    }
-}
-
-// ── markPrice WebSocket ──────────────────────────────────────
-
-async fn start_mark_price_feed(symbol: String, tx: tokio_mpsc::Sender<UserEvent>) {
-    let stream = format!("{}@markPrice@1s", symbol.to_lowercase());
-    let url = format!("{BINANCE_FSTREAM_WS}/stream?streams={stream}");
-
-    let mut retry_delay = std::time::Duration::from_secs(1);
-    let max_delay = std::time::Duration::from_secs(30);
-    let read_timeout = std::time::Duration::from_secs(30);
-
-    loop {
-        tracing::info!(url = %url, "connecting to markPrice ws");
-
-        match connect_async(&url).await {
-            Ok((ws, _)) => {
-                tracing::info!("markPrice ws connected for {symbol}");
-                retry_delay = std::time::Duration::from_secs(1);
-
-                let (mut write, mut read) = ws.split();
-
-                loop {
-                    match tokio::time::timeout(read_timeout, read.next()).await {
-                        Ok(Some(msg)) => match msg {
-                            Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
-                                if let Some(event) = parse_mark_price_msg(&text) {
-                                    let _ = tx.try_send(event);
-                                }
-                            }
-                            Ok(tokio_tungstenite::tungstenite::Message::Ping(data)) => {
-                                let _ = write
-                                    .send(tokio_tungstenite::tungstenite::Message::Pong(data))
-                                    .await;
-                            }
-                            Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => {
-                                tracing::warn!("markPrice ws closed");
-                                break;
-                            }
-                            Err(e) => {
-                                tracing::error!("markPrice ws error: {e}");
-                                break;
-                            }
-                            _ => {}
-                        },
-                        Ok(None) => {
-                            tracing::warn!("markPrice ws stream ended");
-                            break;
-                        }
-                        Err(_) => {
-                            tracing::warn!("markPrice ws read timeout, reconnecting");
-                            break;
-                        }
-                    }
-                }
-            }
+        let sf = match StrategyFile::load(&strat_json) {
+            Ok(sf) => sf,
             Err(e) => {
-                tracing::error!("markPrice ws connect failed: {e}");
+                warn!("skip {}: {e}", path.display());
+                continue;
             }
+        };
+        let status = sf.status.as_deref().unwrap_or("pending");
+        if status != "approved" {
+            info!(
+                name = entry.file_name().to_string_lossy().as_ref(),
+                status,
+                "skipping non-approved strategy"
+            );
+            continue;
         }
+        let name = sf
+            .name
+            .clone()
+            .unwrap_or_else(|| entry.file_name().to_string_lossy().to_string());
+        strategies.push((name, sf));
+    }
 
-        if tx.is_closed() {
-            return;
-        }
+    strategies
+}
 
-        tracing::warn!(delay = ?retry_delay, "markPrice ws reconnecting");
-        tokio::time::sleep(retry_delay).await;
-        retry_delay = (retry_delay * 2).min(max_delay);
+// ── Create strategy instance ───────────────────────────────────
+
+fn default_order_qty(symbol: &str) -> f64 {
+    match symbol {
+        s if s.starts_with("PIPPIN") => 100.0,
+        s if s.starts_with("ETH") => 0.01,
+        s if s.starts_with("BTC") => 0.001,
+        s if s.starts_with("BNB") => 0.01,
+        s if s.starts_with("SOL") => 0.1,
+        s if s.starts_with("XRP") => 10.0,
+        s if s.starts_with("DOGE") => 100.0,
+        _ => 1.0,
     }
 }
 
-fn parse_mark_price_msg(raw: &str) -> Option<UserEvent> {
-    let v: serde_json::Value = serde_json::from_str(raw).ok()?;
-    let data = v.get("data")?;
-    let symbol = data.get("s")?.as_str()?.to_string();
-    let mark_price: f64 = data.get("p")?.as_str()?.parse().ok()?;
-    // "r" = funding rate，可能缺失（非结算周期）
-    let funding_rate: f64 = data
-        .get("r")
-        .and_then(|v| v.as_str())
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0.0);
-    // "T" = next funding time (millis), 可能缺失
-    let next_funding_time: u64 = data
-        .get("T")
-        .and_then(|v| v.as_u64())
-        .unwrap_or(0);
-    Some(UserEvent::MarkPrice { symbol, mark_price, funding_rate, next_funding_time })
+fn create_strategy_instance(
+    engine_strategy: &str,
+    symbol: &str,
+    order_qty: f64,
+    params: &HashMap<String, f64>,
+) -> Box<dyn Strategy + Send> {
+    let has_params = !params.is_empty();
+    match engine_strategy {
+        "market_maker" | "mm" => {
+            if has_params { Box::new(MarketMaker::from_params(symbol, order_qty, params)) }
+            else { Box::new(MarketMaker::new(symbol, 0.0004, order_qty)) }
+        }
+        "scalping" => {
+            if has_params { Box::new(ScalpingStrategy::from_params(symbol, order_qty, params)) }
+            else { Box::new(ScalpingStrategy::new(symbol, order_qty)) }
+        }
+        "breakout" => {
+            if has_params { Box::new(BreakoutStrategy::from_params(symbol, order_qty, params)) }
+            else { Box::new(BreakoutStrategy::new(symbol, order_qty)) }
+        }
+        "rsi" => {
+            if has_params { Box::new(RSIStrategy::from_params(symbol, order_qty, params)) }
+            else { Box::new(RSIStrategy::new(symbol, order_qty)) }
+        }
+        "bollinger" => {
+            if has_params { Box::new(BollingerStrategy::from_params(symbol, order_qty, params)) }
+            else { Box::new(BollingerStrategy::new(symbol, order_qty)) }
+        }
+        "macd" => {
+            if has_params { Box::new(MACDStrategy::from_params(symbol, order_qty, params)) }
+            else { Box::new(MACDStrategy::new(symbol, order_qty)) }
+        }
+        "mean_reversion" => {
+            if has_params { Box::new(MeanReversionStrategy::from_params(symbol, order_qty, params)) }
+            else { Box::new(MeanReversionStrategy::new(symbol, order_qty)) }
+        }
+        "grid" => {
+            if has_params { Box::new(GridStrategy::from_params(symbol, order_qty, params)) }
+            else { Box::new(GridStrategy::new(symbol, order_qty)) }
+        }
+        _ => {
+            if has_params { Box::new(TrendFollower::from_params(symbol, order_qty, params)) }
+            else { Box::new(TrendFollower::new(symbol, order_qty)) }
+        }
+    }
 }
 
-// ── User Data Stream WebSocket ───────────────────────────────
+// ── Build worker config from StrategyFile ──────────────────────
 
-async fn start_user_data_feed(
+fn build_worker_config(
+    name: &str,
+    sf: &StrategyFile,
+    signal_filter: SignalFilter,
+) -> Option<WorkerConfig> {
+    let symbol = sf.normalized_symbol()?;
+    let engine_strategy = sf.engine_strategy.as_deref().unwrap_or("default");
+    let order_qty = sf.order_qty.unwrap_or_else(|| default_order_qty(&symbol));
+    let params = sf.numeric_params();
+    let timeframe_ms = sf.timeframe_ms().unwrap_or(300_000);
+
+    let strategy = create_strategy_instance(engine_strategy, &symbol, order_qty, &params);
+
+    Some(WorkerConfig {
+        strategy_name: name.to_string(),
+        symbol,
+        timeframe_ms,
+        strategy,
+        filter: signal_filter,
+    })
+}
+
+// ── User data stream ───────────────────────────────────────────
+
+async fn start_user_data_stream(
     api_key: String,
     api_secret: String,
     base_url: String,
     dry_run: bool,
-    tx: tokio_mpsc::Sender<UserEvent>,
+    user_tx: broadcast::Sender<UserEvent>,
 ) {
-    let exchange = Exchange::from_credentials(api_key, api_secret, base_url, dry_run);
+    let exchange = Exchange::new(api_key, api_secret, base_url, dry_run);
 
     let mut retry_delay = std::time::Duration::from_secs(1);
     let max_delay = std::time::Duration::from_secs(30);
@@ -265,7 +246,7 @@ async fn start_user_data_feed(
         let listen_key = match exchange.create_listen_key().await {
             Ok(k) => k,
             Err(e) => {
-                tracing::error!("failed to create listenKey: {e}");
+                error!("failed to create listenKey: {e}");
                 tokio::time::sleep(retry_delay).await;
                 retry_delay = (retry_delay * 2).min(max_delay);
                 continue;
@@ -274,8 +255,9 @@ async fn start_user_data_feed(
 
         let ws_base = exchange.ws_base_url();
         let url = format!("{ws_base}/ws/{listen_key}");
-        tracing::info!(url = %url, "connecting to user data stream");
+        info!(url = %url, "connecting to user data stream");
 
+        // listenKey keepalive
         let lk = listen_key.clone();
         let exchange_key = exchange.api_key().to_string();
         let exchange_base = exchange.base_url().to_string();
@@ -298,11 +280,9 @@ async fn start_user_data_feed(
 
         match connect_async(&url).await {
             Ok((ws, _)) => {
-                tracing::info!("user data stream connected");
+                info!("user data stream connected");
                 retry_delay = std::time::Duration::from_secs(1);
-                // listenKey 60 分钟过期，超时设 65 分钟（留余量）
                 let uds_timeout = std::time::Duration::from_secs(65 * 60);
-
                 let (mut write, mut read) = ws.split();
 
                 loop {
@@ -310,7 +290,7 @@ async fn start_user_data_feed(
                         Ok(Some(msg)) => match msg {
                             Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
                                 for event in parse_user_data_msg(&text) {
-                                    let _ = tx.try_send(event);
+                                    let _ = user_tx.send(event);
                                 }
                             }
                             Ok(tokio_tungstenite::tungstenite::Message::Ping(data)) => {
@@ -319,38 +299,39 @@ async fn start_user_data_feed(
                                     .await;
                             }
                             Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => {
-                                tracing::warn!("user data stream closed");
+                                warn!("user data stream closed");
                                 break;
                             }
                             Err(e) => {
-                                tracing::error!("user data stream error: {e}");
+                                error!("user data stream error: {e}");
                                 break;
                             }
                             _ => {}
                         },
                         Ok(None) => {
-                            tracing::warn!("user data stream ended");
+                            warn!("user data stream ended");
                             break;
                         }
                         Err(_) => {
-                            tracing::warn!("user data stream read timeout, reconnecting");
+                            warn!("user data stream read timeout, reconnecting");
                             break;
                         }
                     }
                 }
             }
             Err(e) => {
-                tracing::error!("user data stream connect failed: {e}");
+                error!("user data stream connect failed: {e}");
             }
         }
 
         keepalive_handle.abort();
 
-        if tx.is_closed() {
+        if user_tx.receiver_count() == 0 {
+            info!("no user data receivers, stopping");
             return;
         }
 
-        tracing::warn!(delay = ?retry_delay, "user data stream reconnecting");
+        warn!(delay = ?retry_delay, "user data stream reconnecting");
         tokio::time::sleep(retry_delay).await;
         retry_delay = (retry_delay * 2).min(max_delay);
     }
@@ -416,8 +397,31 @@ fn parse_user_data_msg(raw: &str) -> Vec<UserEvent> {
                 }
             }
         }
+        "ORDER_TRADE_UPDATE" => {
+            if let Some(o) = v.get("o") {
+                let symbol = o.get("s").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let client_order_id = o.get("c").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let side = o.get("S").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let status = o.get("X").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let qty: f64 = o.get("q").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+                let price: f64 = o.get("ap").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+                let commission: f64 = o.get("n").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+                let realized_pnl: f64 = o.get("rp").and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+
+                events.push(UserEvent::OrderUpdate {
+                    symbol,
+                    client_order_id,
+                    side,
+                    status,
+                    qty,
+                    price,
+                    commission,
+                    realized_pnl,
+                });
+            }
+        }
         "listenKeyExpired" => {
-            tracing::warn!("listenKey expired, will reconnect");
+            warn!("listenKey expired, will reconnect");
         }
         _ => {
             tracing::debug!("user data event: {event_type}");
@@ -427,7 +431,146 @@ fn parse_user_data_msg(raw: &str) -> Vec<UserEvent> {
     events
 }
 
-/// Append a trade record to records/trades.jsonl
+// ── markPrice feed (per symbol) ────────────────────────────────
+
+async fn start_mark_price_feed(symbol: String, user_tx: broadcast::Sender<UserEvent>) {
+    let stream = format!("{}@markPrice@1s", symbol.to_lowercase());
+    let url = format!("{BINANCE_FSTREAM_WS}/stream?streams={stream}");
+
+    let mut retry_delay = std::time::Duration::from_secs(1);
+    let max_delay = std::time::Duration::from_secs(30);
+    let read_timeout = std::time::Duration::from_secs(30);
+
+    loop {
+        info!(url = %url, "connecting to markPrice ws");
+
+        match connect_async(&url).await {
+            Ok((ws, _)) => {
+                info!("markPrice ws connected for {symbol}");
+                retry_delay = std::time::Duration::from_secs(1);
+                let (mut write, mut read) = ws.split();
+
+                loop {
+                    match tokio::time::timeout(read_timeout, read.next()).await {
+                        Ok(Some(msg)) => match msg {
+                            Ok(tokio_tungstenite::tungstenite::Message::Text(text)) => {
+                                if let Some(event) = parse_mark_price_msg(&text) {
+                                    let _ = user_tx.send(event);
+                                }
+                            }
+                            Ok(tokio_tungstenite::tungstenite::Message::Ping(data)) => {
+                                let _ = write
+                                    .send(tokio_tungstenite::tungstenite::Message::Pong(data))
+                                    .await;
+                            }
+                            Ok(tokio_tungstenite::tungstenite::Message::Close(_)) => {
+                                warn!("markPrice ws closed");
+                                break;
+                            }
+                            Err(e) => {
+                                error!("markPrice ws error: {e}");
+                                break;
+                            }
+                            _ => {}
+                        },
+                        Ok(None) => {
+                            warn!("markPrice ws stream ended");
+                            break;
+                        }
+                        Err(_) => {
+                            warn!("markPrice ws read timeout, reconnecting");
+                            break;
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                error!("markPrice ws connect failed: {e}");
+            }
+        }
+
+        if user_tx.receiver_count() == 0 {
+            return;
+        }
+
+        warn!(delay = ?retry_delay, "markPrice ws reconnecting");
+        tokio::time::sleep(retry_delay).await;
+        retry_delay = (retry_delay * 2).min(max_delay);
+    }
+}
+
+fn parse_mark_price_msg(raw: &str) -> Option<UserEvent> {
+    let v: serde_json::Value = serde_json::from_str(raw).ok()?;
+    let data = v.get("data")?;
+    let symbol = data.get("s")?.as_str()?.to_string();
+    let mark_price: f64 = data.get("p")?.as_str()?.parse().ok()?;
+    let funding_rate: f64 = data
+        .get("r")
+        .and_then(|v| v.as_str())
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0.0);
+    Some(UserEvent::MarkPrice {
+        symbol,
+        mark_price,
+        funding_rate,
+    })
+}
+
+// ── Config watcher ─────────────────────────────────────────────
+
+fn start_config_watcher(
+    strategies_dir: PathBuf,
+    config_tx: mpsc::Sender<ConfigChange>,
+) {
+    std::thread::spawn(move || {
+        let tx = config_tx;
+        let mut watcher = notify::recommended_watcher(
+            move |res: Result<notify::Event, notify::Error>| {
+                let Ok(event) = res else { return };
+                match event.kind {
+                    EventKind::Modify(_) | EventKind::Create(_) => {}
+                    _ => return,
+                }
+                for path in &event.paths {
+                    let file_name = path
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("");
+                    // Extract strategy name from parent directory
+                    let strategy_name = path
+                        .parent()
+                        .and_then(|p| p.file_name())
+                        .and_then(|n| n.to_str())
+                        .unwrap_or("")
+                        .to_string();
+                    if strategy_name.is_empty() {
+                        continue;
+                    }
+                    let change = match file_name {
+                        "signal.json" => ConfigChange::Strategy(strategy_name),
+                        "trade.json" => ConfigChange::Trade(strategy_name),
+                        "risk.json" => ConfigChange::Risk(strategy_name),
+                        _ => continue,
+                    };
+                    let _ = tx.blocking_send(change);
+                }
+            },
+        )
+        .expect("failed to create config watcher");
+
+        watcher
+            .watch(&strategies_dir, RecursiveMode::Recursive)
+            .expect("failed to watch strategies directory");
+
+        info!("config watcher started: {}", strategies_dir.display());
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(3600));
+        }
+    });
+}
+
+// ── Logging helpers ────────────────────────────────────────────
+
 fn log_trade(
     strategy: &str,
     symbol: &str,
@@ -463,82 +606,15 @@ fn log_trade(
         "client_order_id": client_order_id,
     });
 
-    // Ensure records/ directory exists
-    let log_path = std::path::Path::new(TRADES_LOG);
+    let log_path = paths::records_dir().join("trades.jsonl");
     if let Some(parent) = log_path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-
-    match OpenOptions::new().create(true).append(true).open(log_path) {
-        Ok(mut file) => {
-            if let Err(e) = writeln!(file, "{}", record) {
-                tracing::warn!("failed to write trade log: {e}");
-            }
-        }
-        Err(e) => tracing::warn!("failed to open trades.jsonl: {e}"),
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&log_path) {
+        let _ = writeln!(file, "{}", record);
     }
 }
 
-/// Append a risk event to records/risk_events.jsonl
-fn log_risk_event(
-    strategy: &str,
-    symbol: &str,
-    verdict: &RiskVerdict,
-    pnl: f64,
-) {
-    let (rule, detail) = match verdict {
-        RiskVerdict::ClosePosition(reason) => ("close_position", reason.as_str()),
-        RiskVerdict::Block(reason) => ("block", reason.as_str()),
-        RiskVerdict::Pass => return, // don't log Pass
-    };
-
-    let ts = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-    let record = serde_json::json!({
-        "ts": ts,
-        "strategy": strategy,
-        "symbol": symbol,
-        "rule": rule,
-        "pnl": pnl,
-        "verdict": format!("{:?}", verdict),
-        "detail": detail,
-    });
-
-    let log_path = std::path::Path::new(RISK_EVENTS_LOG);
-    if let Some(parent) = log_path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    match OpenOptions::new().create(true).append(true).open(log_path) {
-        Ok(mut file) => {
-            if let Err(e) = writeln!(file, "{}", record) {
-                tracing::warn!("failed to write risk event log: {e}");
-            }
-        }
-        Err(e) => tracing::warn!("failed to open risk_events.jsonl: {e}"),
-    }
-}
-
-/// Append funding rate to records/funding_rate_history.csv
-fn log_funding_rate(symbol: &str, funding_rate: f64, next_funding_time: &str) {
-    let csv_path = std::path::Path::new(FUNDING_CSV);
-    if let Some(parent) = csv_path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    let write_header = !csv_path.exists();
-    match OpenOptions::new().create(true).append(true).open(csv_path) {
-        Ok(mut file) => {
-            if write_header {
-                let _ = writeln!(file, "timestamp,symbol,funding_rate,next_funding_time");
-            }
-            let ts = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-            if let Err(e) = writeln!(file, "{ts},{symbol},{funding_rate},{next_funding_time}") {
-                tracing::warn!("failed to write funding rate: {e}");
-            }
-        }
-        Err(e) => tracing::warn!("failed to open funding CSV: {e}"),
-    }
-}
-
-/// Append a signal record to records/signals.jsonl
 fn log_signal(
     strategy_name: &str,
     signal: &Signal,
@@ -548,9 +624,8 @@ fn log_signal(
 ) {
     let signal_str = match signal {
         Signal::Order(req) => format!("{:?}", req.side).to_lowercase(),
-        Signal::None => return, // don't log None
+        Signal::None => return,
     };
-
     let ts = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
     let record = serde_json::json!({
         "ts": ts,
@@ -561,125 +636,68 @@ fn log_signal(
         "executed": executed,
     });
 
-    let log_path = std::path::Path::new(SIGNALS_LOG);
+    let log_path = paths::records_dir().join("signals.jsonl");
     if let Some(parent) = log_path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    match OpenOptions::new().create(true).append(true).open(log_path) {
-        Ok(mut file) => {
-            if let Err(e) = writeln!(file, "{}", record) {
-                tracing::warn!("failed to write signal log: {e}");
-            }
-        }
-        Err(e) => tracing::warn!("failed to open signals.jsonl: {e}"),
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&log_path) {
+        let _ = writeln!(file, "{}", record);
     }
 }
 
-/// 根据 symbol 返回合适的下单数量（满足交易所精度要求）
-fn default_order_qty(symbol: &str) -> f64 {
-    match symbol {
-        s if s.starts_with("PIPPIN") => 100.0,
-        s if s.starts_with("ETH") => 0.01,
-        s if s.starts_with("BTC") => 0.001,
-        s if s.starts_with("BNB") => 0.01,
-        s if s.starts_with("SOL") => 0.1,
-        s if s.starts_with("XRP") => 10.0,
-        s if s.starts_with("DOGE") => 100.0,
-        _ => 1.0,
+fn log_pnl_by_strategy(
+    strategy: &str,
+    symbol: &str,
+    side: &str,
+    qty: f64,
+    entry_price: f64,
+    exit_price: f64,
+    pnl_usdt: f64,
+    fees_usdt: f64,
+) {
+    let ts = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    let net_pnl = pnl_usdt - fees_usdt;
+    let record = serde_json::json!({
+        "ts": ts,
+        "strategy": strategy,
+        "symbol": symbol,
+        "side": side,
+        "qty": qty,
+        "entry_price": entry_price,
+        "exit_price": exit_price,
+        "pnl_usdt": pnl_usdt,
+        "fees_usdt": fees_usdt,
+        "net_pnl": net_pnl,
+    });
+
+    let log_path = paths::records_dir().join("pnl_by_strategy.jsonl");
+    if let Some(parent) = log_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&log_path) {
+        let _ = writeln!(file, "{}", record);
     }
 }
 
-/// 根据 config 创建策略实例（优先使用 config file 中的参数）
-fn create_strategy(config: &Config) -> Box<dyn Strategy> {
-    // order_qty: config file > symbol default
-    let qty = config.order_qty.unwrap_or_else(|| default_order_qty(&config.symbol));
-    let has_params = !config.params.is_empty();
-    tracing::info!(symbol = %config.symbol, order_qty = qty, has_params, "creating strategy");
-
-    let sym = &config.symbol;
-    let p = &config.params;
-
-    match config.strategy.as_str() {
-        "market_maker" | "mm" => {
-            tracing::info!("using MarketMaker strategy");
-            if has_params {
-                Box::new(MarketMaker::from_params(sym, qty, p))
-            } else {
-                Box::new(MarketMaker::new(sym, 0.0004, qty))
-            }
+fn log_funding_rate(symbol: &str, funding_rate: f64, next_funding_time: &str) {
+    let csv_path = paths::records_dir().join("funding_rate_history.csv");
+    if let Some(parent) = csv_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let write_header = !csv_path.exists();
+    if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&csv_path) {
+        if write_header {
+            let _ = writeln!(file, "timestamp,symbol,funding_rate,next_funding_time");
         }
-        "scalping" => {
-            tracing::info!("using Scalping strategy");
-            if has_params {
-                Box::new(ScalpingStrategy::from_params(sym, qty, p))
-            } else {
-                Box::new(ScalpingStrategy::new(sym, qty))
-            }
-        }
-        "breakout" => {
-            tracing::info!("using Breakout strategy");
-            if has_params {
-                Box::new(BreakoutStrategy::from_params(sym, qty, p))
-            } else {
-                Box::new(BreakoutStrategy::new(sym, qty))
-            }
-        }
-        "rsi" => {
-            tracing::info!("using RSI strategy");
-            if has_params {
-                Box::new(RSIStrategy::from_params(sym, qty, p))
-            } else {
-                Box::new(RSIStrategy::new(sym, qty))
-            }
-        }
-        "bollinger" => {
-            tracing::info!("using Bollinger strategy");
-            if has_params {
-                Box::new(BollingerStrategy::from_params(sym, qty, p))
-            } else {
-                Box::new(BollingerStrategy::new(sym, qty))
-            }
-        }
-        "macd" => {
-            tracing::info!("using MACD strategy");
-            if has_params {
-                Box::new(MACDStrategy::from_params(sym, qty, p))
-            } else {
-                Box::new(MACDStrategy::new(sym, qty))
-            }
-        }
-        "mean_reversion" => {
-            tracing::info!("using MeanReversion strategy");
-            if has_params {
-                Box::new(MeanReversionStrategy::from_params(sym, qty, p))
-            } else {
-                Box::new(MeanReversionStrategy::new(sym, qty))
-            }
-        }
-        "grid" => {
-            tracing::info!("using Grid strategy");
-            if has_params {
-                Box::new(GridStrategy::from_params(sym, qty, p))
-            } else {
-                Box::new(GridStrategy::new(sym, qty))
-            }
-        }
-        _ => {
-            tracing::info!("using TrendFollower strategy");
-            if has_params {
-                Box::new(TrendFollower::from_params(sym, qty, p))
-            } else {
-                Box::new(TrendFollower::new(sym, qty))
-            }
-        }
+        let ts = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+        let _ = writeln!(file, "{ts},{symbol},{funding_rate},{next_funding_time}");
     }
 }
 
-/// 根据 sizing_mode 计算下单量
-/// - Percent: order_qty = (equity × position_size × leverage) / price
-/// - Fixed: 直接用 order_qty
-async fn compute_order_qty(
-    exchange: &Exchange,
+// ── Order sizing ───────────────────────────────────────────────
+
+fn compute_order_qty(
+    capital: f64,
     sizing_mode: SizingMode,
     position_size: Option<f64>,
     leverage: u32,
@@ -689,136 +707,215 @@ async fn compute_order_qty(
     if sizing_mode == SizingMode::Fixed {
         return fallback_qty;
     }
-    // Percent mode
     let ps = position_size.unwrap_or(0.3);
     if current_price <= 0.0 {
-        tracing::warn!("current_price <= 0, using fallback qty");
+        warn!("current_price <= 0, using fallback qty");
         return fallback_qty;
     }
-    match exchange.get_balance().await {
-        Ok(equity) => {
-            let qty = (equity * ps * leverage as f64) / current_price;
-            tracing::info!(
-                equity = format!("{equity:.2}"),
-                position_size = ps,
-                leverage,
-                price = format!("{current_price:.6}"),
-                qty = format!("{qty:.4}"),
-                "percent-based order qty"
-            );
-            qty
-        }
-        Err(e) => {
-            tracing::warn!("failed to get equity: {e}, using fallback qty");
-            fallback_qty
-        }
-    }
+    capital * ps * leverage as f64 / current_price
 }
 
-/// 将策略信号转为交易所下单，成功后写交易日志
+// ── Execute signal on exchange ─────────────────────────────────
+
 async fn execute_signal(
     signal: &Signal,
     exchange: &Exchange,
-    strategy_name: &str,
-    sizing_mode: SizingMode,
-    position_size: Option<f64>,
-    leverage: u32,
-    current_price: f64,
-    max_loss_per_trade: f64,
+    rt: &mut StrategyRuntime,
 ) {
     let Signal::Order(req) = signal else { return };
 
     let qty = compute_order_qty(
-        exchange, sizing_mode, position_size, leverage, current_price, req.qty,
-    ).await;
+        rt.capital,
+        rt.sizing_mode,
+        rt.position_size,
+        rt.leverage,
+        rt.last_price,
+        rt.order_qty.unwrap_or_else(|| default_order_qty(&rt.symbol)),
+    );
 
-    let side = match req.side {
-        StratSide::Buy => exchange::Side::Buy,
-        StratSide::Sell => exchange::Side::Sell,
-    };
+    // EngineRiskGuard pre-trade check
+    let is_long = matches!(req.side, StratSide::Buy);
+    if let Err(reason) = rt.risk_guard.pre_trade_check(qty, rt.leverage, is_long, rt.last_funding_rate) {
+        warn!(strategy = %rt.name, %reason, "pre-trade check rejected");
+        return;
+    }
+
+    let side = req.side;
     let pos_side = match req.side {
-        StratSide::Buy => exchange::PositionSide::Long,
-        StratSide::Sell => exchange::PositionSide::Short,
+        StratSide::Buy => PositionSide::Long,
+        StratSide::Sell => PositionSide::Short,
     };
-
     let side_str = match req.side {
         StratSide::Buy => "buy",
         StratSide::Sell => "sell",
     };
-    let order_type_str = match req.order_type {
-        StratOrderType::Market => "market",
-        StratOrderType::Limit => "limit",
-    };
 
     let result = match req.order_type {
-        StratOrderType::Market => {
-            exchange.market_order(side, pos_side, qty).await
-        }
+        StratOrderType::Market => exchange.market_order(side, pos_side, qty).await,
         StratOrderType::Limit => {
             let price = req.price.unwrap_or(0.0);
             exchange.limit_order(side, pos_side, qty, price).await
+        }
+        _ => {
+            warn!(strategy = %rt.name, "unsupported order type: {:?}", req.order_type);
+            return;
         }
     };
 
     match result {
         Ok(resp) => {
-            tracing::info!(?resp, "order executed");
-            log_trade(strategy_name, &exchange.symbol, side_str, qty, order_type_str, &resp);
+            info!(strategy = %rt.name, ?resp, "order executed");
+            log_trade(&rt.name, &rt.symbol, side_str, qty, "market", &resp);
 
-            // 挂 STOP_MARKET 条件单作为交易所侧安全网
-            if max_loss_per_trade > 0.0 {
+            let avg_price: f64 = resp
+                .get("avgPrice")
+                .and_then(|v| v.as_str())
+                .or_else(|| resp.get("price").and_then(|v| v.as_str()))
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(rt.last_price);
+            let commission: f64 = resp
+                .get("commission")
+                .and_then(|v| v.as_str().and_then(|s| s.parse().ok()).or_else(|| v.as_f64()))
+                .unwrap_or(0.0);
+            let realized_pnl: f64 = resp
+                .get("realizedPnl")
+                .and_then(|v| v.as_str().and_then(|s| s.parse().ok()).or_else(|| v.as_f64()))
+                .unwrap_or(0.0);
+
+            log_pnl_by_strategy(
+                &rt.name, &rt.symbol, side_str, qty, rt.last_price, avg_price,
+                realized_pnl, commission,
+            );
+
+            rt.risk_guard.record_trade(realized_pnl - commission);
+
+            // Place stop loss safety order
+            if rt.risk_config.max_loss_per_trade > 0.0 {
                 let (sl_side, sl_price) = match req.side {
-                    // 开多 → 止损卖出，价格下跌触发
-                    StratSide::Buy => (
-                        exchange::Side::Sell,
-                        current_price * (1.0 - max_loss_per_trade),
-                    ),
-                    // 开空 → 止损买入，价格上涨触发
-                    StratSide::Sell => (
-                        exchange::Side::Buy,
-                        current_price * (1.0 + max_loss_per_trade),
-                    ),
+                    StratSide::Buy => (StratSide::Sell, rt.last_price * (1.0 - rt.risk_config.max_loss_per_trade)),
+                    StratSide::Sell => (StratSide::Buy, rt.last_price * (1.0 + rt.risk_config.max_loss_per_trade)),
                 };
-                match exchange.stop_loss(sl_side, pos_side, sl_price).await {
-                    Ok(sl_resp) => {
-                        tracing::info!(
-                            stop_price = sl_price,
-                            ?sl_resp,
-                            "STOP_MARKET safety order placed"
-                        );
-                    }
-                    Err(e) => {
-                        tracing::warn!("STOP_MARKET order failed (non-blocking): {e}");
+                if let Err(e) = exchange.stop_loss(sl_side, pos_side, sl_price).await {
+                    warn!(strategy = %rt.name, "STOP_MARKET failed (non-blocking): {e}");
+                }
+            }
+        }
+        Err(e) => error!(strategy = %rt.name, "order failed: {e}"),
+    }
+}
+
+// ── Execute trade override ─────────────────────────────────────
+
+async fn execute_trade_override(
+    trade_override: &mut TradeOverride,
+    trade_path: &std::path::Path,
+    exchange: &Exchange,
+    strategy_name: &str,
+    current_price: f64,
+) {
+    if !trade_override.needs_execution() {
+        return;
+    }
+    if !trade_override.is_active(current_price) {
+        return;
+    }
+
+    warn!(
+        strategy = strategy_name,
+        action = ?trade_override.action,
+        note = %trade_override.note,
+        "executing trade override"
+    );
+
+    match trade_override.action {
+        TradeAction::CloseAll | TradeAction::Stop => {
+            if let Ok(positions) = exchange.get_positions().await {
+                for pos in &positions {
+                    let sym = pos.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
+                    if sym != exchange.symbol { continue; }
+                    let amt: f64 = pos.get("positionAmt")
+                        .and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+                    if amt.abs() < f64::EPSILON { continue; }
+                    match exchange.close_position(sym, amt).await {
+                        Ok(_) => info!("[{strategy_name}] closed {sym} amt={amt}"),
+                        Err(e) => error!("[{strategy_name}] close {sym} failed: {e}"),
                     }
                 }
             }
         }
-        Err(e) => tracing::error!("order failed: {e}"),
+        TradeAction::CloseLong => {
+            if let Ok(positions) = exchange.get_positions().await {
+                for pos in &positions {
+                    let sym = pos.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
+                    if sym != exchange.symbol { continue; }
+                    let amt: f64 = pos.get("positionAmt")
+                        .and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+                    if amt > f64::EPSILON {
+                        let _ = exchange.close_position(sym, amt).await;
+                    }
+                }
+            }
+        }
+        TradeAction::CloseShort => {
+            if let Ok(positions) = exchange.get_positions().await {
+                for pos in &positions {
+                    let sym = pos.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
+                    if sym != exchange.symbol { continue; }
+                    let amt: f64 = pos.get("positionAmt")
+                        .and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+                    if amt < -f64::EPSILON {
+                        let _ = exchange.close_position(sym, amt).await;
+                    }
+                }
+            }
+        }
+        TradeAction::Reduce => {
+            let percent = trade_override.params.percent.unwrap_or(0.5);
+            if let Ok(positions) = exchange.get_positions().await {
+                for pos in &positions {
+                    let sym = pos.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
+                    if sym != exchange.symbol { continue; }
+                    let amt: f64 = pos.get("positionAmt")
+                        .and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+                    if amt.abs() < f64::EPSILON { continue; }
+                    let reduce_amt = amt * percent;
+                    let _ = exchange.close_position(sym, reduce_amt).await;
+                }
+            }
+        }
+        TradeAction::Add => {
+            let percent = trade_override.params.percent.unwrap_or(0.5);
+            let direction = trade_override.params.direction.as_deref();
+            if let Ok(positions) = exchange.get_positions().await {
+                for pos in &positions {
+                    let sym = pos.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
+                    if sym != exchange.symbol { continue; }
+                    let amt: f64 = pos.get("positionAmt")
+                        .and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+                    if amt.abs() < f64::EPSILON { continue; }
+                    let add_amt = (amt * percent).abs();
+                    let (side, pos_side) = match direction {
+                        Some("long") => (StratSide::Buy, PositionSide::Long),
+                        Some("short") => (StratSide::Sell, PositionSide::Short),
+                        _ => {
+                            if amt > 0.0 { (StratSide::Buy, PositionSide::Long) }
+                            else { (StratSide::Sell, PositionSide::Short) }
+                        }
+                    };
+                    let _ = exchange.market_order(side, pos_side, add_amt).await;
+                }
+            }
+        }
+        _ => {} // Hold/Pause/Resume are not oneshot
     }
+
+    trade_override.mark_executed(trade_path);
+    info!(strategy = strategy_name, action = ?trade_override.action, "trade override executed");
 }
 
-/// 确定 state.json 路径：strategies/{name}/state.json
-fn state_json_path(config: &Config) -> Option<PathBuf> {
-    let config_path = config.config.as_ref()?;
-    let dir = config_path.parent()?;
-    Some(dir.join("state.json"))
-}
+// ── State persistence ──────────────────────────────────────────
 
-/// 确定 trade.json 路径：strategies/{name}/trade.json
-fn trade_json_path(config: &Config) -> Option<PathBuf> {
-    let config_path = config.config.as_ref()?;
-    let dir = config_path.parent()?;
-    Some(dir.join("trade.json"))
-}
-
-/// 确定 risk.json 路径：strategies/{name}/risk.json
-fn risk_json_path(config: &Config) -> Option<PathBuf> {
-    let config_path = config.config.as_ref()?;
-    let dir = config_path.parent()?;
-    Some(dir.join("risk.json"))
-}
-
-/// 保存引擎状态
+#[allow(dead_code)]
 fn save_state(
     path: &std::path::Path,
     strategy: &dyn Strategy,
@@ -834,700 +931,416 @@ fn save_state(
     state.save(path);
 }
 
-/// 监听 strategy.json 文件变化，发送通知到 channel
-fn start_strategy_watcher(config_path: PathBuf, tx: tokio_mpsc::Sender<()>) {
-    std::thread::spawn(move || {
-        let watched_path = config_path.clone();
-        let tx_clone = tx.clone();
-        let mut watcher = notify::recommended_watcher(
-            move |res: Result<notify::Event, notify::Error>| {
-                let Ok(event) = res else { return };
-                match event.kind {
-                    EventKind::Modify(_) | EventKind::Create(_) => {}
-                    _ => return,
-                }
-                // 只响应被监听的文件
-                let dominated = event.paths.iter().any(|p| p == &watched_path);
-                if !dominated {
-                    return;
-                }
-                tracing::info!("strategy.json changed, reloading params");
-                let _ = tx_clone.blocking_send(());
-            },
-        )
-        .expect("failed to create strategy file watcher");
-
-        // 监听 strategy.json 所在目录（notify 需要目录级监听）
-        let watch_dir = config_path.parent().unwrap_or(&config_path);
-        watcher
-            .watch(watch_dir, RecursiveMode::NonRecursive)
-            .expect("failed to watch strategy directory");
-
-        tracing::info!("strategy file watcher started: {:?}", config_path);
-        loop {
-            std::thread::sleep(std::time::Duration::from_secs(3600));
-        }
-    });
-}
-
-/// 监听 trade.json 文件变化，发送通知到 channel
-fn start_trade_watcher(trade_path: PathBuf, tx: tokio_mpsc::Sender<()>) {
-    std::thread::spawn(move || {
-        let watched_path = trade_path.clone();
-        let tx_clone = tx.clone();
-        let mut watcher = notify::recommended_watcher(
-            move |res: Result<notify::Event, notify::Error>| {
-                let Ok(event) = res else { return };
-                match event.kind {
-                    EventKind::Modify(_) | EventKind::Create(_) => {}
-                    _ => return,
-                }
-                let dominated = event.paths.iter().any(|p| p == &watched_path);
-                if !dominated {
-                    return;
-                }
-                tracing::info!("trade.json changed, reloading override");
-                let _ = tx_clone.blocking_send(());
-            },
-        )
-        .expect("failed to create trade file watcher");
-
-        let watch_dir = trade_path.parent().unwrap_or(&trade_path);
-        watcher
-            .watch(watch_dir, RecursiveMode::NonRecursive)
-            .expect("failed to watch trade directory");
-
-        tracing::info!("trade file watcher started: {:?}", trade_path);
-        loop {
-            std::thread::sleep(std::time::Duration::from_secs(3600));
-        }
-    });
-}
-
-/// 监听 risk.json 文件变化，发送通知到 channel
-fn start_risk_watcher(risk_path: PathBuf, tx: tokio_mpsc::Sender<()>) {
-    std::thread::spawn(move || {
-        let watched_path = risk_path.clone();
-        let tx_clone = tx.clone();
-        let mut watcher = notify::recommended_watcher(
-            move |res: Result<notify::Event, notify::Error>| {
-                let Ok(event) = res else { return };
-                match event.kind {
-                    EventKind::Modify(_) | EventKind::Create(_) => {}
-                    _ => return,
-                }
-                let dominated = event.paths.iter().any(|p| p == &watched_path);
-                if !dominated {
-                    return;
-                }
-                tracing::info!("risk.json changed, reloading config");
-                let _ = tx_clone.blocking_send(());
-            },
-        )
-        .expect("failed to create risk file watcher");
-
-        let watch_dir = risk_path.parent().unwrap_or(&risk_path);
-        watcher
-            .watch(watch_dir, RecursiveMode::NonRecursive)
-            .expect("failed to watch risk directory");
-
-        tracing::info!("risk file watcher started: {:?}", risk_path);
-        loop {
-            std::thread::sleep(std::time::Duration::from_secs(3600));
-        }
-    });
-}
-
-/// 从 strategy.json 重新加载参数，创建新策略实例并恢复旧状态
-fn reload_strategy(config: &mut Config, strategy: &mut Box<dyn Strategy>) {
-    let Some(ref path) = config.config else { return };
-    let contents = match std::fs::read_to_string(path) {
-        Ok(c) => c,
-        Err(e) => {
-            tracing::warn!("failed to read strategy.json for reload: {e}");
-            return;
-        }
-    };
-    let sf: StrategyFile = match serde_json::from_str(&contents) {
-        Ok(sf) => sf,
-        Err(e) => {
-            tracing::warn!("failed to parse strategy.json for reload: {e}");
-            return;
-        }
-    };
-
-    // 保存旧策略的指标状态
-    let saved_state = strategy.export_state();
-
-    // 应用新参数到 config
-    config.apply_strategy_file(sf);
-
-    // 创建新策略实例（使用新参数）
-    let mut new_strategy = create_strategy(config);
-
-    // 恢复旧指标状态（价格历史等），新参数（周期/阈值）生效
-    new_strategy.restore_state(&saved_state);
-
-    tracing::info!(
-        strategy = new_strategy.name(),
-        params = ?config.params,
-        "strategy hot-reloaded with new params"
-    );
-    *strategy = new_strategy;
-}
-
-/// 尝试执行信号，先经过 DecisionGate + funding rate 过滤
-async fn try_execute_signal(
-    signal: &Signal,
-    trade_override: &TradeOverride,
-    exchange: &Exchange,
-    strategy_name: &str,
-    sizing_mode: SizingMode,
-    position_size: Option<f64>,
-    leverage: u32,
-    current_price: f64,
-    max_loss_per_trade: f64,
-    current_funding_rate: f64,
-    funding_rate_limit: Option<f64>,
-) {
-    if *signal == Signal::None {
-        return;
-    }
-    // 过期/条件失效的 trade override 视为 hold，不拦截
-    if trade_override.is_active(current_price) {
-        // DecisionGate: trade override 过滤
-        if !decision_gate_allows_signal(trade_override) {
-            tracing::debug!(
-                action = ?trade_override.action,
-                "signal blocked by trade override"
-            );
-            return;
-        }
-    }
-
-    // Funding rate 过滤：做多时 funding > limit 拒绝，做空时 funding < -limit 拒绝
-    if let Some(limit) = funding_rate_limit {
-        if let Signal::Order(req) = signal {
-            let is_long = matches!(req.side, StratSide::Buy);
-            if is_long && current_funding_rate > limit {
-                tracing::warn!(
-                    funding_rate = current_funding_rate,
-                    limit,
-                    "long signal blocked: funding rate too high"
-                );
-                return;
-            }
-            if !is_long && current_funding_rate < -limit {
-                tracing::warn!(
-                    funding_rate = current_funding_rate,
-                    limit,
-                    "short signal blocked: funding rate too negative"
-                );
-                return;
-            }
-        }
-    }
-
-    tracing::info!(?signal, "signal passed decision gate");
-    execute_signal(
-        signal, exchange, strategy_name,
-        sizing_mode, position_size, leverage, current_price,
-        max_loss_per_trade,
-    ).await;
-}
-
-/// 执行一次性 trade override 指令（close_all/close_long/close_short/stop/reduce/add）
-async fn execute_trade_override(
-    trade_override: &mut TradeOverride,
-    trade_path: &std::path::Path,
-    exchange: &Exchange,
-    strategy_name: &str,
-    current_price: f64,
-) {
-    if !trade_override.needs_execution() {
-        return;
-    }
-
-    // 检查过期和条件
-    if !trade_override.is_active(current_price) {
-        tracing::debug!(
-            action = ?trade_override.action,
-            "trade override inactive (expired or condition not met)"
-        );
-        return;
-    }
-
-    tracing::warn!(
-        action = ?trade_override.action,
-        note = %trade_override.note,
-        "executing trade override"
-    );
-
-    match trade_override.action {
-        TradeAction::CloseAll | TradeAction::Stop => {
-            match exchange.get_positions().await {
-                Ok(positions) => {
-                    for pos in &positions {
-                        let sym = pos.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
-                        if sym != exchange.symbol {
-                            continue;
-                        }
-                        let amt: f64 = pos.get("positionAmt")
-                            .and_then(|v| v.as_str())
-                            .and_then(|s| s.parse().ok())
-                            .unwrap_or(0.0);
-                        if amt.abs() < f64::EPSILON {
-                            continue;
-                        }
-                        match exchange.close_position(sym, amt).await {
-                            Ok(_) => tracing::info!("[{strategy_name}] closed {sym} amt={amt}"),
-                            Err(e) => tracing::error!("[{strategy_name}] close {sym} failed: {e}"),
-                        }
-                    }
-                }
-                Err(e) => tracing::error!("failed to get positions for close_all: {e}"),
-            }
-        }
-        TradeAction::CloseLong => {
-            match exchange.get_positions().await {
-                Ok(positions) => {
-                    for pos in &positions {
-                        let sym = pos.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
-                        if sym != exchange.symbol {
-                            continue;
-                        }
-                        let amt: f64 = pos.get("positionAmt")
-                            .and_then(|v| v.as_str())
-                            .and_then(|s| s.parse().ok())
-                            .unwrap_or(0.0);
-                        if amt > f64::EPSILON {
-                            match exchange.close_position(sym, amt).await {
-                                Ok(_) => tracing::info!("[{strategy_name}] closed long {sym} amt={amt}"),
-                                Err(e) => tracing::error!("[{strategy_name}] close long {sym} failed: {e}"),
-                            }
-                        }
-                    }
-                }
-                Err(e) => tracing::error!("failed to get positions for close_long: {e}"),
-            }
-        }
-        TradeAction::CloseShort => {
-            match exchange.get_positions().await {
-                Ok(positions) => {
-                    for pos in &positions {
-                        let sym = pos.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
-                        if sym != exchange.symbol {
-                            continue;
-                        }
-                        let amt: f64 = pos.get("positionAmt")
-                            .and_then(|v| v.as_str())
-                            .and_then(|s| s.parse().ok())
-                            .unwrap_or(0.0);
-                        if amt < -f64::EPSILON {
-                            match exchange.close_position(sym, amt).await {
-                                Ok(_) => tracing::info!("[{strategy_name}] closed short {sym} amt={amt}"),
-                                Err(e) => tracing::error!("[{strategy_name}] close short {sym} failed: {e}"),
-                            }
-                        }
-                    }
-                }
-                Err(e) => tracing::error!("failed to get positions for close_short: {e}"),
-            }
-        }
-        TradeAction::Reduce => {
-            let percent = trade_override.params.percent.unwrap_or(0.5);
-            match exchange.get_positions().await {
-                Ok(positions) => {
-                    for pos in &positions {
-                        let sym = pos.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
-                        if sym != exchange.symbol {
-                            continue;
-                        }
-                        let amt: f64 = pos.get("positionAmt")
-                            .and_then(|v| v.as_str())
-                            .and_then(|s| s.parse().ok())
-                            .unwrap_or(0.0);
-                        if amt.abs() < f64::EPSILON {
-                            continue;
-                        }
-                        let reduce_amt = amt * percent;
-                        match exchange.close_position(sym, reduce_amt).await {
-                            Ok(_) => tracing::info!("[{strategy_name}] reduced {sym} by {percent:.0}%: {reduce_amt}"),
-                            Err(e) => tracing::error!("[{strategy_name}] reduce {sym} failed: {e}"),
-                        }
-                    }
-                }
-                Err(e) => tracing::error!("failed to get positions for reduce: {e}"),
-            }
-        }
-        TradeAction::Add => {
-            let percent = trade_override.params.percent.unwrap_or(0.5);
-            // direction 指定加仓方向："long" 或 "short"，不指定时跟随现有仓位方向
-            let direction = trade_override.params.direction.as_deref();
-            match exchange.get_positions().await {
-                Ok(positions) => {
-                    for pos in &positions {
-                        let sym = pos.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
-                        if sym != exchange.symbol {
-                            continue;
-                        }
-                        let amt: f64 = pos.get("positionAmt")
-                            .and_then(|v| v.as_str())
-                            .and_then(|s| s.parse().ok())
-                            .unwrap_or(0.0);
-                        if amt.abs() < f64::EPSILON {
-                            continue;
-                        }
-                        let add_amt = (amt * percent).abs();
-                        let (side, pos_side) = match direction {
-                            Some("long") => (exchange::Side::Buy, exchange::PositionSide::Long),
-                            Some("short") => (exchange::Side::Sell, exchange::PositionSide::Short),
-                            _ => {
-                                // 跟随现有仓位方向
-                                if amt > 0.0 {
-                                    (exchange::Side::Buy, exchange::PositionSide::Long)
-                                } else {
-                                    (exchange::Side::Sell, exchange::PositionSide::Short)
-                                }
-                            }
-                        };
-                        match exchange.market_order(side, pos_side, add_amt).await {
-                            Ok(_) => tracing::info!("[{strategy_name}] added {sym} by {percent:.0}%: {add_amt} direction={direction:?}"),
-                            Err(e) => tracing::error!("[{strategy_name}] add {sym} failed: {e}"),
-                        }
-                    }
-                }
-                Err(e) => tracing::error!("failed to get positions for add: {e}"),
-            }
-        }
-        _ => {} // Hold/Pause/Resume are not oneshot
-    }
-
-    // 标记已执行
-    trade_override.mark_executed(trade_path);
-    tracing::info!(action = ?trade_override.action, "trade override executed and marked");
-}
+// ════════════════════════════════════════════════════════════════
+// ██  MAIN  ██
+// ════════════════════════════════════════════════════════════════
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("hft_engine=debug".parse().unwrap()),
-        )
-        .init();
+    let args = Args::parse();
 
-    let mut config = Config::load();
-    let display_name = config.strategy_name.as_deref().unwrap_or(&config.strategy);
-    tracing::info!("symbol={} leverage={} strategy={} name={} dry_run={}",
-        config.symbol, config.leverage, config.strategy, display_name, config.dry_run);
+    // 0. Load .env
+    let _ = dotenvy::dotenv();
 
-    let mut exchange = Exchange::new(&config);
+    // 1. Logging
+    let _guard = init_logging(&paths::logs_dir(), "engine");
 
-    if let Err(e) = exchange.set_leverage(config.leverage).await {
-        tracing::error!("failed to set leverage: {e}");
-    }
+    // 2. Load account + portfolio config
+    let account_path = paths::account_dir("binance-main").join("account.json");
+    let account = AccountConfig::load(&account_path).expect("failed to load account.json");
 
-    let mut strategy = create_strategy(&config);
+    let portfolio_path = paths::portfolio_dir("binance-main", "main").join("portfolio.json");
+    let portfolio = PortfolioConfig::load(&portfolio_path).expect("failed to load portfolio.json");
 
-    // 设置 clientOrderId 前缀: "{strategy}-{SYMBOL}"
-    let strategy_name = strategy.name().to_lowercase();
-    exchange.order_id_prefix = format!("{}-{}", strategy_name, config.symbol);
+    let dry_run = args.dry_run;
+    let total_capital = portfolio.allocated_capital;
 
-    let candle_ms = config.timeframe_ms.unwrap_or(300_000); // default 5m
-    let mut aggregator = CandleAggregator::new(candle_ms);
-
-    // state.json 路径
-    let state_path = state_json_path(&config);
-
-    // trade.json 路径 + 初始加载
-    let trade_path = trade_json_path(&config);
-    let mut trade_override = trade_path
-        .as_ref()
-        .map(|p| TradeOverride::load(p))
-        .unwrap_or_default();
-    if trade_override.action != TradeAction::Hold {
-        tracing::info!(action = ?trade_override.action, "loaded trade override");
-    }
-
-    // risk.json 路径 + 加载
-    let risk_path = risk_json_path(&config);
-    let mut risk_config = risk_path
-        .as_ref()
-        .map(|p| RiskConfig::load(p))
-        .unwrap_or_default();
-    let capital = config.capital.unwrap_or(200.0);
-    tracing::info!(
-        max_loss = risk_config.max_loss_per_trade,
-        max_profit = risk_config.max_profit_per_trade,
-        max_drawdown_stop = risk_config.max_drawdown_stop,
-        capital,
-        "risk config loaded for inline risk gate"
+    info!(
+        account = %account.name,
+        portfolio = %portfolio.name,
+        capital = total_capital,
+        dry_run,
+        "engine starting"
     );
 
-    // 高水位 + 持仓跟踪器
-    let mut hwm = load_high_water();
-    if !hwm.is_empty() {
-        tracing::info!("restored {} high water marks", hwm.len());
+    // 3. Scan approved strategies
+    let approved = scan_approved_strategies();
+    if approved.is_empty() {
+        error!("no approved strategies found, exiting");
+        return;
     }
-    let mut pos_tracker = PositionTracker::new();
-    let mut total_balance: f64 = 0.0;
 
-    // 恢复状态（如果存在）
-    let mut trade_stats = TradeStats::default();
-    if let Some(ref sp) = state_path {
-        if let Some(saved) = EngineState::load(sp) {
-            // 恢复策略指标
-            strategy.restore_state(&saved.indicators);
-            // 恢复 K 线聚合器
-            if let Some(ref agg_state) = saved.candle_aggregator {
-                aggregator.restore_state(agg_state);
+    info!(count = approved.len(), "approved strategies found");
+    for (name, sf) in &approved {
+        info!(
+            name,
+            symbol = sf.symbol.as_deref().unwrap_or("?"),
+            engine = sf.engine_strategy.as_deref().unwrap_or("default"),
+            "strategy loaded"
+        );
+    }
+
+    // 4. Create Exchange client (singleton)
+    let api_key = std::env::var(account.api_key_env.as_deref().unwrap_or("BINANCE_API_KEY"))
+        .expect("BINANCE_API_KEY not set");
+    let api_secret = std::env::var(account.api_secret_env.as_deref().unwrap_or("BINANCE_API_SECRET"))
+        .expect("BINANCE_API_SECRET not set");
+    let base_url = account
+        .base_url
+        .clone()
+        .unwrap_or_else(|| "https://fapi.binance.com".to_string());
+
+    // 5. Init Ledger
+    let ledger_path = paths::records_dir().join("ledger.json");
+    let mut ledger = if ledger_path.exists() {
+        match Ledger::load(&ledger_path) {
+            Ok(l) => {
+                info!("ledger restored from {}", ledger_path.display());
+                l
             }
-            // 恢复交易统计
-            trade_stats = saved.trade_stats;
-            tracing::info!(
-                total = trade_stats.total,
-                wins = trade_stats.wins,
-                losses = trade_stats.losses,
-                pnl = trade_stats.realized_pnl,
-                "trade stats restored"
-            );
+            Err(e) => {
+                warn!("failed to load ledger: {e}, creating new");
+                Ledger::new(total_capital)
+            }
+        }
+    } else {
+        Ledger::new(total_capital)
+    };
+
+    // Collect unique symbols and build strategy runtimes
+    let mut symbols: Vec<String> = Vec::new();
+    let mut runtimes: HashMap<String, StrategyRuntime> = HashMap::new();
+
+    for (name, sf) in &approved {
+        let symbol = match sf.normalized_symbol() {
+            Some(s) => s,
+            None => {
+                warn!(name, "strategy has no symbol, skipping");
+                continue;
+            }
+        };
+        let symbol_upper = symbol.to_uppercase();
+        if !symbols.contains(&symbol_upper) {
+            symbols.push(symbol_upper.clone());
+        }
+
+        let strat_dir = paths::strategy_dir(name);
+        let capital = sf.capital.unwrap_or(total_capital / approved.len() as f64);
+        let leverage = sf.leverage.unwrap_or(10);
+        let engine_strategy = sf.engine_strategy.clone().unwrap_or_else(|| "default".to_string());
+        let params = sf.numeric_params();
+
+        // Add to ledger if not already present
+        if ledger.get(name).is_none() {
+            ledger.add_strategy(name, capital);
+        }
+
+        // Load risk config
+        let risk_path = strat_dir.join("risk.json");
+        let risk_config = RiskConfig::load(&risk_path);
+        let risk_guard = EngineRiskGuard::new(risk_config.clone(), capital);
+
+        // Load trade override
+        let trade_path = strat_dir.join("trade.json");
+        let trade_override = TradeOverride::load(&trade_path);
+
+        let sizing_mode_str = sf.sizing_mode.as_deref().unwrap_or("percent");
+        let sizing_mode = if sizing_mode_str == "fixed" { SizingMode::Fixed } else { SizingMode::Percent };
+
+        runtimes.insert(
+            name.to_string(),
+            StrategyRuntime {
+                name: name.to_string(),
+                symbol: symbol_upper.clone(),
+                dir: strat_dir,
+                leverage,
+                capital,
+                position_size: sf.position_size,
+                sizing_mode,
+                order_qty: sf.order_qty,
+                engine_strategy,
+                params,
+                trade_override,
+                risk_config,
+                risk_guard,
+                trade_stats: TradeStats::default(),
+                last_price: 0.0,
+                last_funding_rate: 0.0,
+                last_funding_log_nft: 0,
+            },
+        );
+    }
+
+    // 6. Init GlobalRiskGuard
+    let global_risk_config = if let Some(ref pr) = portfolio.risk {
+        GlobalRiskConfig {
+            max_drawdown_pct: pr.max_drawdown_pct.unwrap_or(10.0),
+            max_daily_loss_pct: pr.max_daily_loss_pct.unwrap_or(5.0),
+            max_total_exposure: pr.max_total_exposure.unwrap_or(2.0),
+            max_per_coin_exposure_pct: pr.max_per_coin_exposure_pct.unwrap_or(50.0),
+        }
+    } else {
+        GlobalRiskConfig::default()
+    };
+    let global_risk = GlobalRiskGuard::new(global_risk_config, total_capital);
+
+    // 7. Init OrderRouter
+    let mut order_router = OrderRouter::new(ledger, global_risk);
+    for (name, rt) in &runtimes {
+        let guard = EngineRiskGuard::new(rt.risk_config.clone(), rt.capital);
+        order_router.add_strategy_guard(name, guard);
+    }
+
+    // 8. Create Gateway
+    let gateway = Gateway::new(&symbols);
+
+    // 9. Create signal channel (workers → main loop)
+    let (signal_tx, mut signal_rx) = mpsc::channel::<worker::StrategySignal>(4096);
+
+    // 10. Spawn workers per strategy
+    let mut worker_handles = Vec::new();
+    for (name, sf) in &approved {
+        let symbol = match sf.normalized_symbol() {
+            Some(s) => s.to_uppercase(),
+            None => continue,
+        };
+
+        let trade_dir = sf.trade_direction();
+        let cooldown = sf.cooldown_bars.unwrap_or(0);
+        let min_vol = sf.min_volume.unwrap_or(0.0);
+        let min_spread = sf.min_spread_bps.unwrap_or(0.0);
+        let min_depth = sf.min_depth_usd.unwrap_or(0.0);
+        let filter = SignalFilter::new(trade_dir, cooldown, min_vol, min_spread, min_depth);
+
+        let worker_config = match build_worker_config(name, sf, filter) {
+            Some(wc) => wc,
+            None => {
+                warn!(name, "failed to build worker config, skipping");
+                continue;
+            }
+        };
+
+        let market_rx = match gateway.subscribe_market(&symbol) {
+            Some(rx) => rx,
+            None => {
+                warn!(name, symbol = %symbol, "no market channel for symbol, skipping");
+                continue;
+            }
+        };
+
+        info!(name, symbol = %symbol, "spawning worker");
+        let handle = worker::spawn_worker(worker_config, market_rx, signal_tx.clone());
+        worker_handles.push(handle);
+    }
+
+    // 11. Start Gateway WS connections
+    let feed_configs: Vec<FeedConfig> = symbols
+        .iter()
+        .map(|sym| FeedConfig {
+            symbols: vec![sym.to_lowercase()],
+            agg_trade: true,
+            depth: true,
+            depth_speed: "100ms".to_string(),
+            mark_price: false, // handled by dedicated markPrice feeds
+        })
+        .collect();
+    let _gateway_handles = gateway.start(feed_configs).await;
+
+    // 12. Start User Data Stream + markPrice feeds
+    let user_tx = gateway.user_sender();
+    let mut user_rx = gateway.subscribe_user();
+
+    // User data stream task
+    {
+        let tx = user_tx.clone();
+        let ak = api_key.clone();
+        let ask = api_secret.clone();
+        let bu = base_url.clone();
+        tokio::spawn(async move {
+            start_user_data_stream(ak, ask, bu, dry_run, tx).await;
+        });
+    }
+
+    // Per-symbol markPrice feeds
+    for sym in &symbols {
+        let tx = user_tx.clone();
+        let s = sym.clone();
+        tokio::spawn(async move {
+            start_mark_price_feed(s, tx).await;
+        });
+    }
+
+    // 13. Start Config Watcher
+    let (config_tx, mut config_rx) = mpsc::channel::<ConfigChange>(256);
+    start_config_watcher(paths::strategies_dir(), config_tx);
+
+    // Per-strategy exchange instances (each with correct symbol + order_id_prefix)
+    let mut exchanges: HashMap<String, Exchange> = HashMap::new();
+    for (name, rt) in &runtimes {
+        let ex = Exchange::new(
+            api_key.clone(),
+            api_secret.clone(),
+            base_url.clone(),
+            dry_run,
+        )
+        .with_symbol(&rt.symbol)
+        .with_order_id_prefix(&format!("{}-{}", name, rt.symbol));
+
+        // Set leverage (non-blocking)
+        let leverage = rt.leverage;
+        let ex_for_lev = Exchange::new(
+            api_key.clone(),
+            api_secret.clone(),
+            base_url.clone(),
+            dry_run,
+        )
+        .with_symbol(&rt.symbol);
+
+        let name_clone = name.clone();
+        tokio::spawn(async move {
+            if let Err(e) = ex_for_lev.set_leverage(leverage).await {
+                warn!(strategy = %name_clone, "failed to set leverage: {e}");
+            }
+        });
+
+        exchanges.insert(name.to_string(), ex);
+    }
+
+    // Execute pending trade overrides on startup
+    for (name, rt) in runtimes.iter_mut() {
+        if let Some(exchange) = exchanges.get(name) {
+            let trade_path = rt.dir.join("trade.json");
+            execute_trade_override(
+                &mut rt.trade_override, &trade_path, exchange, name, rt.last_price,
+            ).await;
         }
     }
 
-    tracing::info!("strategy={} candle_interval={}ms", strategy.name(), candle_ms);
+    // Save initial ledger
+    let _ = order_router.ledger().save(&ledger_path);
 
-    // 启动行情 WebSocket 流
-    let feed_config = FeedConfig {
-        symbols: vec![config.symbol.to_lowercase()],
-        ..FeedConfig::default()
-    };
-    let mut rx = start_feed(feed_config, 4096).await;
+    info!("engine running, {} strategies active", runtimes.len());
 
-    // 启动 strategy.json 文件监听（热更新参数）
-    let (config_tx, mut config_rx) = tokio_mpsc::channel::<()>(16);
-    if let Some(ref path) = config.config {
-        start_strategy_watcher(path.clone(), config_tx);
-    }
+    // ── Main event loop ────────────────────────────────────────
 
-    // 启动 trade.json 文件监听
-    let (trade_tx, mut trade_rx) = tokio_mpsc::channel::<()>(16);
-    if let Some(ref path) = trade_path {
-        start_trade_watcher(path.clone(), trade_tx);
-    }
-
-    // 启动 risk.json 文件监听（热更新风控参数）
-    let (risk_tx, mut risk_rx) = tokio_mpsc::channel::<()>(16);
-    if let Some(ref path) = risk_path {
-        start_risk_watcher(path.clone(), risk_tx);
-    }
-
-    // 启动 user data stream（markPrice + ACCOUNT_UPDATE）
-    let (user_tx, mut user_rx) = tokio_mpsc::channel::<UserEvent>(4096);
-
-    // markPrice WebSocket
-    let mark_tx = user_tx.clone();
-    let mark_symbol = config.symbol.clone();
-    tokio::spawn(async move {
-        start_mark_price_feed(mark_symbol, mark_tx).await;
-    });
-
-    // user data stream WebSocket
-    let uds_tx = user_tx.clone();
-    let uds_api_key = config.api_key.clone();
-    let uds_api_secret = config.api_secret.clone();
-    let uds_base_url = config.base_url.clone();
-    let uds_dry_run = config.dry_run;
-    tokio::spawn(async move {
-        start_user_data_feed(uds_api_key, uds_api_secret, uds_base_url, uds_dry_run, uds_tx).await;
-    });
-
-    // 信号过滤器
-    let mut signal_filter = SignalFilter::from_config(&config);
-
-    // 缓存最新盘口（供 liquidity_guard 使用）
-    let mut latest_depth: Option<hft_engine::types::DepthData> = None;
-
-    // 最新市价（从 tick 更新，用于百分比下单量计算）
-    let mut last_price: f64 = 0.0;
-
-    // 缓存最新资金费率（从 MarkPrice 事件更新）
-    let mut last_funding_rate: f64 = 0.0;
-    // 上次记录资金费率时的 next_funding_time（避免重复记录同一周期）
-    let mut last_funding_log_nft: u64 = 0;
-
-    // 启动时执行待处理的一次性指令
-    if let Some(ref tp) = trade_path {
-        execute_trade_override(
-            &mut trade_override, tp, &exchange, &strategy_name, last_price,
-        ).await;
-    }
-
-    // 策略驱动的事件循环
     loop {
         tokio::select! {
-            Some(event) = rx.recv() => {
-                match &event {
-                    MarketEvent::Tick(tick) => {
-                        last_price = tick.price;
+            // Worker signals
+            Some(worker_signal) = signal_rx.recv() => {
+                let strategy_name = &worker_signal.strategy_name;
 
-                        // Tick → CandleAggregator，产出 K 线时调策略
-                        if let Some(candle) = aggregator.update(tick) {
-                            tracing::info!(
-                                o = candle.open, h = candle.high, l = candle.low,
-                                c = candle.close, v = candle.volume,
-                                "candle closed"
-                            );
-                            signal_filter.on_bar();
-                            if let Some(signal) = strategy.on_candle(&candle) {
-                                let filter_ok = signal_filter.allows(&signal, Some(&candle), latest_depth.as_ref()) == FilterResult::Pass;
-                                let executed = filter_ok && signal != Signal::None && decision_gate_allows_signal(&trade_override);
-                                log_signal(&strategy_name, &signal, last_price, &strategy.export_state(), executed);
-                                if filter_ok {
-                                    try_execute_signal(
-                                        &signal, &trade_override, &exchange, &strategy_name,
-                                        config.sizing_mode, config.position_size, config.leverage, last_price,
-                                        risk_config.max_loss_per_trade,
-                                        last_funding_rate, risk_config.funding_rate_limit,
-                                    ).await;
-                                }
-                                if executed {
-                                    if let Some(ref sp) = state_path {
-                                        save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
-                                    }
-                                }
-                            }
-                            // K 线收盘后保存状态（指标更新了）
-                            if let Some(ref sp) = state_path {
-                                save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
-                            }
-                        }
+                let Some(rt) = runtimes.get_mut(strategy_name) else {
+                    warn!(strategy = strategy_name, "signal from unknown strategy");
+                    continue;
+                };
 
-                        // 也把 tick 直接给策略（高频策略用）
-                        if let Some(signal) = strategy.on_tick(tick) {
-                            let filter_ok = signal_filter.allows(&signal, None, latest_depth.as_ref()) == FilterResult::Pass;
-                            let executed = filter_ok && signal != Signal::None && decision_gate_allows_signal(&trade_override);
-                            log_signal(&strategy_name, &signal, last_price, &strategy.export_state(), executed);
-                            if filter_ok {
-                                try_execute_signal(
-                                    &signal, &trade_override, &exchange, &strategy_name,
-                                    config.sizing_mode, config.position_size, config.leverage, last_price,
-                                    risk_config.max_loss_per_trade,
-                                    last_funding_rate, risk_config.funding_rate_limit,
-                                ).await;
-                            }
-                            if executed {
-                                if let Some(ref sp) = state_path {
-                                    save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
-                                }
-                            }
-                        }
-                    }
-                    MarketEvent::Depth(depth) => {
-                        latest_depth = Some(depth.clone());
-                        if let Some(signal) = strategy.on_depth(depth) {
-                            let filter_ok = signal_filter.allows(&signal, None, latest_depth.as_ref()) == FilterResult::Pass;
-                            let executed = filter_ok && signal != Signal::None && decision_gate_allows_signal(&trade_override);
-                            log_signal(&strategy_name, &signal, last_price, &strategy.export_state(), executed);
-                            if filter_ok {
-                                try_execute_signal(
-                                    &signal, &trade_override, &exchange, &strategy_name,
-                                    config.sizing_mode, config.position_size, config.leverage, last_price,
-                                    risk_config.max_loss_per_trade,
-                                    last_funding_rate, risk_config.funding_rate_limit,
-                                ).await;
-                            }
-                            if executed {
-                                if let Some(ref sp) = state_path {
-                                    save_state(sp, strategy.as_ref(), &aggregator, &trade_stats);
-                                }
-                            }
-                        }
-                    }
-                    _ => {
-                        tracing::debug!(?event, "unhandled event");
+                rt.last_price = worker_signal.current_price;
+
+                // Log signal
+                log_signal(strategy_name, &worker_signal.signal, worker_signal.current_price,
+                    &serde_json::json!({}), false);
+
+                // Decision gate: trade override
+                if rt.trade_override.is_active(rt.last_price) {
+                    if !decision_gate_allows_signal(&rt.trade_override) {
+                        tracing::debug!(
+                            strategy = strategy_name,
+                            action = ?rt.trade_override.action,
+                            "signal blocked by trade override"
+                        );
+                        continue;
                     }
                 }
-            }
-            Some(user_event) = user_rx.recv() => {
-                match user_event {
-                    UserEvent::MarkPrice { ref symbol, mark_price, funding_rate, next_funding_time } => {
-                        // 缓存最新资金费率
-                        last_funding_rate = funding_rate;
 
-                        // 定期记录资金费率到 CSV（每 8 小时，跟随结算周期）
-                        if funding_rate != 0.0 && next_funding_time != last_funding_log_nft {
-                            last_funding_log_nft = next_funding_time;
-                            let nft_str = if next_funding_time > 0 {
-                                chrono::DateTime::from_timestamp_millis(next_funding_time as i64)
-                                    .map(|dt| dt.to_rfc3339_opts(chrono::SecondsFormat::Secs, true))
-                                    .unwrap_or_default()
-                            } else {
-                                String::new()
-                            };
-                            log_funding_rate(symbol, funding_rate, &nft_str);
-                            tracing::info!(
-                                symbol,
-                                funding_rate,
-                                next_funding_time,
-                                "funding rate logged to CSV"
-                            );
+                // Funding rate filter
+                if let Some(limit) = rt.risk_config.funding_rate_limit {
+                    if let Signal::Order(ref req) = worker_signal.signal {
+                        let is_long = matches!(req.side, StratSide::Buy);
+                        if is_long && rt.last_funding_rate > limit {
+                            warn!(strategy = strategy_name, "long blocked: funding rate too high");
+                            continue;
+                        }
+                        if !is_long && rt.last_funding_rate < -limit {
+                            warn!(strategy = strategy_name, "short blocked: funding rate too negative");
+                            continue;
+                        }
+                    }
+                }
+
+                // Global risk check
+                match order_router.global_risk.check(order_router.ledger()) {
+                    GlobalRiskVerdict::Pass => {}
+                    GlobalRiskVerdict::Block(reason) => {
+                        warn!(strategy = strategy_name, %reason, "global risk block");
+                        continue;
+                    }
+                    GlobalRiskVerdict::CloseAll(reason) => {
+                        error!(%reason, "global risk: close all triggered");
+                        // Close all positions across all strategies
+                        for (n, ex) in &exchanges {
+                            if let Ok(positions) = ex.get_positions().await {
+                                for pos in &positions {
+                                    let sym = pos.get("symbol").and_then(|v| v.as_str()).unwrap_or("");
+                                    if sym != ex.symbol { continue; }
+                                    let amt: f64 = pos.get("positionAmt")
+                                        .and_then(|v| v.as_str()).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+                                    if amt.abs() > f64::EPSILON {
+                                        let _ = ex.close_position(sym, amt).await;
+                                        info!("[{n}] closed {sym} amt={amt} (global risk)");
+                                    }
+                                }
+                            }
+                        }
+                        continue;
+                    }
+                }
+
+                // Execute signal
+                if let Some(exchange) = exchanges.get(strategy_name) {
+                    execute_signal(&worker_signal.signal, exchange, rt).await;
+                }
+
+                // Save ledger
+                let _ = order_router.ledger().save(&ledger_path);
+            }
+
+            // User data events
+            Ok(user_event) = user_rx.recv() => {
+                match user_event {
+                    UserEvent::MarkPrice { ref symbol, mark_price, funding_rate } => {
+                        // Update funding rate for relevant strategies
+                        for rt in runtimes.values_mut() {
+                            if rt.symbol == *symbol {
+                                rt.last_funding_rate = funding_rate;
+                                rt.last_price = mark_price;
+                            }
                         }
 
-                        // 更新持仓跟踪器的标记价格
-                        pos_tracker.update_mark_price(symbol, mark_price);
+                        // Update order router mark prices (ledger + global risk)
+                        order_router.handle_mark_price(symbol, mark_price);
 
-                        // 对本 symbol 的所有持仓跑 RiskGate
-                        let positions: Vec<TrackedPosition> = pos_tracker
-                            .get_positions_for_symbol(symbol)
-                            .into_iter()
-                            .cloned()
-                            .collect();
-
-                        for pos in &positions {
-                            let key = pos.key();
-                            let pnl = pos.unrealized_pnl;
-                            let notional = pos.position_amt.abs() * pos.mark_price;
-                            let current_hwm = *hwm.get(&key).unwrap_or(&0.0);
-
-                            let verdict = risk_gate(
-                                pnl, capital, current_hwm, notional, total_balance,
-                                &risk_config,
-                            );
-
-                            match verdict {
-                                RiskVerdict::ClosePosition(ref reason) => {
-                                    tracing::warn!(
-                                        "[RISK GATE] {symbol} {} pnl={pnl:.4} → {reason}",
-                                        pos.position_side
-                                    );
-                                    log_risk_event(&strategy_name, symbol, &verdict, pnl);
-                                    match exchange.close_position(symbol, pos.position_amt).await {
-                                        Ok(_) => {
-                                            tracing::info!("  {symbol} closed by risk gate");
-                                            pos_tracker.remove(&key);
-                                            hwm.remove(&key);
-                                            save_high_water(&hwm);
-                                        }
-                                        Err(e) => tracing::error!("  {symbol} close failed: {e}"),
-                                    }
+                        // Log funding rate
+                        if funding_rate != 0.0 {
+                            for rt in runtimes.values_mut() {
+                                if rt.symbol == *symbol && rt.last_funding_log_nft == 0 {
+                                    rt.last_funding_log_nft = 1;
+                                    log_funding_rate(symbol, funding_rate, "");
                                 }
-                                RiskVerdict::Block(ref reason) => {
-                                    tracing::warn!(
-                                        "[RISK GATE] {symbol} {} → block: {reason}",
-                                        pos.position_side
-                                    );
-                                    log_risk_event(&strategy_name, symbol, &verdict, pnl);
-                                }
-                                RiskVerdict::Pass => {
-                                    // 更新高水位
-                                    if pnl > 0.0 && pnl > current_hwm {
-                                        hwm.insert(key.clone(), pnl);
-                                        save_high_water(&hwm);
-                                    } else if pnl <= 0.0 && hwm.contains_key(&key) {
-                                        hwm.remove(&key);
-                                        save_high_water(&hwm);
+                            }
+                        }
+
+                        // Check per-strategy drawdown levels
+                        for (name, _rt) in runtimes.iter() {
+                            if let Some(alloc) = order_router.ledger().get(name) {
+                                let level = GlobalRiskGuard::check_strategy_drawdown(alloc);
+                                match level {
+                                    hft_engine::global_risk::StrategyRiskLevel::Red(dd) => {
+                                        warn!(strategy = %name, drawdown = dd, "strategy in RED zone");
                                     }
+                                    hft_engine::global_risk::StrategyRiskLevel::Meltdown(dd) => {
+                                        error!(strategy = %name, drawdown = dd, "strategy MELTDOWN — should close");
+                                    }
+                                    _ => {}
                                 }
                             }
                         }
@@ -1539,67 +1352,97 @@ async fn main() {
                         entry_price,
                         unrealized_pnl,
                     } => {
-                        tracing::info!(
-                            "ACCOUNT_UPDATE: {symbol} {position_side} amt={position_amt} ep={entry_price} pnl={unrealized_pnl:.4}"
+                        info!(
+                            symbol, position_side, position_amt, entry_price,
+                            unrealized_pnl = format!("{unrealized_pnl:.4}"),
+                            "ACCOUNT_UPDATE"
                         );
-                        pos_tracker.update_position(
-                            symbol, position_side, position_amt, entry_price, unrealized_pnl,
-                        );
+                    }
+                    UserEvent::BalanceUpdate { wallet_balance } => {
+                        info!(balance = wallet_balance, "balance update");
+                    }
+                    UserEvent::OrderUpdate {
+                        ref symbol,
+                        ref client_order_id,
+                        ref side,
+                        ref status,
+                        qty,
+                        price,
+                        commission,
+                        realized_pnl,
+                    } => {
+                        if status == "FILLED" {
+                            info!(
+                                symbol, client_order_id, side, qty, price,
+                                commission, realized_pnl,
+                                "ORDER_TRADE_UPDATE: FILLED"
+                            );
 
-                        if position_amt.abs() < f64::EPSILON {
-                            // 仓位清零，清除高水位
-                            let key = format!("{symbol}:{position_side}");
-                            if hwm.remove(&key).is_some() {
-                                save_high_water(&hwm);
+                            // Route fill to order_router for PnL attribution
+                            let update = hft_engine::order_router::OrderUpdate {
+                                client_order_id: client_order_id.clone(),
+                                symbol: symbol.clone(),
+                                side: side.clone(),
+                                price,
+                                qty,
+                                realized_pnl,
+                                commission,
+                            };
+                            order_router.handle_order_update(&update);
+
+                            // Save ledger
+                            let _ = order_router.ledger().save(&ledger_path);
+                        }
+                    }
+                }
+            }
+
+            // Config file changes
+            Some(change) = config_rx.recv() => {
+                match change {
+                    ConfigChange::Strategy(name) => {
+                        info!(strategy = %name, "signal.json changed — note: worker restart not yet implemented, will apply on next engine restart");
+                    }
+                    ConfigChange::Trade(name) => {
+                        if let Some(rt) = runtimes.get_mut(&name) {
+                            let trade_path = rt.dir.join("trade.json");
+                            let new_override = TradeOverride::load(&trade_path);
+                            info!(
+                                strategy = %name,
+                                action = ?new_override.action,
+                                note = %new_override.note,
+                                "trade.json reloaded"
+                            );
+                            rt.trade_override = new_override;
+                            // Execute oneshot overrides immediately
+                            if let Some(exchange) = exchanges.get(&name) {
+                                execute_trade_override(
+                                    &mut rt.trade_override, &trade_path, exchange, &name, rt.last_price,
+                                ).await;
                             }
                         }
                     }
-                    UserEvent::BalanceUpdate { wallet_balance } => {
-                        tracing::info!("balance update: ${wallet_balance:.2}");
-                        total_balance = wallet_balance;
+                    ConfigChange::Risk(name) => {
+                        if let Some(rt) = runtimes.get_mut(&name) {
+                            let risk_path = rt.dir.join("risk.json");
+                            let new_risk = RiskConfig::load(&risk_path);
+                            info!(
+                                strategy = %name,
+                                max_loss = new_risk.max_loss_per_trade,
+                                max_daily_loss = new_risk.max_daily_loss,
+                                "risk.json reloaded"
+                            );
+                            rt.risk_guard = EngineRiskGuard::new(new_risk.clone(), rt.capital);
+                            rt.risk_config = new_risk;
+                        }
                     }
-                }
-            }
-            Some(()) = config_rx.recv() => {
-                // strategy.json 文件变化 → 热更新策略参数 + 重建信号过滤器
-                reload_strategy(&mut config, &mut strategy);
-                signal_filter = SignalFilter::from_config(&config);
-            }
-            Some(()) = trade_rx.recv() => {
-                // trade.json 文件变化 → 重新加载 trade override
-                if let Some(ref tp) = trade_path {
-                    let new_override = TradeOverride::load(tp);
-                    tracing::info!(
-                        action = ?new_override.action,
-                        note = %new_override.note,
-                        executed_at = ?new_override.executed_at,
-                        "trade.json reloaded"
-                    );
-                    trade_override = new_override;
-                    // 立即执行一次性指令
-                    execute_trade_override(
-                        &mut trade_override, tp, &exchange, &strategy_name, last_price,
-                    ).await;
-                }
-            }
-            Some(()) = risk_rx.recv() => {
-                // risk.json 文件变化 → 热更新风控参数
-                if let Some(ref rp) = risk_path {
-                    let new_risk = RiskConfig::load(rp);
-                    tracing::info!(
-                        max_loss = new_risk.max_loss_per_trade,
-                        max_profit = new_risk.max_profit_per_trade,
-                        max_drawdown_stop = new_risk.max_drawdown_stop,
-                        "risk.json reloaded"
-                    );
-                    risk_config = new_risk;
                 }
             }
         }
     }
 }
 
-// ── tests ─────────────────────────────────────────────────────
+// ── Tests ──────────────────────────────────────────────────────
 
 #[cfg(test)]
 mod tests {
@@ -1612,11 +1455,10 @@ mod tests {
         let raw = r#"{"stream":"ntrnusdt@markPrice@1s","data":{"e":"markPriceUpdate","s":"NTRNUSDT","p":"0.35120000"}}"#;
         let event = parse_mark_price_msg(raw).unwrap();
         match event {
-            UserEvent::MarkPrice { symbol, mark_price, funding_rate, next_funding_time } => {
+            UserEvent::MarkPrice { symbol, mark_price, funding_rate } => {
                 assert_eq!(symbol, "NTRNUSDT");
                 assert!((mark_price - 0.3512).abs() < 1e-8);
-                assert!((funding_rate - 0.0).abs() < 1e-10); // "r" 缺失时默认 0
-                assert_eq!(next_funding_time, 0); // "T" 缺失时默认 0
+                assert!((funding_rate - 0.0).abs() < 1e-10);
             }
             _ => panic!("expected MarkPrice event"),
         }
@@ -1627,11 +1469,10 @@ mod tests {
         let raw = r#"{"stream":"ntrnusdt@markPrice@1s","data":{"e":"markPriceUpdate","s":"NTRNUSDT","p":"0.35120000","r":"0.00015000","T":1774000000000}}"#;
         let event = parse_mark_price_msg(raw).unwrap();
         match event {
-            UserEvent::MarkPrice { symbol, mark_price, funding_rate, next_funding_time } => {
+            UserEvent::MarkPrice { symbol, mark_price, funding_rate } => {
                 assert_eq!(symbol, "NTRNUSDT");
                 assert!((mark_price - 0.3512).abs() < 1e-8);
                 assert!((funding_rate - 0.00015).abs() < 1e-10);
-                assert_eq!(next_funding_time, 1774000000000);
             }
             _ => panic!("expected MarkPrice event"),
         }
@@ -1646,31 +1487,6 @@ mod tests {
     fn parse_mark_price_missing_fields() {
         let raw = r#"{"data":{"e":"markPriceUpdate"}}"#;
         assert!(parse_mark_price_msg(raw).is_none());
-    }
-
-    // ── log_funding_rate ──
-
-    #[test]
-    fn log_funding_rate_creates_csv() {
-        let dir = tempfile::tempdir().unwrap();
-        let csv_path = dir.path().join("funding_rate_history.csv");
-        // 临时修改常量不可行，直接测试文件写入逻辑
-        let write_header = !csv_path.exists();
-        let mut file = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&csv_path)
-            .unwrap();
-        if write_header {
-            writeln!(file, "timestamp,symbol,funding_rate,next_funding_time").unwrap();
-        }
-        writeln!(file, "2026-03-19T10:00:00Z,NTRNUSDT,0.00015,2026-03-19T16:00:00Z").unwrap();
-        drop(file);
-
-        let content = std::fs::read_to_string(&csv_path).unwrap();
-        assert!(content.contains("timestamp,symbol,funding_rate,next_funding_time"));
-        assert!(content.contains("NTRNUSDT"));
-        assert!(content.contains("0.00015"));
     }
 
     // ── parse_user_data_msg ──
@@ -1726,10 +1542,32 @@ mod tests {
     }
 
     #[test]
-    fn parse_user_data_unknown_event() {
-        let raw = r#"{"e":"ORDER_TRADE_UPDATE","o":{}}"#;
+    fn parse_user_data_order_trade_update() {
+        let raw = r#"{"e":"ORDER_TRADE_UPDATE","o":{"s":"NTRNUSDT","c":"test-123","S":"BUY","X":"FILLED","q":"100","ap":"0.35","n":"0.01","rp":"5.0"}}"#;
         let events = parse_user_data_msg(raw);
-        assert!(events.is_empty());
+        assert_eq!(events.len(), 1);
+        match &events[0] {
+            UserEvent::OrderUpdate {
+                symbol,
+                client_order_id,
+                side,
+                status,
+                qty,
+                price,
+                commission,
+                realized_pnl,
+            } => {
+                assert_eq!(symbol, "NTRNUSDT");
+                assert_eq!(client_order_id, "test-123");
+                assert_eq!(side, "BUY");
+                assert_eq!(status, "FILLED");
+                assert!((qty - 100.0).abs() < 1e-8);
+                assert!((price - 0.35).abs() < 1e-8);
+                assert!((commission - 0.01).abs() < 1e-8);
+                assert!((realized_pnl - 5.0).abs() < 1e-8);
+            }
+            _ => panic!("expected OrderUpdate"),
+        }
     }
 
     #[test]
@@ -1745,353 +1583,71 @@ mod tests {
         assert!(events.is_empty());
     }
 
-    // ── TrackedPosition ──
+    // ── compute_order_qty ──
 
     #[test]
-    fn tracked_position_key_format() {
-        let pos = TrackedPosition {
-            symbol: "NTRNUSDT".to_string(),
-            position_side: "BOTH".to_string(),
-            position_amt: 100.0,
-            entry_price: 0.35,
-            unrealized_pnl: 0.0,
-            mark_price: 0.36,
-        };
-        assert_eq!(pos.key(), "NTRNUSDT:BOTH");
+    fn compute_qty_percent_mode() {
+        // capital=100, position_size=0.3, leverage=5, price=10
+        // qty = 100 * 0.3 * 5 / 10 = 15
+        let qty = compute_order_qty(100.0, SizingMode::Percent, Some(0.3), 5, 10.0, 1.0);
+        assert!((qty - 15.0).abs() < 1e-8);
     }
 
     #[test]
-    fn tracked_position_recalc_pnl_long() {
-        let mut pos = TrackedPosition {
-            symbol: "NTRNUSDT".to_string(),
-            position_side: "BOTH".to_string(),
-            position_amt: 100.0,
-            entry_price: 0.35,
-            unrealized_pnl: 0.0,
-            mark_price: 0.37,
-        };
-        pos.recalc_pnl();
-        assert!((pos.unrealized_pnl - 2.0).abs() < 1e-8);
+    fn compute_qty_fixed_mode() {
+        let qty = compute_order_qty(100.0, SizingMode::Fixed, Some(0.3), 5, 10.0, 42.0);
+        assert!((qty - 42.0).abs() < 1e-8);
     }
 
     #[test]
-    fn tracked_position_recalc_pnl_short() {
-        let mut pos = TrackedPosition {
-            symbol: "NTRNUSDT".to_string(),
-            position_side: "BOTH".to_string(),
-            position_amt: -100.0,
-            entry_price: 0.35,
-            unrealized_pnl: 0.0,
-            mark_price: 0.37,
-        };
-        pos.recalc_pnl();
-        assert!((pos.unrealized_pnl - (-2.0)).abs() < 1e-8);
+    fn compute_qty_zero_price_fallback() {
+        let qty = compute_order_qty(100.0, SizingMode::Percent, Some(0.3), 5, 0.0, 7.0);
+        assert!((qty - 7.0).abs() < 1e-8);
     }
 
+    // ── scan_approved_strategies ──
+
     #[test]
-    fn tracked_position_recalc_zero_mark_price() {
-        let mut pos = TrackedPosition {
-            symbol: "NTRNUSDT".to_string(),
-            position_side: "BOTH".to_string(),
-            position_amt: 100.0,
-            entry_price: 0.35,
-            unrealized_pnl: 5.0,
-            mark_price: 0.0,
-        };
-        pos.recalc_pnl();
-        assert!((pos.unrealized_pnl - 5.0).abs() < 1e-8);
+    fn scan_finds_strategies() {
+        let strategies = scan_approved_strategies();
+        // Should find at least some approved strategies in the project
+        // (test depends on actual files, but validates the scan logic runs)
+        for (name, sf) in &strategies {
+            assert_eq!(sf.status.as_deref(), Some("approved"));
+            assert!(!name.is_empty());
+        }
     }
 
-    // ── PositionTracker ──
+    // ── default_order_qty ──
 
     #[test]
-    fn position_tracker_add_and_get() {
-        let mut tracker = PositionTracker::new();
-        tracker.update_position("NTRNUSDT", "BOTH", 100.0, 0.35, 2.0);
-
-        let positions = tracker.get_positions_for_symbol("NTRNUSDT");
-        assert_eq!(positions.len(), 1);
-        assert!((positions[0].position_amt - 100.0).abs() < 1e-8);
+    fn default_qty_by_symbol() {
+        assert!((default_order_qty("BTCUSDT") - 0.001).abs() < 1e-10);
+        assert!((default_order_qty("ETHUSDT") - 0.01).abs() < 1e-10);
+        assert!((default_order_qty("DOGEUSDT") - 100.0).abs() < 1e-10);
+        assert!((default_order_qty("NTRNUSDT") - 1.0).abs() < 1e-10);
     }
 
-    #[test]
-    fn position_tracker_remove_on_zero_amt() {
-        let mut tracker = PositionTracker::new();
-        tracker.update_position("NTRNUSDT", "BOTH", 100.0, 0.35, 2.0);
-        assert_eq!(tracker.get_positions_for_symbol("NTRNUSDT").len(), 1);
-
-        tracker.update_position("NTRNUSDT", "BOTH", 0.0, 0.0, 0.0);
-        assert_eq!(tracker.get_positions_for_symbol("NTRNUSDT").len(), 0);
-    }
+    // ── log helpers (smoke tests) ──
 
     #[test]
-    fn position_tracker_mark_price_updates_pnl() {
-        let mut tracker = PositionTracker::new();
-        tracker.update_position("NTRNUSDT", "BOTH", 100.0, 0.35, 0.0);
-        tracker.update_mark_price("NTRNUSDT", 0.40);
-
-        let positions = tracker.get_positions_for_symbol("NTRNUSDT");
-        assert_eq!(positions.len(), 1);
-        assert!((positions[0].mark_price - 0.40).abs() < 1e-8);
-        assert!((positions[0].unrealized_pnl - 5.0).abs() < 1e-8);
-    }
-
-    #[test]
-    fn position_tracker_multiple_symbols() {
-        let mut tracker = PositionTracker::new();
-        tracker.update_position("NTRNUSDT", "BOTH", 100.0, 0.35, 1.0);
-        tracker.update_position("ETHUSDT", "BOTH", 0.5, 2000.0, 10.0);
-
-        assert_eq!(tracker.get_positions_for_symbol("NTRNUSDT").len(), 1);
-        assert_eq!(tracker.get_positions_for_symbol("ETHUSDT").len(), 1);
-        assert_eq!(tracker.get_positions_for_symbol("BTCUSDT").len(), 0);
-    }
-
-    #[test]
-    fn position_tracker_remove_by_key() {
-        let mut tracker = PositionTracker::new();
-        tracker.update_position("NTRNUSDT", "BOTH", 100.0, 0.35, 1.0);
-        tracker.remove("NTRNUSDT:BOTH");
-        assert_eq!(tracker.get_positions_for_symbol("NTRNUSDT").len(), 0);
-    }
-
-    // ── HighWaterMarks ──
-
-    #[test]
-    fn high_water_save_and_load() {
-        let dir = std::env::temp_dir().join("hft_test_hwm");
-        let _ = std::fs::create_dir_all(&dir);
-        let path = dir.join("test_hwm.json");
-
-        let mut hwm: HighWaterMarks = HashMap::new();
-        hwm.insert("NTRNUSDT:BOTH".to_string(), 5.0);
-        hwm.insert("ETHUSDT:BOTH".to_string(), 20.0);
-
-        let json = serde_json::to_string_pretty(&hwm).unwrap();
-        std::fs::write(&path, &json).unwrap();
-
-        let loaded: HighWaterMarks =
-            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-        assert!((loaded["NTRNUSDT:BOTH"] - 5.0).abs() < 1e-8);
-        assert!((loaded["ETHUSDT:BOTH"] - 20.0).abs() < 1e-8);
-
-        let _ = std::fs::remove_file(&path);
-        let _ = std::fs::remove_dir(&dir);
-    }
-
-    // ── log_risk_event tests ──
-
-    #[test]
-    fn log_risk_event_close_position_writes_json() {
+    fn log_funding_rate_creates_csv() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("risk_events.jsonl");
-
-        // Directly write using the same logic as log_risk_event
-        let verdict = RiskVerdict::ClosePosition("stop_loss: 5.10% >= 5.00%".to_string());
-        let (rule, detail) = match &verdict {
-            RiskVerdict::ClosePosition(r) => ("close_position", r.as_str()),
-            RiskVerdict::Block(r) => ("block", r.as_str()),
-            RiskVerdict::Pass => unreachable!(),
-        };
-        let record = serde_json::json!({
-            "ts": "2026-03-19T00:00:00Z",
-            "strategy": "test-strat",
-            "symbol": "NTRNUSDT",
-            "rule": rule,
-            "pnl": -5.2,
-            "verdict": format!("{:?}", verdict),
-            "detail": detail,
-        });
-        let mut file = OpenOptions::new().create(true).append(true).open(&path).unwrap();
-        writeln!(file, "{}", record).unwrap();
+        let csv_path = dir.path().join("funding_rate_history.csv");
+        let write_header = !csv_path.exists();
+        let mut file = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&csv_path)
+            .unwrap();
+        if write_header {
+            writeln!(file, "timestamp,symbol,funding_rate,next_funding_time").unwrap();
+        }
+        writeln!(file, "2026-03-19T10:00:00Z,NTRNUSDT,0.00015,2026-03-19T16:00:00Z").unwrap();
         drop(file);
 
-        let content = std::fs::read_to_string(&path).unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(content.trim()).unwrap();
-        assert_eq!(parsed["strategy"], "test-strat");
-        assert_eq!(parsed["symbol"], "NTRNUSDT");
-        assert_eq!(parsed["rule"], "close_position");
-        assert_eq!(parsed["pnl"], -5.2);
-        assert!(parsed["detail"].as_str().unwrap().contains("stop_loss"));
-    }
-
-    #[test]
-    fn log_risk_event_block_writes_json() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("risk_events.jsonl");
-
-        let verdict = RiskVerdict::Block("position_ratio: 40.00% > 30.00%".to_string());
-        let (rule, detail) = match &verdict {
-            RiskVerdict::Block(r) => ("block", r.as_str()),
-            _ => unreachable!(),
-        };
-        let record = serde_json::json!({
-            "ts": "2026-03-19T00:00:00Z",
-            "strategy": "test-strat",
-            "symbol": "ETHUSDT",
-            "rule": rule,
-            "pnl": 0.0,
-            "verdict": format!("{:?}", verdict),
-            "detail": detail,
-        });
-        let mut file = OpenOptions::new().create(true).append(true).open(&path).unwrap();
-        writeln!(file, "{}", record).unwrap();
-        drop(file);
-
-        let content = std::fs::read_to_string(&path).unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(content.trim()).unwrap();
-        assert_eq!(parsed["rule"], "block");
-        assert!(parsed["detail"].as_str().unwrap().contains("position_ratio"));
-    }
-
-    #[test]
-    fn log_risk_event_pass_is_noop() {
-        // Calling log_risk_event with Pass should not write anything
-        // Verify the function returns early
-        let verdict = RiskVerdict::Pass;
-        match verdict {
-            RiskVerdict::Pass => {} // log_risk_event returns early
-            _ => panic!("expected Pass"),
-        }
-    }
-
-    // ── log_signal tests ──
-
-    #[test]
-    fn log_signal_buy_writes_json() {
-        use hft_engine::types::{OrderRequest, OrderType as StratOrderType, Side as StratSide};
-
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("signals.jsonl");
-
-        let signal = Signal::Order(OrderRequest {
-            symbol: "NTRNUSDT".to_string(),
-            side: StratSide::Buy,
-            order_type: StratOrderType::Market,
-            qty: 100.0,
-            price: None,
-        });
-        let signal_str = match &signal {
-            Signal::Order(req) => format!("{:?}", req.side).to_lowercase(),
-            Signal::None => unreachable!(),
-        };
-        let indicators = serde_json::json!({"ema_fast": 0.119, "ema_slow": 0.117});
-        let record = serde_json::json!({
-            "ts": "2026-03-19T00:00:00Z",
-            "strategy": "test-strat",
-            "signal": signal_str,
-            "price": 0.118,
-            "indicators": indicators,
-            "executed": true,
-        });
-        let mut file = OpenOptions::new().create(true).append(true).open(&path).unwrap();
-        writeln!(file, "{}", record).unwrap();
-        drop(file);
-
-        let content = std::fs::read_to_string(&path).unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(content.trim()).unwrap();
-        assert_eq!(parsed["strategy"], "test-strat");
-        assert_eq!(parsed["signal"], "buy");
-        assert_eq!(parsed["price"], 0.118);
-        assert_eq!(parsed["executed"], true);
-        assert_eq!(parsed["indicators"]["ema_fast"], 0.119);
-    }
-
-    #[test]
-    fn log_signal_sell_writes_json() {
-        use hft_engine::types::{OrderRequest, OrderType as StratOrderType, Side as StratSide};
-
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("signals.jsonl");
-
-        let signal = Signal::Order(OrderRequest {
-            symbol: "ETHUSDT".to_string(),
-            side: StratSide::Sell,
-            order_type: StratOrderType::Market,
-            qty: 0.01,
-            price: None,
-        });
-        let signal_str = match &signal {
-            Signal::Order(req) => format!("{:?}", req.side).to_lowercase(),
-            Signal::None => unreachable!(),
-        };
-        let record = serde_json::json!({
-            "ts": "2026-03-19T00:00:00Z",
-            "strategy": "eth-scalp",
-            "signal": signal_str,
-            "price": 3500.0,
-            "indicators": serde_json::Value::Null,
-            "executed": false,
-        });
-        let mut file = OpenOptions::new().create(true).append(true).open(&path).unwrap();
-        writeln!(file, "{}", record).unwrap();
-        drop(file);
-
-        let content = std::fs::read_to_string(&path).unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(content.trim()).unwrap();
-        assert_eq!(parsed["signal"], "sell");
-        assert_eq!(parsed["executed"], false);
-    }
-
-    #[test]
-    fn log_signal_none_is_noop() {
-        let signal = Signal::None;
-        // log_signal returns early for Signal::None
-        match signal {
-            Signal::None => {}
-            _ => panic!("expected None"),
-        }
-    }
-
-    #[test]
-    fn log_signal_appends_multiple_lines() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("signals.jsonl");
-
-        // Write two lines
-        for i in 0..2 {
-            let record = serde_json::json!({
-                "ts": format!("2026-03-19T00:0{}:00Z", i),
-                "strategy": "test",
-                "signal": "buy",
-                "price": 0.1 + i as f64,
-                "indicators": {},
-                "executed": true,
-            });
-            let mut file = OpenOptions::new().create(true).append(true).open(&path).unwrap();
-            writeln!(file, "{}", record).unwrap();
-        }
-
-        let content = std::fs::read_to_string(&path).unwrap();
-        let lines: Vec<&str> = content.trim().lines().collect();
-        assert_eq!(lines.len(), 2);
-        // Both lines are valid JSON
-        for line in &lines {
-            let _: serde_json::Value = serde_json::from_str(line).unwrap();
-        }
-    }
-
-    #[test]
-    fn log_risk_event_appends_multiple_lines() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("risk_events.jsonl");
-
-        for i in 0..3 {
-            let record = serde_json::json!({
-                "ts": format!("2026-03-19T00:0{}:00Z", i),
-                "strategy": "test",
-                "symbol": "NTRNUSDT",
-                "rule": "close_position",
-                "pnl": -(i as f64),
-                "verdict": "ClosePosition",
-                "detail": "test",
-            });
-            let mut file = OpenOptions::new().create(true).append(true).open(&path).unwrap();
-            writeln!(file, "{}", record).unwrap();
-        }
-
-        let content = std::fs::read_to_string(&path).unwrap();
-        let lines: Vec<&str> = content.trim().lines().collect();
-        assert_eq!(lines.len(), 3);
+        let content = std::fs::read_to_string(&csv_path).unwrap();
+        assert!(content.contains("timestamp,symbol,funding_rate,next_funding_time"));
+        assert!(content.contains("NTRNUSDT"));
     }
 }
