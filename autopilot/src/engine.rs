@@ -1,7 +1,7 @@
-//! 规则引擎 — 读取状态数据，评估规则，产出决策
+//! 规则引擎 — 读取 ledger + state 数据，评估规则，产出决策
 
-use crate::config::AutopilotConfig;
-use crate::types::TradeStats;
+use crate::config;
+use crate::types::{LedgerStrategy, TradeStats};
 
 /// autopilot 对单个策略的决策
 #[derive(Debug, Clone, PartialEq)]
@@ -10,6 +10,8 @@ pub enum Decision {
     Pause { reason: String },
     /// 恢复交易（写 trade.json resume）
     Resume { reason: String },
+    /// 全平仓位（写 trade.json close_all）
+    Stop { reason: String },
     /// 扩仓（改 signal.json position_size）
     ScaleUp { new_position_size: f64, reason: String },
     /// 缩仓（改 signal.json position_size）
@@ -27,8 +29,6 @@ pub enum Decision {
 pub struct StrategySnapshot {
     pub name: String,
     pub current_position_size: f64,
-    pub capital: f64,
-    pub status: String,
     pub current_trailing_stop: f64,
 }
 
@@ -62,8 +62,6 @@ impl TrackedState {
         let new_wins = new_stats.wins.saturating_sub(self.prev_stats.wins);
         let new_losses = new_stats.losses.saturating_sub(self.prev_stats.losses);
 
-        // 逐笔推断：如果 wins 增加了，最后一笔是赢；losses 增加了，最后一笔是亏
-        // 如果同时增加了多笔，以最后变化的为准
         if new_losses > 0 && new_wins == 0 {
             self.consecutive_losses += new_losses;
             self.consecutive_wins = 0;
@@ -71,8 +69,6 @@ impl TrackedState {
             self.consecutive_wins += new_wins;
             self.consecutive_losses = 0;
         } else if new_wins > 0 && new_losses > 0 {
-            // 多笔同时更新，无法确定顺序，保守处理
-            // 如果最终是亏损的方向
             if new_stats.realized_pnl < self.prev_stats.realized_pnl {
                 self.consecutive_losses += 1;
                 self.consecutive_wins = 0;
@@ -82,7 +78,6 @@ impl TrackedState {
             }
         }
 
-        // 更新负 PnL 追踪
         if new_stats.realized_pnl < 0.0 {
             if self.negative_pnl_since.is_none() {
                 self.negative_pnl_since = Some(chrono::Utc::now().timestamp());
@@ -96,98 +91,111 @@ impl TrackedState {
     }
 }
 
-/// 评估规则，产出决策列表（按优先级排列）
+/// 评估单个策略，产出决策列表（按优先级排列）
 pub fn evaluate(
-    config: &AutopilotConfig,
     snapshot: &StrategySnapshot,
     tracked: &TrackedState,
     stats: &TradeStats,
+    ledger: Option<&LedgerStrategy>,
 ) -> Vec<Decision> {
     let mut decisions = Vec::new();
     let now = chrono::Utc::now().timestamp();
 
-    // ── 1. 停机规则（最高优先级）────────────────────────────────
-    if config.suspend_rules.auto_suspend {
-        // 总亏损超限
-        if snapshot.capital > 0.0 && stats.realized_pnl < 0.0 {
-            let loss_ratio = -stats.realized_pnl / snapshot.capital;
-            if loss_ratio >= config.suspend_rules.max_total_loss_pct {
-                decisions.push(Decision::Suspend {
-                    reason: format!(
-                        "总亏损 {:.1}% >= 阈值 {:.1}%",
-                        loss_ratio * 100.0,
-                        config.suspend_rules.max_total_loss_pct * 100.0
-                    ),
-                });
-                return decisions; // 停机后不再评估其他规则
-            }
-        }
+    let capital = ledger.map(|l| l.allocated_capital).unwrap_or(0.0);
 
-        // 持续亏损超时
-        if let Some(since) = tracked.negative_pnl_since {
-            let hours = (now - since) as f64 / 3600.0;
-            if hours >= config.suspend_rules.negative_pnl_hours as f64 {
-                decisions.push(Decision::Suspend {
-                    reason: format!(
-                        "持续亏损 {:.1}h >= 阈值 {}h",
-                        hours, config.suspend_rules.negative_pnl_hours
-                    ),
-                });
-                return decisions;
-            }
+    // ── 1. 回撤 >= 25% 配额 → stop（全平）─────────────────────
+    if let Some(ls) = ledger {
+        let dd = ls.drawdown_pct();
+        if dd >= config::DRAWDOWN_STOP_PCT {
+            decisions.push(Decision::Stop {
+                reason: format!(
+                    "回撤 {:.1}% >= {:.1}%",
+                    dd * 100.0,
+                    config::DRAWDOWN_STOP_PCT * 100.0
+                ),
+            });
+            return decisions;
         }
     }
 
-    // ── 2. 暂停/恢复规则 ────────────────────────────────────────
+    // ── 2. 总亏损超限 → suspend ────────────────────────────────
+    if let Some(ls) = ledger {
+        let loss_ratio = ls.loss_ratio();
+        if loss_ratio >= config::TOTAL_LOSS_SUSPEND_PCT {
+            decisions.push(Decision::Suspend {
+                reason: format!(
+                    "总亏损 {:.1}% >= {:.1}%",
+                    loss_ratio * 100.0,
+                    config::TOTAL_LOSS_SUSPEND_PCT * 100.0
+                ),
+            });
+            return decisions;
+        }
+    }
+
+    // ── 3. 持续亏损超时 → suspend ──────────────────────────────
+    if let Some(since) = tracked.negative_pnl_since {
+        let hours = (now - since) as f64 / 3600.0;
+        if hours >= config::NEGATIVE_PNL_SUSPEND_HOURS as f64 {
+            decisions.push(Decision::Suspend {
+                reason: format!(
+                    "持续亏损 {:.1}h >= {}h",
+                    hours, config::NEGATIVE_PNL_SUSPEND_HOURS
+                ),
+            });
+            return decisions;
+        }
+    }
+
+    // ── 4. 暂停/恢复规则 ──────────────────────────────────────
     if !tracked.paused {
-        // 连续亏损暂停
-        if tracked.consecutive_losses >= config.pause_rules.consecutive_losses {
+        // 连续亏损 → pause
+        if tracked.consecutive_losses >= config::CONSECUTIVE_LOSS_PAUSE {
             decisions.push(Decision::Pause {
                 reason: format!(
-                    "连续亏损 {} 笔 >= 阈值 {}",
-                    tracked.consecutive_losses, config.pause_rules.consecutive_losses
+                    "连续亏损 {} 笔 >= {}",
+                    tracked.consecutive_losses, config::CONSECUTIVE_LOSS_PAUSE
                 ),
             });
         }
 
-        // 日亏损暂停（用 realized_pnl 近似，engine 日切时重置 state）
-        if snapshot.capital > 0.0 && stats.realized_pnl < 0.0 {
-            let daily_loss_ratio = -stats.realized_pnl / snapshot.capital;
-            if daily_loss_ratio >= config.pause_rules.daily_loss_pct {
+        // 日损失超限 → pause
+        if capital > 0.0 && stats.realized_pnl < 0.0 {
+            let daily_loss_ratio = -stats.realized_pnl / capital;
+            if daily_loss_ratio >= config::DAILY_LOSS_PAUSE_PCT {
                 decisions.push(Decision::Pause {
                     reason: format!(
-                        "日亏损 {:.1}% >= 阈值 {:.1}%",
+                        "日亏损 {:.1}% >= {:.1}%",
                         daily_loss_ratio * 100.0,
-                        config.pause_rules.daily_loss_pct * 100.0
+                        config::DAILY_LOSS_PAUSE_PCT * 100.0
                     ),
                 });
             }
         }
-    } else if tracked.paused && config.pause_rules.auto_resume_minutes > 0 {
+    } else if config::AUTO_RESUME_MINUTES > 0 {
         // 自动恢复
         if let Some(paused_at) = tracked.paused_at {
             let elapsed_mins = (now - paused_at) as u64 / 60;
-            if elapsed_mins >= config.pause_rules.auto_resume_minutes {
+            if elapsed_mins >= config::AUTO_RESUME_MINUTES {
                 decisions.push(Decision::Resume {
                     reason: format!(
                         "暂停已 {} 分钟 >= 冷却期 {} 分钟",
-                        elapsed_mins, config.pause_rules.auto_resume_minutes
+                        elapsed_mins, config::AUTO_RESUME_MINUTES
                     ),
                 });
             }
         }
     }
 
-    // ── 3. 仓位缩放规则 ─────────────────────────────────────────
+    // ── 5. 仓位缩放规则 ──────────────────────────────────────
     let scale_on_cooldown = tracked.last_scale_at
-        .map(|t| (now - t) as u64 <= config.scaling.cooldown_secs)
+        .map(|t| (now - t) as u64 <= config::SCALE_COOLDOWN_SECS)
         .unwrap_or(false);
 
     if !scale_on_cooldown && !tracked.paused {
-        // 连续赢 → 扩仓
-        if tracked.consecutive_wins >= config.scaling.scale_up_after_wins {
-            let new_ps = (snapshot.current_position_size * config.scaling.scale_up_factor)
-                .min(config.scaling.position_size_max);
+        if tracked.consecutive_wins >= config::SCALE_UP_AFTER_WINS {
+            let new_ps = (snapshot.current_position_size * config::SCALE_UP_FACTOR)
+                .min(config::POSITION_SIZE_MAX);
             if (new_ps - snapshot.current_position_size).abs() > 0.001 {
                 decisions.push(Decision::ScaleUp {
                     new_position_size: new_ps,
@@ -201,10 +209,9 @@ pub fn evaluate(
             }
         }
 
-        // 连续亏 → 缩仓
-        if tracked.consecutive_losses >= config.scaling.scale_down_after_losses {
-            let new_ps = (snapshot.current_position_size * config.scaling.scale_down_factor)
-                .max(config.scaling.position_size_min);
+        if tracked.consecutive_losses >= config::SCALE_DOWN_AFTER_LOSSES {
+            let new_ps = (snapshot.current_position_size * config::SCALE_DOWN_FACTOR)
+                .max(config::POSITION_SIZE_MIN);
             if (new_ps - snapshot.current_position_size).abs() > 0.001 {
                 decisions.push(Decision::ScaleDown {
                     new_position_size: new_ps,
@@ -219,18 +226,13 @@ pub fn evaluate(
         }
     }
 
-    // ── 4. 风控参数动态调节 ──────────────────────────────────────
-    if stats.realized_pnl > 0.0 && config.risk_tuning.tighten_on_profit {
-        // 盈利时收紧 trailing_stop（向 min 靠近）
-        let pnl_ratio = if snapshot.capital > 0.0 {
-            stats.realized_pnl / snapshot.capital
-        } else {
-            0.0
-        };
-        // 盈利越多，trailing_stop 越紧
-        let range = config.risk_tuning.trailing_stop_max - config.risk_tuning.trailing_stop_min;
-        let target = config.risk_tuning.trailing_stop_max - (pnl_ratio * range).min(range);
-        let target = target.max(config.risk_tuning.trailing_stop_min);
+    // ── 6. 风控参数动态调节 ─────────────────────────────────────
+    // 盈利时收紧 trailing_stop（锁利），亏损时不放宽
+    if stats.realized_pnl > 0.0 && capital > 0.0 {
+        let pnl_ratio = stats.realized_pnl / capital;
+        let range = config::TRAILING_STOP_MAX - config::TRAILING_STOP_MIN;
+        let target = (config::TRAILING_STOP_MAX - (pnl_ratio * range).min(range))
+            .max(config::TRAILING_STOP_MIN);
 
         if (target - snapshot.current_trailing_stop).abs() > 0.001 {
             decisions.push(Decision::AdjustTrailingStop {
@@ -238,19 +240,6 @@ pub fn evaluate(
                 reason: format!(
                     "盈利 {:.1}%, trailing_stop {:.3} → {:.3}",
                     pnl_ratio * 100.0,
-                    snapshot.current_trailing_stop,
-                    target
-                ),
-            });
-        }
-    } else if stats.realized_pnl < 0.0 && config.risk_tuning.widen_on_loss {
-        // 亏损时放宽 trailing_stop（向 max 靠近）
-        let target = config.risk_tuning.trailing_stop_max;
-        if (target - snapshot.current_trailing_stop).abs() > 0.001 {
-            decisions.push(Decision::AdjustTrailingStop {
-                new_value: target,
-                reason: format!(
-                    "亏损中, trailing_stop {:.3} → {:.3}",
                     snapshot.current_trailing_stop,
                     target
                 ),
@@ -265,118 +254,178 @@ pub fn evaluate(
     decisions
 }
 
+/// 检查全局回撤是否接近红线
+pub fn check_global_drawdown(total_equity: f64, total_allocated: f64) -> Option<String> {
+    if total_allocated > 0.0 && total_equity < total_allocated {
+        let dd = (total_allocated - total_equity) / total_allocated;
+        if dd >= config::GLOBAL_DRAWDOWN_PAUSE_PCT {
+            return Some(format!(
+                "全局回撤 {:.1}% >= 红线 {:.1}%",
+                dd * 100.0,
+                config::GLOBAL_DRAWDOWN_PAUSE_PCT * 100.0
+            ));
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn default_config() -> AutopilotConfig {
-        serde_json::from_str(r#"{"name": "test"}"#).unwrap()
-    }
+    use crate::types::LedgerStrategy;
 
     fn default_snapshot() -> StrategySnapshot {
         StrategySnapshot {
             name: "test".to_string(),
             current_position_size: 0.30,
-            capital: 200.0,
-            status: "approved".to_string(),
             current_trailing_stop: 0.02,
+        }
+    }
+
+    fn default_ledger(capital: f64, pnl: f64) -> LedgerStrategy {
+        LedgerStrategy {
+            strategy_name: "test".into(),
+            allocated_capital: capital,
+            realized_pnl: pnl,
+            unrealized_pnl: 0.0,
+            fees_paid: 0.0,
+            funding_paid: 0.0,
+            peak_equity: capital,
         }
     }
 
     #[test]
     fn no_trades_no_action() {
-        let cfg = default_config();
         let snap = default_snapshot();
         let tracked = TrackedState::default();
         let stats = TradeStats::default();
-        let decisions = evaluate(&cfg, &snap, &tracked, &stats);
+        let ledger = default_ledger(200.0, 0.0);
+        let decisions = evaluate(&snap, &tracked, &stats, Some(&ledger));
         assert_eq!(decisions, vec![Decision::NoAction]);
     }
 
     #[test]
     fn consecutive_losses_triggers_pause() {
-        let cfg = default_config();
         let snap = default_snapshot();
         let tracked = TrackedState {
             consecutive_losses: 3,
             ..Default::default()
         };
         let stats = TradeStats { total: 3, wins: 0, losses: 3, realized_pnl: -5.0 };
-        let decisions = evaluate(&cfg, &snap, &tracked, &stats);
+        let ledger = default_ledger(200.0, -5.0);
+        let decisions = evaluate(&snap, &tracked, &stats, Some(&ledger));
         assert!(decisions.iter().any(|d| matches!(d, Decision::Pause { .. })));
     }
 
     #[test]
+    fn drawdown_triggers_stop() {
+        let snap = default_snapshot();
+        let tracked = TrackedState::default();
+        let stats = TradeStats::default();
+        // 25% drawdown: peak=200, equity=150 → dd=25%
+        let ledger = LedgerStrategy {
+            strategy_name: "test".into(),
+            allocated_capital: 200.0,
+            realized_pnl: -50.0,
+            unrealized_pnl: 0.0,
+            fees_paid: 0.0,
+            funding_paid: 0.0,
+            peak_equity: 200.0,
+        };
+        let decisions = evaluate(&snap, &tracked, &stats, Some(&ledger));
+        assert!(decisions.iter().any(|d| matches!(d, Decision::Stop { .. })));
+    }
+
+    #[test]
+    fn total_loss_triggers_suspend() {
+        let snap = default_snapshot();
+        let tracked = TrackedState::default();
+        let stats = TradeStats { total: 5, wins: 1, losses: 4, realized_pnl: -40.0 };
+        let ledger = default_ledger(200.0, -40.0);
+        let decisions = evaluate(&snap, &tracked, &stats, Some(&ledger));
+        assert!(decisions.iter().any(|d| matches!(d, Decision::Suspend { .. })));
+    }
+
+    #[test]
     fn consecutive_wins_triggers_scale_up() {
-        let cfg = default_config();
         let snap = default_snapshot();
         let tracked = TrackedState {
             consecutive_wins: 3,
             ..Default::default()
         };
         let stats = TradeStats { total: 3, wins: 3, losses: 0, realized_pnl: 10.0 };
-        let decisions = evaluate(&cfg, &snap, &tracked, &stats);
+        let ledger = default_ledger(200.0, 10.0);
+        let decisions = evaluate(&snap, &tracked, &stats, Some(&ledger));
         assert!(decisions.iter().any(|d| matches!(d, Decision::ScaleUp { .. })));
     }
 
     #[test]
     fn consecutive_losses_triggers_scale_down() {
-        let cfg = default_config();
         let snap = default_snapshot();
         let tracked = TrackedState {
             consecutive_losses: 2,
             ..Default::default()
         };
         let stats = TradeStats { total: 2, wins: 0, losses: 2, realized_pnl: -5.0 };
-        let decisions = evaluate(&cfg, &snap, &tracked, &stats);
+        let ledger = default_ledger(200.0, -5.0);
+        let decisions = evaluate(&snap, &tracked, &stats, Some(&ledger));
         assert!(decisions.iter().any(|d| matches!(d, Decision::ScaleDown { .. })));
     }
 
     #[test]
-    fn total_loss_triggers_suspend() {
-        let cfg = default_config();
-        let snap = default_snapshot();
+    fn profit_tightens_trailing_stop() {
+        let snap = StrategySnapshot {
+            current_trailing_stop: 0.05,
+            ..default_snapshot()
+        };
         let tracked = TrackedState::default();
-        // capital=200, loss=40 → 20% >= 20%
-        let stats = TradeStats { total: 5, wins: 1, losses: 4, realized_pnl: -40.0 };
-        let decisions = evaluate(&cfg, &snap, &tracked, &stats);
-        assert!(decisions.iter().any(|d| matches!(d, Decision::Suspend { .. })));
+        let stats = TradeStats { total: 5, wins: 4, losses: 1, realized_pnl: 50.0 };
+        let ledger = default_ledger(200.0, 50.0);
+        let decisions = evaluate(&snap, &tracked, &stats, Some(&ledger));
+        assert!(decisions.iter().any(|d| matches!(d, Decision::AdjustTrailingStop { .. })));
     }
 
     #[test]
-    fn position_size_clamped_to_max() {
-        let cfg = default_config(); // max = 0.50
-        let snap = StrategySnapshot {
-            current_position_size: 0.48,
-            ..default_snapshot()
-        };
-        let tracked = TrackedState {
-            consecutive_wins: 3,
-            ..Default::default()
-        };
-        let stats = TradeStats { total: 3, wins: 3, losses: 0, realized_pnl: 10.0 };
-        let decisions = evaluate(&cfg, &snap, &tracked, &stats);
-        if let Some(Decision::ScaleUp { new_position_size, .. }) = decisions.first() {
-            assert!(*new_position_size <= 0.50);
-        }
+    fn global_drawdown_detects_red_line() {
+        // total_allocated=200, equity=175 → dd=12.5% > 10%
+        let result = check_global_drawdown(175.0, 200.0);
+        assert!(result.is_some());
     }
 
     #[test]
-    fn position_size_clamped_to_min() {
-        let cfg = default_config(); // min = 0.10
-        let snap = StrategySnapshot {
-            current_position_size: 0.12,
-            ..default_snapshot()
-        };
+    fn global_drawdown_ok_when_healthy() {
+        let result = check_global_drawdown(195.0, 200.0);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn scale_cooldown_prevents_action() {
+        let snap = default_snapshot();
+        let now = chrono::Utc::now().timestamp();
         let tracked = TrackedState {
-            consecutive_losses: 2,
+            consecutive_wins: 5,
+            last_scale_at: Some(now - 100),
             ..Default::default()
         };
-        let stats = TradeStats { total: 2, wins: 0, losses: 2, realized_pnl: -5.0 };
-        let decisions = evaluate(&cfg, &snap, &tracked, &stats);
-        if let Some(Decision::ScaleDown { new_position_size, .. }) = decisions.first() {
-            assert!(*new_position_size >= 0.10);
-        }
+        let stats = TradeStats { total: 5, wins: 5, losses: 0, realized_pnl: 20.0 };
+        let ledger = default_ledger(200.0, 20.0);
+        let decisions = evaluate(&snap, &tracked, &stats, Some(&ledger));
+        assert!(!decisions.iter().any(|d| matches!(d, Decision::ScaleUp { .. })));
+    }
+
+    #[test]
+    fn paused_state_skips_pause_check() {
+        let snap = default_snapshot();
+        let tracked = TrackedState {
+            consecutive_losses: 10,
+            paused: true,
+            paused_at: Some(chrono::Utc::now().timestamp()),
+            ..Default::default()
+        };
+        let stats = TradeStats { total: 10, wins: 0, losses: 10, realized_pnl: -20.0 };
+        let ledger = default_ledger(200.0, -20.0);
+        let decisions = evaluate(&snap, &tracked, &stats, Some(&ledger));
+        assert!(!decisions.iter().any(|d| matches!(d, Decision::Pause { .. })));
     }
 
     #[test]
@@ -411,33 +460,47 @@ mod tests {
     }
 
     #[test]
-    fn scale_cooldown_prevents_action() {
-        let cfg = default_config(); // cooldown = 300s
+    fn no_ledger_still_works() {
         let snap = default_snapshot();
-        let now = chrono::Utc::now().timestamp();
-        let tracked = TrackedState {
-            consecutive_wins: 5,
-            last_scale_at: Some(now - 100), // 100s ago, within cooldown
-            ..Default::default()
-        };
-        let stats = TradeStats { total: 5, wins: 5, losses: 0, realized_pnl: 20.0 };
-        let decisions = evaluate(&cfg, &snap, &tracked, &stats);
-        assert!(!decisions.iter().any(|d| matches!(d, Decision::ScaleUp { .. })));
+        let tracked = TrackedState::default();
+        let stats = TradeStats::default();
+        let decisions = evaluate(&snap, &tracked, &stats, None);
+        assert_eq!(decisions, vec![Decision::NoAction]);
     }
 
     #[test]
-    fn paused_state_skips_pause_check() {
-        let cfg = default_config();
-        let snap = default_snapshot();
+    fn position_size_clamped_to_max() {
+        let snap = StrategySnapshot {
+            current_position_size: 0.48,
+            ..default_snapshot()
+        };
         let tracked = TrackedState {
-            consecutive_losses: 10,
-            paused: true,
-            paused_at: Some(chrono::Utc::now().timestamp()),
+            consecutive_wins: 3,
             ..Default::default()
         };
-        let stats = TradeStats { total: 10, wins: 0, losses: 10, realized_pnl: -20.0 };
-        let decisions = evaluate(&cfg, &snap, &tracked, &stats);
-        // Should not emit another Pause since already paused
-        assert!(!decisions.iter().any(|d| matches!(d, Decision::Pause { .. })));
+        let stats = TradeStats { total: 3, wins: 3, losses: 0, realized_pnl: 10.0 };
+        let ledger = default_ledger(200.0, 10.0);
+        let decisions = evaluate(&snap, &tracked, &stats, Some(&ledger));
+        if let Some(Decision::ScaleUp { new_position_size, .. }) = decisions.first() {
+            assert!(*new_position_size <= config::POSITION_SIZE_MAX);
+        }
+    }
+
+    #[test]
+    fn position_size_clamped_to_min() {
+        let snap = StrategySnapshot {
+            current_position_size: 0.12,
+            ..default_snapshot()
+        };
+        let tracked = TrackedState {
+            consecutive_losses: 2,
+            ..Default::default()
+        };
+        let stats = TradeStats { total: 2, wins: 0, losses: 2, realized_pnl: -5.0 };
+        let ledger = default_ledger(200.0, -5.0);
+        let decisions = evaluate(&snap, &tracked, &stats, Some(&ledger));
+        if let Some(Decision::ScaleDown { new_position_size, .. }) = decisions.first() {
+            assert!(*new_position_size >= config::POSITION_SIZE_MIN);
+        }
     }
 }

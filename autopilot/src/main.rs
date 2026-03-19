@@ -1,7 +1,8 @@
-//! autopilot — 算法自动调控引擎
+//! autopilot — 数据驱动的动态调控引擎
 //!
-//! 监听所有策略的 state.json 变化，根据 autopilot.json 规则自动：
+//! 读取 ledger.json + state.json + risk.json，根据硬编码规则自动：
 //! - 暂停/恢复交易（写 trade.json）
+//! - 回撤超限全平（写 trade.json close_all）
 //! - 扩仓/缩仓（改 signal.json position_size）
 //! - 调节 trailing_stop（改 risk.json）
 //! - 停机（改 signal.json status=suspended）
@@ -11,9 +12,8 @@ mod engine;
 mod types;
 mod writer;
 
-use config::AutopilotConfig;
 use engine::{Decision, StrategySnapshot, TrackedState};
-use types::{EngineState, RiskFile, StrategyFile};
+use types::{EngineState, Ledger, RiskConfig, StrategyFile};
 
 use clap::Parser;
 use notify::{EventKind, RecursiveMode, Watcher};
@@ -21,14 +21,14 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 
-/// autopilot — 算法自动调控引擎
+/// autopilot — 数据驱动的动态调控引擎
 #[derive(Parser, Debug)]
 struct Args {
     /// strategies 目录路径（默认 accounts/binance-main/portfolios/main/strategies）
     #[arg(long)]
     strategies_dir: Option<PathBuf>,
 
-    /// 周期扫描间隔（秒），用于时间相关规则
+    /// 轮询间隔（秒），用于 ledger.json 定时读取
     #[arg(long, default_value_t = 30)]
     interval: u64,
 
@@ -44,7 +44,6 @@ struct Args {
 /// 每个策略的运行时上下文
 struct StrategyContext {
     dir: PathBuf,
-    config: AutopilotConfig,
     tracked: TrackedState,
 }
 
@@ -53,6 +52,7 @@ fn main() {
     let strategies_dir = args
         .strategies_dir
         .unwrap_or_else(|| clawchat_shared::paths::strategies_dir());
+    let ledger_path = clawchat_shared::paths::records_dir().join("ledger.json");
 
     // 初始化日志
     tracing_subscriber::fmt()
@@ -64,20 +64,17 @@ fn main() {
 
     tracing::info!(
         strategies_dir = %strategies_dir.display(),
+        ledger = %ledger_path.display(),
         interval = args.interval,
         dry_run = args.dry_run,
-        "autopilot starting"
+        "autopilot starting (data-driven mode)"
     );
 
-    // 初始扫描
+    // 初始扫描：找所有 approved 策略
     let mut contexts = scan_strategies(&strategies_dir);
-    tracing::info!(count = contexts.len(), "found strategies with autopilot.json");
+    tracing::info!(count = contexts.len(), "found approved strategies");
 
-    if contexts.is_empty() {
-        tracing::warn!("no strategies with autopilot.json found, waiting for changes...");
-    }
-
-    // 启动文件监听
+    // 启动文件监听（state.json + signal.json 变化）
     let (tx, rx) = mpsc::channel::<PathBuf>();
     let tx_clone = tx.clone();
     let watch_dir = strategies_dir.clone();
@@ -92,7 +89,7 @@ fn main() {
             for path in &event.paths {
                 if let Some(filename) = path.file_name() {
                     let fname = filename.to_string_lossy();
-                    if fname == "state.json" || fname == "autopilot.json" {
+                    if fname == "state.json" || fname == "signal.json" {
                         let _ = tx_clone.send(path.clone());
                     }
                 }
@@ -113,51 +110,68 @@ fn main() {
     loop {
         match rx.recv_timeout(timeout) {
             Ok(changed_path) => {
-                // 找到对应的策略目录
                 let strategy_dir = changed_path.parent().unwrap_or(&changed_path);
                 let strategy_name = strategy_dir
                     .file_name()
                     .map(|n| n.to_string_lossy().to_string())
                     .unwrap_or_default();
 
-                // autopilot.json 变化 → 重新加载配置
-                if changed_path.ends_with("autopilot.json") {
-                    tracing::info!(strategy = %strategy_name, "autopilot.json changed, reloading");
-                    if let Some(cfg) = AutopilotConfig::load(&changed_path) {
-                        if cfg.enabled {
-                            contexts
-                                .entry(strategy_name.clone())
-                                .and_modify(|ctx| ctx.config = cfg.clone())
-                                .or_insert_with(|| StrategyContext {
-                                    dir: strategy_dir.to_path_buf(),
-                                    config: cfg,
-                                    tracked: TrackedState::default(),
-                                });
-                        } else {
-                            tracing::info!(strategy = %strategy_name, "autopilot disabled");
-                            contexts.remove(&strategy_name);
-                        }
-                    }
+                // signal.json 变化 → 可能是新策略上线或状态变更
+                if changed_path.ends_with("signal.json") {
+                    handle_signal_change(&mut contexts, &strategy_name, strategy_dir);
                     continue;
                 }
 
-                // state.json 变化 → 评估规则
+                // state.json 变化 → 评估该策略
                 if let Some(ctx) = contexts.get_mut(&strategy_name) {
-                    process_strategy(ctx, args.dry_run);
+                    let ledger = Ledger::load(&ledger_path);
+                    let ledger_strats = ledger.as_ref().map(|l| l.all_strategies());
+                    let ls = ledger_strats
+                        .as_ref()
+                        .and_then(|s| s.get(&strategy_name));
+                    process_strategy(ctx, ls, args.dry_run);
                 }
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
-                // 周期扫描：重新扫描策略目录 + 评估时间相关规则
+                // 定时轮询：读 ledger.json，评估所有策略
                 let new_contexts = scan_strategies(&strategies_dir);
                 for (name, new_ctx) in new_contexts {
-                    contexts
-                        .entry(name)
-                        .and_modify(|ctx| ctx.config = new_ctx.config.clone())
-                        .or_insert(new_ctx);
+                    contexts.entry(name).or_insert(new_ctx);
                 }
 
-                for ctx in contexts.values_mut() {
-                    process_strategy(ctx, args.dry_run);
+                let ledger = Ledger::load(&ledger_path);
+                let ledger_strats = ledger.as_ref().map(|l| l.all_strategies());
+
+                // 全局回撤检查
+                if let Some(ref l) = ledger {
+                    if let Some(reason) = engine::check_global_drawdown(
+                        l.total_equity(),
+                        l.total_allocated(),
+                    ) {
+                        tracing::warn!("{reason} — 全部策略 pause");
+                        if !args.dry_run {
+                            for ctx in contexts.values_mut() {
+                                if !ctx.tracked.paused {
+                                    let _ = writer::write_trade_json(
+                                        &ctx.dir,
+                                        "pause",
+                                        &format!("[autopilot] {reason}"),
+                                    );
+                                    ctx.tracked.paused = true;
+                                    ctx.tracked.paused_at =
+                                        Some(chrono::Utc::now().timestamp());
+                                }
+                            }
+                        }
+                        continue;
+                    }
+                }
+
+                for (name, ctx) in contexts.iter_mut() {
+                    let ls = ledger_strats
+                        .as_ref()
+                        .and_then(|s| s.get(name));
+                    process_strategy(ctx, ls, args.dry_run);
                 }
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => {
@@ -168,7 +182,36 @@ fn main() {
     }
 }
 
-/// 扫描 strategies/ 目录，找到有 autopilot.json 且 enabled 的策略
+/// signal.json 变化处理：新策略加入/状态变更
+fn handle_signal_change(
+    contexts: &mut HashMap<String, StrategyContext>,
+    strategy_name: &str,
+    strategy_dir: &Path,
+) {
+    let signal_path = strategy_dir.join("signal.json");
+    let Ok(contents) = std::fs::read_to_string(&signal_path) else { return };
+    let Ok(sf) = serde_json::from_str::<StrategyFile>(&contents) else { return };
+
+    let status = sf.status.as_deref().unwrap_or("");
+    if status == "approved" {
+        if !contexts.contains_key(strategy_name) {
+            tracing::info!(strategy = %strategy_name, "new strategy detected");
+            contexts.insert(
+                strategy_name.to_string(),
+                StrategyContext {
+                    dir: strategy_dir.to_path_buf(),
+                    tracked: TrackedState::default(),
+                },
+            );
+        }
+    } else if status == "suspended" {
+        if contexts.remove(strategy_name).is_some() {
+            tracing::info!(strategy = %strategy_name, "strategy suspended, removed from watch");
+        }
+    }
+}
+
+/// 扫描 strategies/ 目录，找到 approved 策略（不需要 autopilot.json）
 fn scan_strategies(strategies_dir: &Path) -> HashMap<String, StrategyContext> {
     let mut result = HashMap::new();
 
@@ -186,52 +229,43 @@ fn scan_strategies(strategies_dir: &Path) -> HashMap<String, StrategyContext> {
             continue;
         }
 
-        let autopilot_path = dir.join("autopilot.json");
-        if !autopilot_path.exists() {
-            continue;
-        }
-
-        let Some(config) = AutopilotConfig::load(&autopilot_path) else {
-            continue;
-        };
-
-        if !config.enabled {
-            continue;
-        }
-
-        // 只监控 approved/active 状态的策略
         let strategy_path = dir.join("signal.json");
         if let Ok(contents) = std::fs::read_to_string(&strategy_path) {
             if let Ok(sf) = serde_json::from_str::<StrategyFile>(&contents) {
                 let status = sf.status.as_deref().unwrap_or("");
-                if status != "approved" && status != "active" {
+                if status != "approved" {
                     continue;
                 }
+
+                let name = dir
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+
+                result.insert(
+                    name,
+                    StrategyContext {
+                        dir,
+                        tracked: TrackedState::default(),
+                    },
+                );
             }
         }
-
-        let name = dir
-            .file_name()
-            .map(|n| n.to_string_lossy().to_string())
-            .unwrap_or_default();
-
-        tracing::info!(strategy = %name, "autopilot enabled");
-        result.insert(
-            name,
-            StrategyContext {
-                dir,
-                config,
-                tracked: TrackedState::default(),
-            },
-        );
     }
 
     result
 }
 
 /// 处理单个策略：加载数据 → 评估规则 → 执行决策
-fn process_strategy(ctx: &mut StrategyContext, dry_run: bool) {
-    let name = &ctx.config.name;
+fn process_strategy(
+    ctx: &mut StrategyContext,
+    ledger_strat: Option<&types::LedgerStrategy>,
+    dry_run: bool,
+) {
+    let strategy_name = ctx.dir
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
 
     // 加载 state.json
     let state_path = ctx.dir.join("state.json");
@@ -239,54 +273,50 @@ fn process_strategy(ctx: &mut StrategyContext, dry_run: bool) {
         Ok(contents) => match serde_json::from_str(&contents) {
             Ok(s) => s,
             Err(e) => {
-                tracing::warn!(strategy = %name, "parse state.json: {e}");
+                tracing::warn!(strategy = %strategy_name, "parse state.json: {e}");
                 return;
             }
         },
-        Err(_) => return, // 引擎未运行，没有 state.json
+        Err(_) => return, // 引擎未运行
     };
 
     // 检测新交易
-    let has_new_trades = ctx.tracked.update_from_stats(&state.trade_stats);
-    if !has_new_trades && ctx.tracked.prev_stats.total > 0 {
-        // 没有新交易且不是首次加载，跳过（除非是定时扫描）
-        // 定时扫描由 timeout 触发，也会进入这里用于时间相关规则
-    }
+    ctx.tracked.update_from_stats(&state.trade_stats);
 
-    // 加载 signal.json
+    // 加载 signal.json 获取 position_size
     let strategy_path = ctx.dir.join("signal.json");
     let strategy: StrategyFile = match std::fs::read_to_string(&strategy_path) {
         Ok(contents) => match serde_json::from_str(&contents) {
             Ok(s) => s,
             Err(e) => {
-                tracing::warn!(strategy = %name, "parse signal.json: {e}");
+                tracing::warn!(strategy = %strategy_name, "parse signal.json: {e}");
                 return;
             }
         },
         Err(e) => {
-            tracing::warn!(strategy = %name, "read signal.json: {e}");
+            tracing::warn!(strategy = %strategy_name, "read signal.json: {e}");
             return;
         }
     };
 
     // 加载 risk.json
     let risk_path = ctx.dir.join("risk.json");
-    let risk: RiskFile = match std::fs::read_to_string(&risk_path) {
-        Ok(contents) => serde_json::from_str(&contents).unwrap_or_default(),
-        Err(_) => RiskFile::default(),
-    };
+    let risk = RiskConfig::load(&risk_path);
 
     // 构建快照
     let snapshot = StrategySnapshot {
-        name: name.clone(),
+        name: strategy_name.clone(),
         current_position_size: strategy.position_size.unwrap_or(0.3),
-        capital: 200.0, // TODO: 从 signal.json capital 字段读
-        status: strategy.status.unwrap_or_default(),
         current_trailing_stop: risk.trailing_stop,
     };
 
     // 评估规则
-    let decisions = engine::evaluate(&ctx.config, &snapshot, &ctx.tracked, &state.trade_stats);
+    let decisions = engine::evaluate(
+        &snapshot,
+        &ctx.tracked,
+        &state.trade_stats,
+        ledger_strat,
+    );
 
     // 执行决策
     for decision in &decisions {
@@ -294,10 +324,10 @@ fn process_strategy(ctx: &mut StrategyContext, dry_run: bool) {
             continue;
         }
 
-        tracing::info!(strategy = %name, decision = ?decision, "autopilot decision");
+        tracing::info!(strategy = %strategy_name, decision = ?decision, "autopilot decision");
 
         if dry_run {
-            tracing::info!(strategy = %name, "[DRY-RUN] would execute: {decision:?}");
+            tracing::info!(strategy = %strategy_name, "[DRY-RUN] would execute: {decision:?}");
             continue;
         }
 
@@ -308,7 +338,7 @@ fn process_strategy(ctx: &mut StrategyContext, dry_run: bool) {
                     "pause",
                     &format!("[autopilot] {reason}"),
                 ) {
-                    tracing::error!(strategy = %name, "write trade.json: {e}");
+                    tracing::error!(strategy = %strategy_name, "write trade.json: {e}");
                 }
                 ctx.tracked.paused = true;
                 ctx.tracked.paused_at = Some(chrono::Utc::now().timestamp());
@@ -319,60 +349,54 @@ fn process_strategy(ctx: &mut StrategyContext, dry_run: bool) {
                     "resume",
                     &format!("[autopilot] {reason}"),
                 ) {
-                    tracing::error!(strategy = %name, "write trade.json: {e}");
+                    tracing::error!(strategy = %strategy_name, "write trade.json: {e}");
                 }
                 ctx.tracked.paused = false;
                 ctx.tracked.paused_at = None;
-                // 恢复后重置连续亏损计数
                 ctx.tracked.consecutive_losses = 0;
+            }
+            Decision::Stop { reason } => {
+                if let Err(e) = writer::write_trade_json(
+                    &ctx.dir,
+                    "close_all",
+                    &format!("[autopilot] {reason}"),
+                ) {
+                    tracing::error!(strategy = %strategy_name, "write trade.json: {e}");
+                }
             }
             Decision::ScaleUp { new_position_size, reason } => {
                 if let Err(e) = writer::update_position_size(&ctx.dir, *new_position_size) {
-                    tracing::error!(strategy = %name, "update position_size: {e}");
+                    tracing::error!(strategy = %strategy_name, "update position_size: {e}");
                 } else {
-                    tracing::info!(strategy = %name, reason, "scaled up");
+                    tracing::info!(strategy = %strategy_name, reason, "scaled up");
                     ctx.tracked.last_scale_at = Some(chrono::Utc::now().timestamp());
-                    ctx.tracked.consecutive_wins = 0; // 重置，等下一轮积累
+                    ctx.tracked.consecutive_wins = 0;
                 }
             }
             Decision::ScaleDown { new_position_size, reason } => {
                 if let Err(e) = writer::update_position_size(&ctx.dir, *new_position_size) {
-                    tracing::error!(strategy = %name, "update position_size: {e}");
+                    tracing::error!(strategy = %strategy_name, "update position_size: {e}");
                 } else {
-                    tracing::info!(strategy = %name, reason, "scaled down");
+                    tracing::info!(strategy = %strategy_name, reason, "scaled down");
                     ctx.tracked.last_scale_at = Some(chrono::Utc::now().timestamp());
                     ctx.tracked.consecutive_losses = 0;
                 }
             }
             Decision::Suspend { reason } => {
                 if let Err(e) = writer::update_strategy_status(&ctx.dir, "suspended") {
-                    tracing::error!(strategy = %name, "update status: {e}");
+                    tracing::error!(strategy = %strategy_name, "update status: {e}");
                 } else {
-                    tracing::warn!(strategy = %name, reason, "SUSPENDED by autopilot");
+                    tracing::warn!(strategy = %strategy_name, reason, "SUSPENDED by autopilot");
                 }
             }
             Decision::AdjustTrailingStop { new_value, reason } => {
                 if let Err(e) = writer::update_trailing_stop(&ctx.dir, *new_value) {
-                    tracing::error!(strategy = %name, "update trailing_stop: {e}");
+                    tracing::error!(strategy = %strategy_name, "update trailing_stop: {e}");
                 } else {
-                    tracing::info!(strategy = %name, reason, "adjusted trailing_stop");
+                    tracing::info!(strategy = %strategy_name, reason, "adjusted trailing_stop");
                 }
             }
             Decision::NoAction => {}
         }
     }
-}
-
-/// 记录 autopilot 决策到日志文件（审计追踪）
-#[allow(dead_code)]
-fn log_decision(strategy_dir: &Path, strategy_name: &str, decision: &Decision) {
-    let log_path = strategy_dir.join("autopilot.log");
-    let timestamp = chrono::Utc::now()
-        .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
-    let line = format!("{timestamp} [{strategy_name}] {decision:?}\n");
-    let _ = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&log_path)
-        .and_then(|mut f| std::io::Write::write_all(&mut f, line.as_bytes()));
 }

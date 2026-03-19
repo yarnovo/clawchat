@@ -16,7 +16,7 @@ hft: ## Run multi-strategy engine (per-strategy mode from signal.json)
 # === Autopilot (Rust) ===
 
 autopilot: ## Run autopilot (algorithm-driven trade control)
-	cargo run --release -p autopilot -- --strategies-dir strategies
+	cargo run --release -p autopilot
 
 # === CLI (Rust) ===
 
@@ -134,7 +134,7 @@ start-autopilot: ## Start autopilot in background
 	@if [ -f .pid/autopilot.pid ] && kill -0 $$(cat .pid/autopilot.pid) 2>/dev/null; then \
 		echo "Autopilot 已在运行 (PID $$(cat .pid/autopilot.pid))"; \
 	else \
-		nohup cargo run --release -p autopilot -- --strategies-dir strategies > logs/autopilot.log 2>&1 & \
+		nohup cargo run --release -p autopilot > logs/autopilot.log 2>&1 & \
 		echo $$! > .pid/autopilot.pid; \
 		echo "Autopilot 已启动 (PID $$!)"; \
 		echo "日志: logs/autopilot.log"; \
